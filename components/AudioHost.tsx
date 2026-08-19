@@ -9,11 +9,11 @@ type Props={enabled:boolean};
 
 export default function AudioHost({enabled}:Props){
  const [open,setOpen]=useState(false),[active,setActive]=useState(false),[muted,setMuted]=useState(false);
- const [input,setInput]=useState(85),[output,setOutput]=useState(80),[sensitivity,setSensitivity]=useState(38);
+ const [input,setInput]=useState(125),[output,setOutput]=useState(80),[sensitivity,setSensitivity]=useState(38);
  const [noise,setNoise]=useState(true),[echo,setEcho]=useState(true),[agc,setAgc]=useState(true),[level,setLevel]=useState(0);
  const [devices,setDevices]=useState<MediaDeviceInfo[]>([]),[micId,setMicId]=useState(""),[speakerId,setSpeakerId]=useState("");
  const [testing,setTesting]=useState(false);
- const stream=useRef<MediaStream|null>(null),ctx=useRef<AudioContext|null>(null),raf=useRef<number|undefined>(undefined);
+ const stream=useRef<MediaStream|null>(null),ctx=useRef<AudioContext|null>(null),gain=useRef<GainNode|null>(null),raf=useRef<number|undefined>(undefined);
  const testStream=useRef<MediaStream|null>(null),testAudio=useRef<HTMLAudioElement|null>(null);
 
  async function refreshDevices(){
@@ -36,13 +36,23 @@ export default function AudioHost({enabled}:Props){
   ctx.current=null;
   setLevel(0);
  }
- function startMeter(s:MediaStream){
+ function startMeter(s:MediaStream,monitor=false){
   stopMeter();
   const ac=new AudioContext();
   ctx.current=ac;
-  const src=ac.createMediaStreamSource(s),an=ac.createAnalyser();
+  const src=ac.createMediaStreamSource(s),inputGain=ac.createGain(),an=ac.createAnalyser();
+  gain.current=inputGain;
+  inputGain.gain.value=input/100;
   an.fftSize=256;
-  src.connect(an);
+  src.connect(inputGain);
+  inputGain.connect(an);
+  if(monitor){
+   const destination=ac.createMediaStreamDestination();
+   inputGain.connect(destination);
+   const audio=testAudio.current;
+   if(audio){audio.srcObject=destination.stream;audio.volume=output/100}
+   ac.resume().catch(()=>{});
+  }
   const data=new Uint8Array(an.frequencyBinCount);
   const tick=()=>{
    an.getByteFrequencyData(data);
@@ -61,7 +71,7 @@ export default function AudioHost({enabled}:Props){
    s.getAudioTracks().forEach(t=>t.enabled=!muted);
    setActive(true);
    await refreshDevices();
-   startMeter(s);
+  startMeter(s);
   }catch(e){
    console.error(e);
    setActive(false);
@@ -85,14 +95,11 @@ export default function AudioHost({enabled}:Props){
    stopMicTest();
    const s=await navigator.mediaDevices.getUserMedia({audio:constraints(),video:false});
    testStream.current=s;
-   setTesting(true);
-   startMeter(s);
-
    const audio=new Audio();
    testAudio.current=audio;
    audio.autoplay=true;
-   audio.volume=output/100;
-   audio.srcObject=s;
+  setTesting(true);
+  startMeter(s,true);
 
    const anyAudio=audio as HTMLAudioElement & {setSinkId?:(id:string)=>Promise<void>};
    if(speakerId && anyAudio.setSinkId){
@@ -112,12 +119,16 @@ export default function AudioHost({enabled}:Props){
   testAudio.current=null;
   testStream.current?.getTracks().forEach(t=>t.stop());
   testStream.current=null;
-  if(!active)stopMeter();
+  stopMeter();
+  if(active&&stream.current)startMeter(stream.current);
   setTesting(false);
  }
  useEffect(()=>{refreshDevices().catch(()=>{});return()=>disconnect()},[]);
  useEffect(()=>{if(active)connect()},[micId,noise,echo,agc]);
- useEffect(()=>{if(testAudio.current)testAudio.current.volume=output/100},[output]);
+ useEffect(()=>{
+  if(testAudio.current)testAudio.current.volume=output/100;
+  if(gain.current)gain.current.gain.value=input/100;
+ },[input,output]);
 
  return <>
  <div className="voice-engine compact">
@@ -160,14 +171,14 @@ export default function AudioHost({enabled}:Props){
 
     <section className="voice-group">
      <div className="voice-group-title"><AudioLines size={15}/><div><b>Entrada</b><span>Volume e detecção de voz</span></div></div>
-     <label>Volume do microfone <b>{input}%</b><input type="range" min="0" max="100" value={input} onChange={e=>setInput(+e.target.value)}/></label>
+    <label>Volume do microfone <b>{input}%</b><input type="range" min="0" max="200" value={input} onChange={e=>setInput(+e.target.value)}/></label>
      <label>Sensibilidade <b>{sensitivity}%</b><input type="range" min="1" max="100" value={sensitivity} onChange={e=>setSensitivity(+e.target.value)}/></label>
      <div className="voice-meter large"><i style={{width:`${Math.max(2,level)}%`}}/><span>{level>sensitivity?"Sua voz está sendo detectada":"Fale para calibrar"}</span></div>
     </section>
 
     <section className="voice-group">
      <div className="voice-group-title"><Volume2 size={15}/><div><b>Saída</b><span>Volume do áudio recebido</span></div></div>
-     <label>Volume de saída <b>{output}%</b><input type="range" min="0" max="100" value={output} onChange={e=>setOutput(+e.target.value)}/></label>
+    <label>Volume de saída <b>{output}%</b><input type="range" min="0" max="150" value={output} onChange={e=>setOutput(+e.target.value)}/></label>
     </section>
 
     <section className="voice-group">
