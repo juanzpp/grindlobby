@@ -5,6 +5,10 @@ import {voiceIceServers} from "@/lib/webrtc/config";
 type Signal={id:number;sender_id:string;target_id:string|null;signal_type:"offer"|"answer"|"ice-candidate"|"leave";payload:RTCSessionDescriptionInit|RTCIceCandidateInit};
 export type RemoteVoicePeer={userId:string;stream:MediaStream|null;status:"Connecting"|"Connected"|"Reconnecting";speaking:boolean;volume:number;muted:boolean};
 
+declare global{
+ interface Window{__GRINDLOBBY_VOICE_DEBUG__?:boolean}
+}
+
 type PeerEntry={pc:RTCPeerConnection;remoteStream:MediaStream|null;iceQueue:RTCIceCandidateInit[];retryTimer?:number;disconnectTimer?:number;statsTimer?:number;lastStats?:{timestamp:number;bytesSent:number;bytesReceived:number};answering?:boolean;lastOffer?:string;analyser?:AnalyserNode;audioContext?:AudioContext;raf?:number};
 
 const voiceDebug=process.env.NODE_ENV==="development"||process.env.NEXT_PUBLIC_VOICE_DEBUG==="true";
@@ -277,6 +281,11 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,members:string[]
   entries.current.clear();
   setRemotePeers([]);
  }
+ useEffect(()=>{
+  if(!productionVoiceDebug||window.__GRINDLOBBY_VOICE_DEBUG__)return;
+  window.__GRINDLOBBY_VOICE_DEBUG__=true;
+  console.debug("[GrindLobby Voice] debug-enabled");
+ },[]);
  useEffect(()=>{
   mounted.current=true;
   return()=>{
