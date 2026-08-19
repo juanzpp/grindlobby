@@ -1,0 +1,179 @@
+@import url("https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,600;0,700;1,700&family=Inter:wght@400;500;600;700&display=swap");
+
+:root{
+  --gl-background:.13 .035 285;
+  --gl-foreground:.96 .01 285;
+  --gl-card:.17 .04 285;
+  --gl-panel:.20 .045 288;
+  --gl-primary:.58 .24 300;
+  --gl-primary-glow:.72 .20 305;
+  --gl-secondary:.24 .05 288;
+  --gl-muted:.24 .045 288;
+  --gl-muted-foreground:.68 .03 290;
+  --gl-accent:.30 .09 295;
+  --gl-destructive:.60 .22 20;
+  --gl-success:.75 .18 155;
+  --gl-warning:.80 .16 85;
+  --gl-border:.30 .05 290;
+  --gl-input:.28 .05 290;
+  --gl-gradient-primary:linear-gradient(120deg,oklch(var(--gl-primary)),oklch(var(--gl-primary-glow)));
+  --gl-gradient-hero:radial-gradient(120% 140% at 20% 10%,oklch(.32 .13 300/.75),transparent 60%),linear-gradient(120deg,oklch(.18 .06 290),oklch(.15 .04 285));
+  --gl-shadow-glow:0 0 30px oklch(var(--gl-primary)/.45);
+  --gl-shadow-panel:0 12px 34px oklch(.08 .03 285/.6);
+}
+
+html{background:oklch(var(--gl-background));}
+body{background:oklch(var(--gl-background));color:oklch(var(--gl-foreground));font-family:"Inter",ui-sans-serif,system-ui,sans-serif;}
+h1,h2,h3,h4,.font-display{font-family:"Chakra Petch","Inter",ui-sans-serif,system-ui,sans-serif;}
+
+.lovable-surface{min-height:100svh;background:radial-gradient(circle at 82% -20%,oklch(var(--gl-primary)/.10),transparent 30%),oklch(var(--gl-background));color:oklch(var(--gl-foreground));}
+.lovable-panel{border:1px solid oklch(var(--gl-border));border-radius:1rem;background:oklch(var(--gl-card));box-shadow:var(--gl-shadow-panel);}
+.lovable-hero{background-image:var(--gl-gradient-hero);}
+.lovable-label{font-size:.6875rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:oklch(var(--gl-muted-foreground));}
+.lovable-btn-primary{background-image:var(--gl-gradient-primary);color:#fff;box-shadow:var(--gl-shadow-glow);transition:filter .2s ease,transform .2s ease,opacity .2s ease;}
+.lovable-btn-primary:hover:not(:disabled){filter:brightness(1.08);transform:translateY(-1px);}
+.lovable-btn-ghost{border:1px solid oklch(var(--gl-border));background:oklch(var(--gl-secondary));color:oklch(var(--gl-foreground));transition:background-color .2s ease,border-color .2s ease;}
+.lovable-btn-ghost:hover:not(:disabled){border-color:oklch(var(--gl-primary)/.55);background:oklch(var(--gl-accent));}
+.lovable-btn-primary:disabled,.lovable-btn-ghost:disabled{cursor:not-allowed;opacity:.55;}
+.lovable-feedback{border-radius:.7rem;padding:.65rem .8rem;font-size:.78rem;line-height:1.45;}
+.lovable-feedback-error{border:1px solid oklch(var(--gl-destructive)/.45);background:oklch(var(--gl-destructive)/.12);color:#fca5a5;}
+.lovable-feedback-success{border:1px solid oklch(var(--gl-success)/.32);background:oklch(var(--gl-success)/.08);color:oklch(var(--gl-success));}
+
+.lovable-brand{display:flex;flex-direction:column;align-items:center;gap:.65rem;color:oklch(var(--gl-foreground));}
+.lovable-brand-emblem{object-fit:contain;filter:drop-shadow(0 0 18px oklch(var(--gl-primary)/.6));}
+.lovable-brand>span{font-size:1.5rem;font-style:italic;font-weight:700;letter-spacing:-.035em;white-space:nowrap;}
+.lovable-brand>span b{color:oklch(var(--gl-primary-glow));}
+.lovable-brand-compact{display:inline-flex;flex-direction:row;gap:.4rem;}
+
+/* Login / auth imported from Lovable, wired to the existing Supabase routes. */
+.lovable-login{position:relative;min-height:100svh;overflow:hidden;background:oklch(var(--gl-background));}
+.lovable-login-grid{display:grid;min-height:100svh;grid-template-columns:minmax(0,1.15fr) minmax(420px,.85fr);align-items:center;gap:3.5rem;padding:2.5rem 3.5rem;}
+.lovable-login-hero{position:relative;display:flex;min-width:0;flex-direction:column;align-items:center;transition:opacity .45s ease,filter .7s ease,transform 1.15s cubic-bezier(.2,.75,.2,1);}
+.lovable-login-art{position:relative;width:100%;max-width:620px;}
+.lovable-login-art::before{content:"";position:absolute;inset:10%;border-radius:50%;background:radial-gradient(circle,oklch(var(--gl-primary)/.42),transparent 67%);filter:blur(42px);opacity:.76;}
+.lovable-login-art img{position:relative;width:100%;height:auto;object-fit:contain;mask-image:radial-gradient(72% 72% at 50% 45%,#000,transparent);}
+.lovable-login-core{position:absolute;left:50%;bottom:15%;width:3px;height:3px;transform:translateX(-50%);border-radius:50%;background:oklch(var(--gl-primary-glow));box-shadow:0 0 30px 16px oklch(var(--gl-primary-glow)/.46);}
+.lovable-login-wordmark{margin-top:-1rem;font-size:clamp(2rem,4vw,3.75rem);font-weight:600;letter-spacing:.34em;line-height:1;color:oklch(var(--gl-foreground));text-indent:.34em;}
+.lovable-login-divider{display:flex;align-items:center;gap:.75rem;margin:1.3rem 0;color:oklch(var(--gl-primary-glow));}
+.lovable-login-divider span{width:clamp(6rem,12vw,10rem);height:1px;background:oklch(var(--gl-border));}
+.lovable-login-divider b{font-size:.75rem;transform:rotate(45deg);}
+.lovable-login-tagline{font-size:1rem;font-weight:700;letter-spacing:.28em;text-transform:uppercase;color:oklch(var(--gl-primary-glow));}
+.lovable-login-copy{margin-top:1rem;text-align:center;font-size:.875rem;line-height:1.55;color:oklch(var(--gl-muted-foreground));}
+.lovable-login-card{position:relative;width:100%;max-width:520px;justify-self:center;border:1px solid oklch(var(--gl-border));border-radius:1rem;background:oklch(var(--gl-card)/.92);padding:2rem 2.25rem;box-shadow:var(--gl-shadow-panel);backdrop-filter:blur(24px);transition:opacity .35s ease,filter .45s ease,transform .55s ease;}
+.lovable-login-card-head{display:flex;flex-direction:column;align-items:center;text-align:center;}
+.lovable-login-mini-logo{width:6rem;height:6rem;object-fit:contain;filter:drop-shadow(0 0 20px oklch(var(--gl-primary)/.58));}
+.lovable-login-card-head h1{margin-top:.45rem;font-size:1.5rem;letter-spacing:.32em;text-indent:.32em;}
+.lovable-login-card-head p{margin-top:.7rem;font-size:.875rem;line-height:1.5;color:oklch(var(--gl-muted-foreground));}
+.lovable-login-form{display:grid;gap:1.05rem;margin-top:1.65rem;}
+.lovable-field>span:first-child,.auth-label{display:block;font-size:.6875rem;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:oklch(var(--gl-muted-foreground));}
+.lovable-input-wrap{display:flex;height:3rem;align-items:center;gap:.75rem;margin-top:.45rem;border:1px solid oklch(var(--gl-input));border-radius:.55rem;background:oklch(var(--gl-secondary)/.6);padding:0 .8rem;transition:border-color .2s ease,box-shadow .2s ease;}
+.lovable-input-wrap:focus-within{border-color:oklch(var(--gl-primary)/.75);box-shadow:0 0 0 3px oklch(var(--gl-primary)/.12);}
+.lovable-input-wrap svg{flex:none;color:oklch(var(--gl-muted-foreground));}
+.lovable-input-wrap input{height:100%;min-width:0;flex:1;border:0;background:transparent;color:oklch(var(--gl-foreground));font-size:.875rem;outline:0;}
+.lovable-input-wrap input::placeholder{color:oklch(var(--gl-muted-foreground)/.75);}
+.lovable-password-toggle{display:grid;width:2rem;height:2rem;place-items:center;color:oklch(var(--gl-muted-foreground));}
+.lovable-login-options{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.75rem;font-size:.875rem;}
+.lovable-toggle{display:flex;align-items:center;gap:.5rem;color:oklch(var(--gl-muted-foreground));}
+.lovable-toggle>span:first-child{display:grid;width:1.25rem;height:1.25rem;place-items:center;border:1px solid oklch(var(--gl-border));border-radius:5px;background:oklch(var(--gl-secondary));font-size:.7rem;font-weight:800;}
+.lovable-toggle.is-checked>span:first-child{border-color:transparent;background:oklch(var(--gl-primary));color:#fff;}
+.lovable-toggle b{font-weight:500;color:oklch(var(--gl-foreground));}
+.lovable-login-submit{display:flex;height:3.5rem;width:100%;align-items:center;justify-content:center;gap:.75rem;border-radius:.75rem;font-weight:600;}
+.lovable-login-forgot{text-align:center;font-size:.875rem;color:oklch(var(--gl-primary-glow));text-decoration:underline;text-underline-offset:4px;}
+.lovable-confirmation{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem;margin-top:1.55rem;border-top:1px solid oklch(var(--gl-border));padding-top:1.35rem;}
+.lovable-confirmation-icon{display:grid;width:2.75rem;height:2.75rem;flex:none;place-items:center;border-radius:.55rem;background:oklch(var(--gl-secondary));color:oklch(var(--gl-primary-glow));}
+.lovable-confirmation>div{min-width:180px;flex:1;}
+.lovable-confirmation strong{font-size:.875rem;}
+.lovable-confirmation p{margin-top:.15rem;font-size:.75rem;color:oklch(var(--gl-muted-foreground));}
+.lovable-confirmation button{border:1px solid oklch(var(--gl-border));border-radius:.55rem;background:oklch(var(--gl-secondary));padding:.65rem 1rem;font-size:.8rem;color:oklch(var(--gl-primary-glow));}
+.lovable-login-footer{margin-top:1.55rem;text-align:center;color:oklch(var(--gl-muted-foreground));}
+.lovable-login-footer p{display:flex;align-items:center;justify-content:center;gap:.5rem;font-size:.875rem;}
+.lovable-login-footer a{font-weight:700;color:oklch(var(--gl-primary-glow));}
+.lovable-login-footer small{display:flex;align-items:center;justify-content:center;gap:.5rem;margin-top:.9rem;font-size:.7rem;}
+.lovable-login.is-entering .lovable-login-card{opacity:0;filter:blur(8px);transform:translateX(3rem) scale(.97);}
+.lovable-login.is-entering .lovable-login-hero{filter:brightness(1.55) saturate(1.25);transform:scale(2.5) translateX(12%);}
+.lovable-login.is-entering .lovable-login-core{animation:lovablePortalSurge 1.15s ease-in forwards;}
+.lovable-login-flash{position:fixed;inset:0;z-index:70;pointer-events:none;background:radial-gradient(circle at 28% 52%,oklch(.78 .19 305/.95),transparent 55%);animation:lovablePortalFlash 1.15s ease-in forwards;}
+@keyframes lovablePortalSurge{to{box-shadow:0 0 220px 170px oklch(var(--gl-primary-glow)/.94);transform:translateX(-50%) scale(40)}}
+@keyframes lovablePortalFlash{0%{opacity:0}68%{opacity:.62}100%{opacity:1;background:oklch(.78 .19 305)}}
+
+/* Shared auth pages keep their existing API behavior inside the Lovable shell. */
+.auth-shell{background:oklch(var(--gl-background));}
+.auth-visual{background:radial-gradient(circle at 50% 40%,oklch(var(--gl-primary)/.25),transparent 35%),url('/lovable/login-portal.jpg') center/cover no-repeat;}
+.auth-visual::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent 50%,oklch(var(--gl-background)/.8));pointer-events:none;}
+.auth-visual>.gl-logo,.auth-gateway{display:none;}
+.auth-visual-copy{z-index:2;}
+.auth-card{border-color:oklch(var(--gl-border));background:oklch(var(--gl-card)/.95);box-shadow:var(--gl-shadow-panel);}
+.auth-mobile-logo .gl-logo-symbol{filter:drop-shadow(0 0 18px oklch(var(--gl-primary)/.55));}
+.auth-input,.settings-label select{border-color:oklch(var(--gl-input));background:oklch(var(--gl-secondary)/.6);}
+.auth-input:focus{border-color:oklch(var(--gl-primary));box-shadow:0 0 0 3px oklch(var(--gl-primary)/.12);}
+.auth-primary{background-image:var(--gl-gradient-primary);box-shadow:var(--gl-shadow-glow);}
+
+/* Dashboard */
+.lovable-dashboard-sidebar{position:sticky;top:0;height:100svh;overflow-y:auto;}
+.lovable-sidebar-nav button,.lovable-mobile-nav button{transition:background-color .2s ease,color .2s ease,border-color .2s ease,box-shadow .2s ease;}
+.lovable-dashboard-main{min-width:0;}
+.lovable-rank-emblem{filter:drop-shadow(0 0 45px oklch(var(--gl-primary)/.55));}
+.lovable-rank-progress{background:linear-gradient(90deg,oklch(var(--gl-primary)),oklch(var(--gl-primary-glow)));}
+.lovable-level-ring{background:conic-gradient(oklch(var(--gl-primary-glow)) var(--level-progress),oklch(var(--gl-secondary)) 0);}
+.lovable-member-list>li+li{border-top:1px solid oklch(var(--gl-border));}
+.lovable-avatar{background:linear-gradient(135deg,oklch(var(--gl-primary)),oklch(var(--gl-primary-glow)));}
+.lovable-presence-dot{box-shadow:0 0 0 2px oklch(var(--gl-panel));}
+.lovable-wave span{width:2px;border-radius:999px;}
+.lovable-store-card img{transition:transform .35s ease;}
+.lovable-store-card:hover img{transform:scale(1.045);}
+.lovable-dashboard-view{min-height:calc(100svh - 8rem);}
+.lovable-view-hero{background:var(--gl-gradient-hero);}
+.lovable-select{appearance:none;border:1px solid oklch(var(--gl-border));border-radius:.55rem;background:oklch(var(--gl-panel));padding:.55rem 2rem .55rem .75rem;color:oklch(var(--gl-foreground));outline:0;}
+.lovable-select:focus{border-color:oklch(var(--gl-primary));}
+.lovable-modal-backdrop{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:#030208cc;padding:1rem;backdrop-filter:blur(12px);}
+.lovable-modal{width:min(100%,32rem);border:1px solid oklch(var(--gl-border));border-radius:1rem;background:oklch(var(--gl-card));padding:1.4rem;box-shadow:0 30px 100px #000a;}
+.lovable-modal input,.lovable-modal select{width:100%;margin-top:.4rem;border:1px solid oklch(var(--gl-input));border-radius:.55rem;background:oklch(var(--gl-secondary));padding:.75rem;color:oklch(var(--gl-foreground));outline:0;}
+
+/* Lobby: same visual system, with the existing LiveKit implementation untouched. */
+.lovable-room .room-top{border-color:oklch(var(--gl-border));background:oklch(var(--gl-card)/.82);}
+.lovable-room .room-wrap{max-width:1600px;padding-top:1.5rem;}
+.lovable-room .room-hero,.lovable-room .room-panel,.lovable-room .voice-engine,.lovable-room .stream-card{border-color:oklch(var(--gl-border));background:oklch(var(--gl-card));box-shadow:var(--gl-shadow-panel);}
+.lovable-room .room-hero{background-image:var(--gl-gradient-hero);}
+.lovable-room .room-grid{grid-template-columns:minmax(0,1.6fr) minmax(320px,.9fr);}
+.lovable-room .member-card{border-color:oklch(var(--gl-border));background:oklch(var(--gl-panel)/.5);}
+.lovable-room .member-avatar{background:linear-gradient(135deg,oklch(var(--gl-primary)),oklch(var(--gl-primary-glow)));}
+.lovable-room .primary,.lovable-room .stream-start,.lovable-room .auth-primary{background-image:var(--gl-gradient-primary);box-shadow:var(--gl-shadow-glow);}
+.lovable-room .secondary{border-color:oklch(var(--gl-border));background:oklch(var(--gl-secondary));}
+.lovable-room .voice-modal,.lovable-room .stream-modal,.lovable-room .stream-viewer{border-color:oklch(var(--gl-border));background:oklch(var(--gl-card));}
+
+/* Existing ECA dialog restyled without changing its assurance logic. */
+.age-gate{background:#030208d9;backdrop-filter:blur(16px);}
+.age-card{border-color:oklch(var(--gl-border));background:oklch(var(--gl-card));box-shadow:0 30px 100px #000b;}
+.age-symbol,.age-options button.selected{border-color:oklch(var(--gl-primary)/.55);background:oklch(var(--gl-primary)/.15);color:oklch(var(--gl-primary-glow));}
+
+.error-page{background:radial-gradient(circle at 50% 25%,oklch(var(--gl-primary)/.2),transparent 35%),oklch(var(--gl-background));}
+.error-page button,.error-page a{background-image:var(--gl-gradient-primary);box-shadow:var(--gl-shadow-glow);}
+
+@media(max-width:1180px){
+  .lovable-login-grid{grid-template-columns:minmax(0,1fr) minmax(390px,.9fr);gap:2rem;padding-inline:2rem;}
+  .lovable-login-wordmark{font-size:2.5rem;}
+  .lovable-room .room-grid{grid-template-columns:1fr;}
+}
+@media(max-width:900px){
+  .lovable-login{overflow-y:auto;}
+  .lovable-login-grid{display:block;padding:0 1rem 1.25rem;}
+  .lovable-login-hero{height:15rem;overflow:hidden;opacity:.8;}
+  .lovable-login-art{position:absolute;top:-7rem;width:min(34rem,110vw);}
+  .lovable-login-wordmark,.lovable-login-divider,.lovable-login-tagline,.lovable-login-copy{display:none;}
+  .lovable-login-card{margin:-1.5rem auto 0;padding:1.5rem;}
+  .lovable-login.is-entering .lovable-login-hero{transform:scale(3.2);}
+}
+@media(max-width:640px){
+  .lovable-login-grid{padding-inline:.6rem;}
+  .lovable-login-card{padding:1.25rem 1rem;}
+  .lovable-login-options{align-items:flex-start;}
+  .lovable-toggle{max-width:48%;align-items:flex-start;font-size:.75rem;}
+  .lovable-confirmation button{width:100%;}
+  .lovable-mobile-nav{scrollbar-width:none;}
+  .lovable-mobile-nav::-webkit-scrollbar{display:none;}
+}
+@media(prefers-reduced-motion:reduce){
+  .lovable-login *,.lovable-login::before,.lovable-login::after{animation-duration:.001ms!important;transition-duration:.001ms!important;}
+  .lovable-login.is-entering .lovable-login-hero{transform:none;}
+  .lovable-store-card img{transition:none;}
+}
