@@ -5,7 +5,7 @@ import {voiceIceServers} from "@/lib/webrtc/config";
 type Signal={id:number;sender_id:string;target_id:string|null;signal_type:"offer"|"answer"|"ice-candidate"|"leave";payload:RTCSessionDescriptionInit|RTCIceCandidateInit};
 export type RemoteVoicePeer={userId:string;stream:MediaStream|null;status:"Connecting"|"Connected"|"Reconnecting";speaking:boolean;volume:number;muted:boolean};
 
-type PeerEntry={pc:RTCPeerConnection;remoteStream:MediaStream|null;iceQueue:RTCIceCandidateInit[];retryTimer?:number;analyser?:AnalyserNode;audioContext?:AudioContext;raf?:number};
+type PeerEntry={pc:RTCPeerConnection;remoteStream:MediaStream|null;iceQueue:RTCIceCandidateInit[];retryTimer?:number;answering?:boolean;lastOffer?:string;analyser?:AnalyserNode;audioContext?:AudioContext;raf?:number};
 
 const devLog=(event:string,details:Record<string,unknown>={})=>{
  if(process.env.NODE_ENV==="development")console.debug(`[voice] ${event}`,details);
@@ -128,33 +128,61 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,members:string[]
    updatePeer(userId,{status:"Reconnecting"});
   }
  }
+ async function applyQueuedCandidates(entry:PeerEntry,userId:string){
+  if(!entry.pc.remoteDescription)return;
+  const queued=entry.iceQueue.splice(0);
+  for(const candidate of queued){
+   try{await entry.pc.addIceCandidate(candidate);devLog("ice-applied",{userId});}
+   catch(error){devLog("ice-apply-failed",{userId,error:String(error)});}
+  }
+ }
  async function handleSignal(signal:Signal){
   if(signal.sender_id===localUserId)return;
   if(signal.signal_type==="leave"){closePeer(signal.sender_id);return;}
   if(!activeMembers.current.includes(signal.sender_id)||!localStreamRef.current)return;
   if(signal.signal_type==="offer"){
-    devLog("offer-received",{senderId:signal.sender_id});
-   if(!entries.current.has(signal.sender_id))await createPeer(signal.sender_id,false);
-   const entry=entries.current.get(signal.sender_id);if(!entry)return;
-   await entry.pc.setRemoteDescription(signal.payload as RTCSessionDescriptionInit);
-   for(const candidate of entry.iceQueue)await entry.pc.addIceCandidate(candidate).catch(()=>{});
-   entry.iceQueue=[];
-   const answer=await entry.pc.createAnswer();
-   await entry.pc.setLocalDescription(answer);
-   await sendSignal(signal.sender_id,"answer",answer);
+   const senderId=signal.sender_id;
+   const offer=signal.payload as RTCSessionDescriptionInit;
+   const offerKey=offer.sdp||JSON.stringify(offer);
+   devLog("offer-received",{senderId,signalingState:entries.current.get(senderId)?.pc.signalingState});
+   let entry=entries.current.get(senderId);
+   if(!entry){await createPeer(senderId,false);entry=entries.current.get(senderId);}
+   if(!entry){devLog("answer-create-failed",{senderId,error:"peer-not-created"});return;}
+  if(entry.lastOffer===offerKey)return;
+   entry.answering=true;entry.lastOffer=offerKey;
+   try{
+    if(entry.pc.signalingState==="have-local-offer"){
+     devLog("answer-create-failed",{senderId,error:"peer-already-has-local-offer"});
+     return;
+    }
+    await entry.pc.setRemoteDescription(offer);
+    await applyQueuedCandidates(entry,senderId);
+    const answer=await entry.pc.createAnswer();
+    devLog("answer-created",{senderId});
+    await entry.pc.setLocalDescription(answer);
+    const sent=await sendSignal(senderId,"answer",answer);
+    if(!sent)devLog("answer-send-failed",{senderId});
+   }catch(error){
+    devLog("answer-create-failed",{senderId,error:String(error),signalingState:entry.pc.signalingState});
+   }finally{entry.answering=false;}
   }else if(signal.signal_type==="answer"){
   devLog("answer-received",{senderId:signal.sender_id});
    const entry=entries.current.get(signal.sender_id);if(!entry)return;
-   await entry.pc.setRemoteDescription(signal.payload as RTCSessionDescriptionInit);
-   for(const candidate of entry.iceQueue)await entry.pc.addIceCandidate(candidate).catch(()=>{});
-   entry.iceQueue=[];
+    try{
+     await entry.pc.setRemoteDescription(signal.payload as RTCSessionDescriptionInit);
+     await applyQueuedCandidates(entry,signal.sender_id);
+    }catch(error){devLog("answer-received-failed",{senderId:signal.sender_id,error:String(error)});}
   }else if(signal.signal_type==="ice-candidate"){
    if(!entries.current.has(signal.sender_id))await createPeer(signal.sender_id,localUserId<signal.sender_id);
    const entry=entries.current.get(signal.sender_id);if(!entry)return;
    const candidate=signal.payload as RTCIceCandidateInit;
   devLog("ice-received",{senderId:signal.sender_id});
-   if(entry.pc.remoteDescription)await entry.pc.addIceCandidate(candidate).catch(()=>{});else entry.iceQueue.push(candidate);
+   if(entry.pc.remoteDescription)await applyCandidate(entry,candidate,signal.sender_id);else entry.iceQueue.push(candidate);
   }
+ }
+ async function applyCandidate(entry:PeerEntry,candidate:RTCIceCandidateInit,userId:string){
+  try{await entry.pc.addIceCandidate(candidate);devLog("ice-applied",{userId});}
+  catch(error){devLog("ice-apply-failed",{userId,error:String(error)});}
  }
  async function poll(){
   if(pollBusy.current)return;

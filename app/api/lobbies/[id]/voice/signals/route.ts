@@ -5,18 +5,18 @@ import { createAdminClient } from '@/lib/supabase/admin'
 const signalTypes = new Set(['offer', 'answer', 'ice-candidate', 'candidate', 'leave'])
 const presenceCutoff = () => new Date(Date.now() - 30000).toISOString()
 
-async function authorizedMember(id: string) {
+async function authorizedMember(id: string, allowExpired = false) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Não autorizado.', status: 401 as const }
   const admin = createAdminClient()
-  const { data: membership } = await admin
+  let membershipQuery = admin
     .from('lobby_members')
     .select('user_id')
     .eq('lobby_id', id)
     .eq('user_id', user.id)
-    .gt('last_seen_at', presenceCutoff())
-    .maybeSingle()
+  if (!allowExpired) membershipQuery = membershipQuery.gt('last_seen_at', presenceCutoff())
+  const { data: membership } = await membershipQuery.maybeSingle()
   if (!membership) return { error: 'Você não está presente neste lobby.', status: 403 as const }
   return { admin, user }
 }
@@ -43,16 +43,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const auth = await authorizedMember(id)
-  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
   const body = await request.json().catch(() => null) as { targetId?: string | null; type?: string; payload?: unknown } | null
   if (!body?.type || !signalTypes.has(body.type) || !body.payload || typeof body.payload !== 'object') {
     return NextResponse.json({ error: 'Sinal inválido.' }, { status: 400 })
   }
+  const auth = await authorizedMember(id, body.type === 'leave')
+  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status })
   const targetId = body.targetId || null
   const signalType = body.type === 'candidate' ? 'ice-candidate' : body.type
   if (process.env.NODE_ENV === 'development') console.debug('[voice] signals-post', { lobbyId: id, senderId: auth.user.id, targetId, type: signalType })
-  if (targetId) {
+  if (targetId && body.type !== 'leave') {
     const { data: target } = await auth.admin
       .from('lobby_members')
       .select('user_id')
