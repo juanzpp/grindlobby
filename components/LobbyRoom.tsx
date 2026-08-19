@@ -1,5 +1,5 @@
 "use client";
-import {useEffect,useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
 import {useRouter} from 'next/navigation';
 import AudioHost from './AudioHost';
 import {loadAudioPreferences,playAudioEvent} from '@/lib/audio';
@@ -9,14 +9,26 @@ type Member={user_id:string;role:string;joined_at:string;profile?:{id:string;use
 type Lobby={id:string;owner_id:string;name:string;description:string|null;visibility:string;max_members:number;status:string;game?:{name:string;slug:string}|null;members:Member[];isMember:boolean;me:string};
 export default function LobbyRoom({id,user}:{id:string;user:any}){
  const [lobby,setLobby]=useState<Lobby|null>(null); const [loading,setLoading]=useState(true); const [busy,setBusy]=useState(false); const [copied,setCopied]=useState(false); const [error,setError]=useState(''); const router=useRouter();
+ const roomConnected=useRef(false); const roomExitAnnounced=useRef(false);
  async function load(){try{const r=await fetch(`/api/lobbies/${id}`,{cache:'no-store'});const j=await r.json();if(!r.ok)throw new Error(j.error||'Falha');setLobby(j.lobby)}catch(e:any){setError(e.message)}finally{setLoading(false)}}
  useEffect(()=>{load();const t=setInterval(load,10000);return()=>clearInterval(t)},[id]);
+ useEffect(()=>{
+  if(lobby?.isMember&&!roomConnected.current){
+   roomConnected.current=true;
+   roomExitAnnounced.current=false;
+   playAudioEvent('connected',loadAudioPreferences());
+  }
+ },[lobby?.isMember]);
  useEffect(()=>{
   if(!lobby?.isMember)return;
   let expired=false;
   const expire=()=>{
    if(expired)return;
    expired=true;
+  if(roomConnected.current&&!roomExitAnnounced.current){
+   roomExitAnnounced.current=true;
+   playAudioEvent('disconnected',loadAudioPreferences());
+  }
    const url=`/api/lobbies/${id}/leave`;
    if(navigator.sendBeacon){navigator.sendBeacon(url,new Blob([], {type:'application/json'}));}
    else fetch(url,{method:'POST',keepalive:true}).catch(()=>{});
@@ -29,8 +41,8 @@ export default function LobbyRoom({id,user}:{id:string;user:any}){
   window.addEventListener('pagehide',expire);
   return()=>{clearInterval(timer);window.removeEventListener('pagehide',expire);expire()};
  },[id,lobby?.isMember]);
- async function join(){setBusy(true);const r=await fetch(`/api/lobbies/${id}/join`,{method:'POST'});const j=await r.json();setBusy(false);if(!r.ok)return setError(j.error||'Falha');playAudioEvent('join',loadAudioPreferences());load()}
- async function leave(){setBusy(true);const r=await fetch(`/api/lobbies/${id}/leave`,{method:'POST'});setBusy(false);if(r.ok){playAudioEvent('leave',loadAudioPreferences());router.push('/')}else setError('Não foi possível sair.')}
+ async function join(){setBusy(true);const r=await fetch(`/api/lobbies/${id}/join`,{method:'POST'});const j=await r.json();setBusy(false);if(!r.ok)return setError(j.error||'Falha');load()}
+ async function leave(){setBusy(true);const r=await fetch(`/api/lobbies/${id}/leave`,{method:'POST'});setBusy(false);if(r.ok){if(!roomExitAnnounced.current){roomExitAnnounced.current=true;playAudioEvent('disconnected',loadAudioPreferences())}router.push('/')}else setError('Não foi possível sair.')}
  function copy(){navigator.clipboard?.writeText(location.href);setCopied(true);setTimeout(()=>setCopied(false),1500)}
  if(loading)return <main className="room-shell"><div className="room-loading"><Loader2 className="animate-spin"/>Carregando lobby...</div></main>
  if(!lobby)return <main className="room-shell"><div className="room-loading">{error||'Lobby não encontrado.'}</div></main>
