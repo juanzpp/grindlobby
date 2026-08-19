@@ -1,5 +1,6 @@
 "use client";
 import {useEffect,useRef,useState} from "react";
+import {AudioPreferences,AudioMode,AudioVoice,loadAudioPreferences,playAudioEvent,saveAudioPreferences} from "@/lib/audio";
 import {
   Mic,MicOff,Headphones,SlidersHorizontal,Radio,PhoneOff,
   X,Volume2,AudioLines,Settings2
@@ -14,6 +15,7 @@ export default function AudioHost({enabled}:Props){
  const [testMode,setTestMode]=useState<"direct"|"processed">("processed"),[applied,setApplied]=useState<Partial<MediaTrackSettings>>({});
  const [devices,setDevices]=useState<MediaDeviceInfo[]>([]),[micId,setMicId]=useState(""),[speakerId,setSpeakerId]=useState("");
  const [testing,setTesting]=useState(false);
+ const [audioPreferences,setAudioPreferences]=useState<AudioPreferences>(loadAudioPreferences);
  const stream=useRef<MediaStream|null>(null),ctx=useRef<AudioContext|null>(null),gain=useRef<GainNode|null>(null),outputGain=useRef<GainNode|null>(null),raf=useRef<number|undefined>(undefined);
  const testStream=useRef<MediaStream|null>(null),testAudio=useRef<HTMLAudioElement|null>(null);
 
@@ -97,6 +99,8 @@ export default function AudioHost({enabled}:Props){
    s.getAudioTracks().forEach(t=>t.enabled=!muted);
   updateApplied(s);
    setActive(true);
+  playAudioEvent("mic_active",audioPreferences);
+  playAudioEvent("connected",audioPreferences);
    await refreshDevices();
   startMeter(s);
   }catch(e){
@@ -105,23 +109,27 @@ export default function AudioHost({enabled}:Props){
    alert("Não foi possível acessar o microfone. Confira a permissão do navegador.");
   }
  }
- function disconnect(){
+ function disconnect(notify=true){
+  const wasActive=active;
   stopMicTest();
   stream.current?.getTracks().forEach(t=>t.stop());
   stream.current=null;
   stopMeter();
   setActive(false);
+  if(notify&&wasActive)playAudioEvent("disconnected",audioPreferences);
  }
  function toggleMute(){
   const next=!muted;
   setMuted(next);
   stream.current?.getAudioTracks().forEach(t=>t.enabled=!next);
+  playAudioEvent("mic_muted",audioPreferences);
  }
  async function runMicTest(mode=testMode){
   try{
    stopMicTest();
   const s=await navigator.mediaDevices.getUserMedia({audio:constraints(mode==="processed"),video:false});
    testStream.current=s;
+  playAudioEvent("mic_test",audioPreferences);
    updateApplied(s);
    const audio=new Audio();
    testAudio.current=audio;
@@ -154,7 +162,7 @@ export default function AudioHost({enabled}:Props){
   }
   setTesting(false);
  }
- useEffect(()=>{refreshDevices().catch(()=>{});return()=>disconnect()},[]);
+ useEffect(()=>{refreshDevices().catch(()=>{});return()=>disconnect(false)},[]);
  useEffect(()=>{if(active)connect()},[micId]);
  useEffect(()=>{
   if(testAudio.current)testAudio.current.volume=1;
@@ -168,6 +176,13 @@ export default function AudioHost({enabled}:Props){
  async function chooseTestMode(mode:"direct"|"processed"){
   setTestMode(mode);
   if(testing){stopMicTest();await runMicTest(mode)}
+ }
+ function updateAudioPreferences(next:Partial<AudioPreferences>){
+  setAudioPreferences(current=>{
+   const updated={...current,...next};
+   saveAudioPreferences(updated);
+   return updated;
+  });
  }
 
  return <>
@@ -187,7 +202,7 @@ export default function AudioHost({enabled}:Props){
     ? <button className="primary" disabled={!enabled} onClick={connect}><Mic size={16}/>Entrar no áudio</button>
     : <>
       <button className={muted?"voice-danger":"secondary"} onClick={toggleMute}>{muted?<MicOff size={16}/>:<Mic size={16}/>} {muted?"Ativar":"Mutar"}</button>
-      <button className="voice-danger" onClick={disconnect}><PhoneOff size={16}/>Sair do áudio</button>
+      <button className="voice-danger" onClick={()=>disconnect()}><PhoneOff size={16}/>Sair do áudio</button>
      </>
    }
    <button className="secondary" onClick={()=>setOpen(true)}><SlidersHorizontal size={16}/>Configurar</button>
@@ -233,6 +248,18 @@ export default function AudioHost({enabled}:Props){
       <button className={agc?"on":""} onClick={()=>setAgc(!agc)}>Ganho automático <span>{agc?"ON":"OFF"}</span></button>
      </div>
       <div className="voice-note">Aplicado: {applied.sampleRate||"—"} Hz · {applied.sampleSize||"—"} bit · {applied.channelCount||"—"} canal · NS {applied.noiseSuppression?"ON":"OFF"} · EC {applied.echoCancellation?"ON":"OFF"} · AGC {applied.autoGainControl?"ON":"OFF"}</div>
+    </section>
+
+    <section className="voice-group audio-alerts-group">
+     <div className="voice-group-title"><Radio size={15}/><div><b>Sons e avisos</b><span>Alertas da sala e preferências de reprodução</span></div></div>
+     <div className="voice-toggles">
+      <button className={audioPreferences.soundsEnabled?"on":""} onClick={()=>updateAudioPreferences({soundsEnabled:!audioPreferences.soundsEnabled})}>Sons de interface <span>{audioPreferences.soundsEnabled?"ON":"OFF"}</span></button>
+      <button className={audioPreferences.voiceEnabled?"on":""} onClick={()=>updateAudioPreferences({voiceEnabled:!audioPreferences.voiceEnabled})}>Avisos por voz <span>{audioPreferences.voiceEnabled?"ON":"OFF"}</span></button>
+     </div>
+     <label>Voz<select value={audioPreferences.voice} onChange={e=>updateAudioPreferences({voice:e.target.value as AudioVoice})}><option value="laura">Laura</option><option value="adam">Adam</option></select></label>
+     <label>Modo<select value={audioPreferences.mode} onChange={e=>updateAudioPreferences({mode:e.target.value as AudioMode})}><option value="sound">Som apenas</option><option value="voice">Voz apenas</option><option value="both">Ambos</option><option value="disabled">Desativado</option></select></label>
+     <label>Volume dos sons <b>{Math.round(audioPreferences.soundsVolume*100)}%</b><input type="range" min="0" max="100" value={Math.round(audioPreferences.soundsVolume*100)} onChange={e=>updateAudioPreferences({soundsVolume:+e.target.value/100})}/></label>
+     <label>Volume da voz <b>{Math.round(audioPreferences.voiceVolume*100)}%</b><input type="range" min="0" max="100" value={Math.round(audioPreferences.voiceVolume*100)} onChange={e=>updateAudioPreferences({voiceVolume:+e.target.value/100})}/></label>
     </section>
 
     <section className="voice-group voice-test-group">

@@ -2,6 +2,7 @@
 import {useEffect,useState} from 'react';
 import {useRouter} from 'next/navigation';
 import AudioHost from './AudioHost';
+import {loadAudioPreferences,playAudioEvent} from '@/lib/audio';
 import {ArrowLeft,Gamepad2,Mic2,MonitorUp,Users,Shield,LogOut,Loader2,Radio,Copy,Check} from 'lucide-react';
 
 type Member={user_id:string;role:string;joined_at:string;profile?:{id:string;username:string;display_name:string;avatar:string|null;status:string}};
@@ -28,8 +29,8 @@ export default function LobbyRoom({id,user}:{id:string;user:any}){
   window.addEventListener('pagehide',expire);
   return()=>{clearInterval(timer);window.removeEventListener('pagehide',expire);expire()};
  },[id,lobby?.isMember]);
- async function join(){setBusy(true);const r=await fetch(`/api/lobbies/${id}/join`,{method:'POST'});const j=await r.json();setBusy(false);if(!r.ok)return setError(j.error||'Falha');load()}
- async function leave(){setBusy(true);const r=await fetch(`/api/lobbies/${id}/leave`,{method:'POST'});setBusy(false);if(r.ok)router.push('/');else setError('Não foi possível sair.')}
+ async function join(){setBusy(true);const r=await fetch(`/api/lobbies/${id}/join`,{method:'POST'});const j=await r.json();setBusy(false);if(!r.ok)return setError(j.error||'Falha');playAudioEvent('join',loadAudioPreferences());load()}
+ async function leave(){setBusy(true);const r=await fetch(`/api/lobbies/${id}/leave`,{method:'POST'});setBusy(false);if(r.ok){playAudioEvent('leave',loadAudioPreferences());router.push('/')}else setError('Não foi possível sair.')}
  function copy(){navigator.clipboard?.writeText(location.href);setCopied(true);setTimeout(()=>setCopied(false),1500)}
  if(loading)return <main className="room-shell"><div className="room-loading"><Loader2 className="animate-spin"/>Carregando lobby...</div></main>
  if(!lobby)return <main className="room-shell"><div className="room-loading">{error||'Lobby não encontrado.'}</div></main>
