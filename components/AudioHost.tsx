@@ -1,6 +1,7 @@
 "use client";
 import {useEffect,useRef,useState} from "react";
 import {playAudioEvent} from "@/lib/audio";
+import {unlockRemoteAudioContexts} from "./RemoteVoiceAudio";
 import {
   Mic,MicOff,Headphones,SlidersHorizontal,Radio,PhoneOff,
   X,Settings2
@@ -88,6 +89,7 @@ export default function AudioHost({enabled,onStreamChange}:Props){
  async function connect(){
   if(!enabled)return;
   try{
+  await unlockRemoteAudioContexts();
   disconnect();
    const s=await navigator.mediaDevices.getUserMedia({audio:constraints(),video:false});
    stream.current=s;
