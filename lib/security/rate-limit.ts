@@ -14,7 +14,17 @@ export class RateLimitExceededError extends Error{
 }
 
 export class RateLimitUnavailableError extends Error{
-  constructor(){super("Proteção temporariamente indisponível.");this.name="RateLimitUnavailableError"}
+  code:string;
+  constructor(code="rate_limit_unavailable"){
+    super("Proteção temporariamente indisponível.");
+    this.name="RateLimitUnavailableError";
+    this.code=code;
+  }
+}
+
+function safeErrorCode(value:unknown,fallback:string){
+  const code=typeof value==="object"&&value!==null&&"code" in value&&typeof value.code==="string"?value.code:"";
+  return /^[a-zA-Z0-9_.:-]{1,64}$/.test(code)?code:fallback;
 }
 
 function clientAddress(request:Request){
@@ -43,7 +53,8 @@ export async function enforceRateLimit(request:Request,options:RateLimitOptions)
     p_limit:options.limit,
     p_window_seconds:options.windowSeconds,
   });
-  if(error||!Array.isArray(data)||!data[0])throw new RateLimitUnavailableError();
+  if(error)throw new RateLimitUnavailableError(safeErrorCode(error,"rate_limit_rpc_failed"));
+  if(!Array.isArray(data)||!data[0])throw new RateLimitUnavailableError("rate_limit_invalid_response");
   const result=data[0] as {allowed:boolean;remaining:number;reset_at:string};
   if(!result.allowed){
     const retryAfter=Math.max(1,Math.ceil((new Date(result.reset_at).getTime()-Date.now())/1000));
