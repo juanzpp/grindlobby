@@ -1,5 +1,6 @@
 "use client";
-import {useEffect,useRef} from "react";
+import {useEffect,useRef,useState} from "react";
+import {AudioOutputPreferences,loadAudioOutputPreferences,subscribeAudioOutput} from "@/lib/audio-output";
 
 type Props={stream:MediaStream|null;volume:number;muted:boolean};
 const remoteContexts=new Set<AudioContext>();
@@ -21,8 +22,19 @@ export default function RemoteVoiceAudio({stream,volume,muted}:Props){
  const context=useRef<AudioContext|null>(null);
  const source=useRef<MediaStreamAudioSourceNode|null>(null);
  const gain=useRef<GainNode|null>(null);
+ const [outputPreferences,setOutputPreferences]=useState<AudioOutputPreferences>(loadAudioOutputPreferences);
+ const effectiveGain=()=>muted?0:Math.min(2,Math.max(0,(volume/100)*(outputPreferences.volume/100)));
+ async function applyOutputDevice(){
+  const element=audio.current;
+  const audioContext=context.current as (AudioContext&{setSinkId?:(deviceId:string)=>Promise<void>})|null;
+  if(element){
+   const selectable=element as HTMLAudioElement&{setSinkId?:(deviceId:string)=>Promise<void>};
+   if(outputPreferences.deviceId&&selectable.setSinkId)await selectable.setSinkId(outputPreferences.deviceId);
+  }
+  if(audioContext?.setSinkId)await audioContext.setSinkId(outputPreferences.deviceId);
+ }
  async function useDirectOutput(element:HTMLAudioElement){
-  const boundedVolume=muted?0:Math.min(1,Math.max(0,volume/100));
+  const boundedVolume=Math.min(1,effectiveGain());
   element.volume=boundedVolume;
   devLog("remote-audio-context-state",{state:context.current?.state??"direct-fallback",fallback:true,volume:boundedVolume});
  }
@@ -32,6 +44,7 @@ export default function RemoteVoiceAudio({stream,volume,muted}:Props){
   const tracks=stream.getAudioTracks();
   if(!tracks.length)return;
   const audioContext=context.current;
+  try{await applyOutputDevice();}catch(error){devLog("remote-audio-output-device-failed",{deviceId:outputPreferences.deviceId,error:String(error)});}
   if(audioContext?.state==="suspended"){
    try{await audioContext.resume();devLog("remote-audio-context-resumed",{state:audioContext.state});}
    catch(error){devLog("remote-audio-context-resume-failed",{error:String(error)});await useDirectOutput(element);}
@@ -61,12 +74,14 @@ export default function RemoteVoiceAudio({stream,volume,muted}:Props){
   const outputGain=audioContext.createGain();
   mediaSource.connect(outputGain);outputGain.connect(audioContext.destination);
   context.current=audioContext;source.current=mediaSource;gain.current=outputGain;
-  outputGain.gain.setTargetAtTime(muted?0:Math.min(2,Math.max(0,volume/100)),audioContext.currentTime,.035);
+  outputGain.gain.setTargetAtTime(effectiveGain(),audioContext.currentTime,.035);
+  applyOutputDevice().catch(error=>devLog("remote-audio-output-device-failed",{deviceId:outputPreferences.deviceId,error:String(error)}));
   devLog("remote-audio-context-state",{state:audioContext.state});
   if(userUnlockedRemoteAudio)resumeAndPlay().catch(error=>devLog("remote-audio-play-failed",{error:String(error)}));else useDirectOutput(element).then(()=>resumeAndPlay()).catch(error=>devLog("remote-audio-play-failed",{error:String(error)}));
     return()=>{element.pause();element.srcObject=null;track.onmute=null;track.onunmute=null;track.onended=null;mediaSource.disconnect();outputGain.disconnect();remoteContexts.delete(audioContext);audioContext.close().catch(error=>devLog("remote-audio-context-close-failed",{error:String(error)}));context.current=null;source.current=null;gain.current=null};
  },[stream]);
- useEffect(()=>{const node=gain.current;const audioContext=context.current;if(!node||!audioContext)return;node.gain.cancelScheduledValues(audioContext.currentTime);node.gain.setTargetAtTime(muted?0:Math.min(2,Math.max(0,volume/100)),audioContext.currentTime,.035);if(audioContext.state!=="running")useDirectOutput(audio.current!);else if(audio.current)audio.current.volume=0},[volume,muted]);
+ useEffect(()=>{const unsubscribe=subscribeAudioOutput(setOutputPreferences);return()=>{unsubscribe()}},[]);
+ useEffect(()=>{const node=gain.current;const audioContext=context.current;if(!node||!audioContext)return;node.gain.cancelScheduledValues(audioContext.currentTime);node.gain.setTargetAtTime(effectiveGain(),audioContext.currentTime,.035);applyOutputDevice().catch(error=>devLog("remote-audio-output-device-failed",{deviceId:outputPreferences.deviceId,error:String(error)}));if(audioContext.state!=="running")useDirectOutput(audio.current!);else if(audio.current)audio.current.volume=0},[volume,muted,outputPreferences]);
  useEffect(()=>{const retry=()=>{unlockRemoteAudioContexts().finally(()=>resumeAndPlay())};window.addEventListener("pointerdown",retry);window.addEventListener("touchstart",retry);window.addEventListener("keydown",retry);return()=>{window.removeEventListener("pointerdown",retry);window.removeEventListener("touchstart",retry);window.removeEventListener("keydown",retry)}},[stream]);
  return <audio ref={audio} autoPlay playsInline muted={false} aria-hidden="true"/>;
 }

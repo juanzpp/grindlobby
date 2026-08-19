@@ -1,10 +1,11 @@
 "use client";
 import {useEffect,useRef,useState} from "react";
 import {playAudioEvent} from "@/lib/audio";
+import {AudioOutputPreferences,loadAudioOutputPreferences,saveAudioOutputPreferences} from "@/lib/audio-output";
 import {unlockRemoteAudioContexts} from "./RemoteVoiceAudio";
 import {
   Mic,MicOff,Headphones,SlidersHorizontal,Radio,PhoneOff,
-  X,Settings2
+  X,Settings2,Volume2,Play
 } from "lucide-react";
 
 type Props={enabled:boolean;onStreamChange?:(stream:MediaStream|null)=>void};
@@ -15,6 +16,8 @@ export default function AudioHost({enabled,onStreamChange}:Props){
  const [noise,setNoise]=useState(true),[echo,setEcho]=useState(true),[agc,setAgc]=useState(false),[level,setLevel]=useState(0);
  const [testMode,setTestMode]=useState<"direct"|"processed">("processed"),[applied,setApplied]=useState<Partial<MediaTrackSettings>>({});
  const [devices,setDevices]=useState<MediaDeviceInfo[]>([]),[micId,setMicId]=useState("");
+ const [outputPreferences,setOutputPreferences]=useState<AudioOutputPreferences>(loadAudioOutputPreferences);
+ const [outputSupported,setOutputSupported]=useState(false);
  const [testing,setTesting]=useState(false);
  const stream=useRef<MediaStream|null>(null),ctx=useRef<AudioContext|null>(null),gain=useRef<GainNode|null>(null),raf=useRef<number|undefined>(undefined);
  const testStream=useRef<MediaStream|null>(null),testAudio=useRef<HTMLAudioElement|null>(null);
@@ -22,6 +25,16 @@ export default function AudioHost({enabled,onStreamChange}:Props){
  async function refreshDevices(){
   const d=await navigator.mediaDevices.enumerateDevices();
   setDevices(d);
+ }
+ function updateOutputPreferences(next:Partial<AudioOutputPreferences>){
+  setOutputPreferences(current=>{const updated={...current,...next};saveAudioOutputPreferences(updated);return updated});
+ }
+ async function testOutput(){
+  const audio=new Audio("/audio/ui/join.wav");
+  audio.volume=Math.min(1,Math.max(0,outputPreferences.volume/100));
+  const selectable=audio as HTMLAudioElement&{setSinkId?:(deviceId:string)=>Promise<void>};
+  if(outputPreferences.deviceId&&selectable.setSinkId)await selectable.setSinkId(outputPreferences.deviceId);
+  await audio.play();
  }
  function constraints(processed=true,device=micId){
   return {
@@ -167,7 +180,7 @@ export default function AudioHost({enabled,onStreamChange}:Props){
   }
   setTesting(false);
  }
- useEffect(()=>{refreshDevices().catch(()=>{});return()=>disconnect()},[]);
+ useEffect(()=>{setOutputSupported(typeof HTMLMediaElement!="undefined"&&"setSinkId" in HTMLMediaElement.prototype);refreshDevices().catch(()=>{});return()=>disconnect()},[]);
  useEffect(()=>{
   if(testAudio.current)testAudio.current.volume=1;
   setSmoothGain(gain.current,input/100);
@@ -219,6 +232,14 @@ export default function AudioHost({enabled,onStreamChange}:Props){
      <label>Volume do microfone <b>{input}%</b><input type="range" min="0" max="200" value={input} onChange={e=>setInput(+e.target.value)}/></label>
      <label>Sensibilidade <b>{sensitivity}%</b><input type="range" min="1" max="100" value={sensitivity} onChange={e=>setSensitivity(+e.target.value)}/></label>
      <div className="voice-meter large"><i style={{width:`${Math.max(2,level)}%`}}/><span>{level>sensitivity?"Sua voz está sendo detectada":"Fale para calibrar"}</span></div>
+    </section>
+
+    <section className="voice-group audio-output-group">
+     <div className="voice-group-title"><Volume2 size={15}/><div><b>Saída de áudio</b><span>Fones e alto-falantes da call</span></div></div>
+     <label>Dispositivo de saída<select value={outputPreferences.deviceId} onChange={e=>updateOutputPreferences({deviceId:e.target.value})}><option value="">Padrão do sistema</option>{devices.filter(d=>d.kind==="audiooutput").map(d=><option key={d.deviceId} value={d.deviceId}>{d.label||"Saída de áudio"}</option>)}</select></label>
+    <div className="voice-note">{outputSupported&&outputPreferences.deviceId?`Dispositivo selecionado: ${devices.find(d=>d.deviceId===outputPreferences.deviceId)?.label||"Saída selecionada"}`:"Usando saída padrão do sistema"}</div>
+     <label>Volume geral da call <b>{outputPreferences.volume}%</b><input type="range" min="0" max="200" value={outputPreferences.volume} onChange={e=>updateOutputPreferences({volume:+e.target.value})}/></label>
+     <button className="secondary output-test-button" onClick={()=>testOutput().catch(error=>console.error("Não foi possível testar a saída de áudio",error))}><Play size={14}/>Testar saída</button>
     </section>
 
     <section className="voice-group">
