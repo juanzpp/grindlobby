@@ -46,7 +46,79 @@ h1,h2,h3,h4,.font-display{font-family:"Chakra Petch","Inter",ui-sans-serif,syste
 .lovable-brand-compact{display:inline-flex;flex-direction:row;gap:.4rem;}
 
 /* Login / auth imported from Lovable, wired to the existing Supabase routes. */
-.lovable-login{position:relative;min-height:100svh;overflow:hidden;background:oklch(var(--gl-background));}
+.lovable-login{
+  --gl-background:.05 .008 285;
+  --gl-foreground:.95 .008 285;
+  --gl-card:.09 .018 288;
+  --gl-panel:.12 .024 290;
+  --gl-primary:.44 .19 300;
+  --gl-primary-glow:.62 .19 305;
+  --gl-secondary:.15 .028 290;
+  --gl-muted:.15 .026 290;
+  --gl-muted-foreground:.62 .022 292;
+  --gl-accent:.20 .06 297;
+  --gl-border:.20 .03 292;
+  --gl-input:.20 .03 292;
+  --gl-gradient-hero:radial-gradient(120% 140% at 20% 10%,oklch(.22 .11 300/.6),transparent 62%),linear-gradient(120deg,oklch(.10 .035 292),oklch(.05 .012 285));
+  --gl-shadow-glow:0 0 26px oklch(.50 .22 302/.4);
+  --gl-shadow-panel:0 12px 34px oklch(.02 .01 285/.75);
+  position:relative;
+  min-height:100svh;
+  overflow:hidden;
+  background:oklch(var(--gl-background));
+}
+.lovable-login .lovable-panel{border-radius:1rem;backdrop-filter:blur(18px);}
+
+@keyframes portal-surge{
+  0%{box-shadow:0 0 0 0 oklch(.78 .19 305/.9);opacity:.2}
+  100%{box-shadow:0 0 180px 120px oklch(.78 .19 305/.65);opacity:1}
+}
+@keyframes t-vignette{0%{opacity:0}100%{opacity:1}}
+@keyframes t-streak{0%{transform:translateX(0) scaleX(.2);opacity:0}25%{opacity:1}100%{transform:translateX(-118vw) scaleX(1.4);opacity:0}}
+@keyframes t-sweep{0%{transform:translateX(20%);opacity:0}30%{opacity:1}100%{transform:translateX(-260%);opacity:0}}
+@keyframes t-shock{0%{transform:translate(-50%,-50%) scale(.1);opacity:0;border-width:3px}20%{opacity:.9}100%{transform:translate(-50%,-50%) scale(6);opacity:0;border-width:1px}}
+@keyframes t-beam{0%{transform:translateX(-50%) scaleY(.1);opacity:0}45%{transform:translateX(-50%) scaleY(1);opacity:1}100%{transform:translateX(-50%) scaleY(1.2);opacity:.2}}
+@keyframes t-ember{0%{transform:translateY(0) scale(.6);opacity:0}30%{opacity:1}100%{transform:translateY(-46vh) scale(1.4);opacity:0}}
+@keyframes t-core{0%{transform:translate(-50%,-50%) scale(.2);opacity:.2}60%{transform:translate(-50%,-50%) scale(2.2);opacity:.95}100%{transform:translate(-50%,-50%) scale(9);opacity:1}}
+@keyframes t-flash{0%,55%{opacity:0}85%{opacity:.55}100%{opacity:1}}
+@keyframes t-push-in{0%{transform:scale(1);filter:brightness(1)}60%{transform:scale(1.06);filter:brightness(1.12)}100%{transform:scale(1.22);filter:brightness(1.35)}}
+@keyframes fog-drift{0%{transform:translate3d(-8%,0,0) scale(1.1);opacity:.5}50%{transform:translate3d(6%,-2%,0) scale(1.2);opacity:.8}100%{transform:translate3d(-8%,0,0) scale(1.1);opacity:.5}}
+@keyframes fog-drift-rev{0%{transform:translate3d(6%,1%,0) scale(1.15);opacity:.45}50%{transform:translate3d(-7%,-3%,0) scale(1.25);opacity:.75}100%{transform:translate3d(6%,1%,0) scale(1.15);opacity:.45}}
+@keyframes env-flicker{0%,100%{opacity:.55}42%{opacity:.78}47%{opacity:.42}63%{opacity:.85}}
+@keyframes dust{0%{transform:translate3d(0,8vh,0);opacity:0}15%{opacity:.75}100%{transform:translate3d(3vw,-80vh,0);opacity:0}}
+@keyframes shaft-sway{0%,100%{transform:translateX(-50%) rotate(-1.5deg) scaleY(1);opacity:.35}50%{transform:translateX(-50%) rotate(1.5deg) scaleY(1.08);opacity:.6}}
+@keyframes floor-flow{from{background-position-y:0}to{background-position-y:160px}}
+@keyframes grain-jit{0%{transform:translate(0,0)}25%{transform:translate(-1%,1%)}50%{transform:translate(1%,-1%)}75%{transform:translate(-1%,-1%)}100%{transform:translate(0,0)}}
+@keyframes warp-line{0%{transform:translateX(0) scaleX(.05);opacity:0}20%{opacity:1}100%{transform:translateX(-130vw) scaleX(2.2);opacity:0}}
+@keyframes warp-zoom{0%{transform:scale(1);filter:blur(0)}70%{transform:scale(1.35);filter:blur(2px)}100%{transform:scale(2.1);filter:blur(14px);opacity:0}}
+@keyframes glitch-slice{0%,100%{transform:translateX(0);opacity:0}10%{transform:translateX(-6%);opacity:1}22%{transform:translateX(5%);opacity:.8}38%{transform:translateX(-9%);opacity:1}60%{transform:translateX(3%);opacity:.6}80%{transform:translateX(-2%);opacity:1}}
+@keyframes glitch-rgb{0%,100%{opacity:0;transform:translate(0,0)}30%{opacity:.55;transform:translate(4px,-2px)}55%{opacity:.35;transform:translate(-5px,3px)}85%{opacity:.6;transform:translate(2px,1px)}}
+@keyframes ink-wipe{0%{clip-path:circle(0% at 28% 50%)}100%{clip-path:circle(160% at 28% 50%)}}
+@keyframes shard-in{0%{transform:translate(var(--sx),var(--sy)) rotate(0deg) scale(.2);opacity:0}25%{opacity:1}100%{transform:translate(0,0) rotate(180deg) scale(1.4);opacity:0}}
+
+.animate-portal-surge{animation:portal-surge 1.5s ease-in forwards}
+.animate-t-vignette{animation:t-vignette 1.1s ease-out forwards}
+.animate-t-streak{animation:t-streak .85s cubic-bezier(.2,.7,.2,1) forwards}
+.animate-t-sweep{animation:t-sweep 1.3s ease-in forwards}
+.animate-t-shock{animation:t-shock 1.2s ease-out forwards;opacity:0}
+.animate-t-beam{animation:t-beam 1.8s ease-in-out forwards}
+.animate-t-ember{animation:t-ember 1.6s ease-out forwards}
+.animate-t-core{animation:t-core 2.2s cubic-bezier(.6,0,.9,.4) forwards}
+.animate-t-flash{animation:t-flash 2.2s ease-in forwards}
+.animate-push-in{animation:t-push-in 2.2s cubic-bezier(.5,0,.8,.4) forwards}
+.animate-fog{animation:fog-drift 22s ease-in-out infinite}
+.animate-fog-rev{animation:fog-drift-rev 28s ease-in-out infinite}
+.animate-env-flicker{animation:env-flicker 6s ease-in-out infinite}
+.animate-dust{animation:dust 14s linear infinite}
+.animate-shaft{animation:shaft-sway 9s ease-in-out infinite}
+.animate-floor{animation:floor-flow 6s linear infinite}
+.animate-grain{animation:grain-jit 1.2s steps(4) infinite}
+.animate-warp-line{animation:warp-line .7s cubic-bezier(.2,.7,.2,1) infinite}
+.animate-warp-zoom{animation:warp-zoom 2.2s cubic-bezier(.5,0,.8,.4) forwards}
+.animate-glitch-slice{animation:glitch-slice 1.1s steps(3) infinite}
+.animate-glitch-rgb{animation:glitch-rgb .5s steps(2) infinite}
+.animate-ink-wipe{animation:ink-wipe 1.9s cubic-bezier(.7,0,.3,1) forwards}
+.animate-shard{animation:shard-in 1.5s ease-out forwards}
 .lovable-login-grid{display:grid;min-height:100svh;grid-template-columns:minmax(0,1.15fr) minmax(420px,.85fr);align-items:center;gap:3.5rem;padding:2.5rem 3.5rem;}
 .lovable-login-hero{position:relative;display:flex;min-width:0;flex-direction:column;align-items:center;transition:opacity .45s ease,filter .7s ease,transform 1.15s cubic-bezier(.2,.75,.2,1);}
 .lovable-login-art{position:relative;width:100%;max-width:620px;}
