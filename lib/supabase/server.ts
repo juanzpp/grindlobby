@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-export async function createClient() {
+export async function createClient(options:{persistent?:boolean}={}) {
   const cookieStore = await cookies()
 
   return createServerClient(
@@ -14,9 +14,12 @@ export async function createClient() {
         },
         setAll(cookiesToSet) {
           try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            )
+            cookiesToSet.forEach(({ name, value, options: cookieOptions }) => {
+              if (options.persistent === false) {
+                const { maxAge: _maxAge, expires: _expires, ...sessionOptions } = cookieOptions
+                cookieStore.set(name, value, sessionOptions)
+              } else cookieStore.set(name, value, cookieOptions)
+            })
           } catch {
             // Server Components cannot always write cookies. Route handlers can.
           }

@@ -12,6 +12,9 @@ const voiceDebug=process.env.NODE_ENV==="development"||process.env.NEXT_PUBLIC_V
 const log=(event:string,details:Record<string,unknown>={})=>{if(voiceDebug)console.debug(`[GrindLobby Voice] ${event}`,details)};
 const logError=(event:string,details:Record<string,unknown>={})=>{if(voiceDebug)console.error(`[GrindLobby Voice] ${event}`,details)};
 let activeRoom:Room|null=null;
+const activeRoomListeners=new Set<(room:Room|null)=>void>();
+function updateActiveRoom(room:Room|null){activeRoom=room;for(const listener of activeRoomListeners)listener(room)}
+export function subscribeActiveLiveKitRoom(listener:(room:Room|null)=>void){activeRoomListeners.add(listener);listener(activeRoom);return()=>{activeRoomListeners.delete(listener)}}
 
 export async function setLiveKitMicrophoneMuted(muted:boolean){
  const publication=activeRoom?.localParticipant.getTrackPublication(Track.Source.Microphone);
@@ -51,8 +54,8 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,lobbyMembers:Voi
  useEffect(()=>{if(process.env.NEXT_PUBLIC_VOICE_DEBUG!=="true"||window.__GRINDLOBBY_VOICE_DEBUG__)return;window.__GRINDLOBBY_VOICE_DEBUG__=true;console.debug("[GrindLobby Voice] debug-enabled")},[]);
  useEffect(()=>{
   localStreamRef.current=localStream;const run=++generation.current;
-  if(!localStream){const room=roomRef.current;roomRef.current=null;if(activeRoom===room)activeRoom=null;room?.disconnect();setVoicePresence(new Map(lobbyMembersRef.current.map(member=>[member.userId,{userId:member.userId,connected:false,stream:null,status:"Offline",speaking:false,audioLevel:0,microphoneMuted:true,volume:volumes.current.get(member.userId)?.volume??100,muted:volumes.current.get(member.userId)?.muted??false}])));return}
-  const room=new Room({adaptiveStream:true,dynacast:true,disconnectOnPageLeave:true});roomRef.current=room;activeRoom=room;
+  if(!localStream){const room=roomRef.current;roomRef.current=null;if(activeRoom===room)updateActiveRoom(null);room?.disconnect();setVoicePresence(new Map(lobbyMembersRef.current.map(member=>[member.userId,{userId:member.userId,connected:false,stream:null,status:"Offline",speaking:false,audioLevel:0,microphoneMuted:true,volume:volumes.current.get(member.userId)?.volume??100,muted:volumes.current.get(member.userId)?.muted??false}])));return}
+  const room=new Room({adaptiveStream:true,dynacast:true,disconnectOnPageLeave:true});roomRef.current=room;updateActiveRoom(room);
   const onParticipantConnected=(participant:RemoteParticipant)=>{syncVoicePresence(room);log("participant-connected",{peerId:participant.identity})};
   const onParticipantDisconnected=(participant:RemoteParticipant)=>{syncVoicePresence(room);log("participant-disconnected",{peerId:participant.identity})};
   const onTrackSubscribed=(track:RemoteTrack,_publication:RemoteTrackPublication,participant:RemoteParticipant)=>{syncVoicePresence(room);if(track instanceof RemoteAudioTrack)log("remote-audio-subscribed",{peerId:participant.identity,trackSid:track.sid})};
@@ -69,7 +72,7 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,lobbyMembers:Voi
     log("room-connected",{room:room.name,participantCount:room.numParticipants,connectionState:room.state});
    }catch(error){logError("room-connect-failed",{error:String(error)});if(run===generation.current)syncVoicePresence(room)}
   })();
-  return()=>{generation.current+=1;room.removeAllListeners();room.disconnect();if(roomRef.current===room)roomRef.current=null;if(activeRoom===room)activeRoom=null;setVoicePresence(new Map())};
+  return()=>{generation.current+=1;room.removeAllListeners();room.disconnect();if(roomRef.current===room)roomRef.current=null;if(activeRoom===room)updateActiveRoom(null);setVoicePresence(new Map())};
  },[Boolean(localStream),lobbyId,localUserId]);
  useEffect(()=>{
   localStreamRef.current=localStream;const room=roomRef.current;if(!localStream||!room||room.state!==ConnectionState.Connected)return;
@@ -81,6 +84,6 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,lobbyMembers:Voi
  const voiceMembers=[...voicePresence.values()],remotePeers=voiceMembers.filter(member=>member.userId!==localUserId&&member.connected);
  function setPeerVolume(userId:string,volume:number){const current=volumes.current.get(userId)??{volume:100,muted:false};volumes.current.set(userId,{...current,volume});setVoicePresence(items=>{const next=new Map(items),item=next.get(userId);if(item)next.set(userId,{...item,volume});return next})}
  function togglePeerMuted(userId:string){const current=volumes.current.get(userId)??{volume:100,muted:false},muted=!current.muted;volumes.current.set(userId,{...current,muted});setVoicePresence(items=>{const next=new Map(items),item=next.get(userId);if(item)next.set(userId,{...item,muted});return next})}
- function notifyVoiceLeave(){generation.current+=1;const room=roomRef.current;roomRef.current=null;if(activeRoom===room)activeRoom=null;room?.disconnect();setVoicePresence(new Map())}
+ function notifyVoiceLeave(){generation.current+=1;const room=roomRef.current;roomRef.current=null;if(activeRoom===room)updateActiveRoom(null);room?.disconnect();setVoicePresence(new Map())}
  return{remotePeers,voiceMembers,setPeerVolume,togglePeerMuted,notifyVoiceLeave};
 }

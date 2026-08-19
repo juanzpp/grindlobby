@@ -1,0 +1,6 @@
+"use client";
+import {Eye,EyeOff} from "lucide-react";import {useState} from "react";
+export default function PasswordField({value,onChange,label="Senha",autoComplete="current-password",showStrength=false}:{value:string;onChange:(value:string)=>void;label?:string;autoComplete?:string;showStrength?:boolean}){
+ const [visible,setVisible]=useState(false),checks=[value.length>=8,/[A-Z]/.test(value),/[a-z]/.test(value),/\d/.test(value),/[^A-Za-z0-9]/.test(value)],score=checks.filter(Boolean).length;
+ return <label className="auth-label">{label}<span className="password-wrap"><input className="auth-input" type={visible?"text":"password"} value={value} onChange={event=>onChange(event.target.value)} autoComplete={autoComplete} minLength={8} required/><button type="button" onClick={()=>setVisible(current=>!current)} aria-label={visible?"Ocultar senha":"Mostrar senha"}>{visible?<EyeOff size={17}/>:<Eye size={17}/>}</button></span>{showStrength?<><span className="password-strength" aria-label={`Força da senha: ${score} de 5`}>{checks.map((ok,index)=><i className={ok?"ok":""} key={index}/>)}</span><small className="password-hint">8+ caracteres, maiúscula, minúscula e número. Símbolo recomendado.</small></>:null}</label>;
+}
