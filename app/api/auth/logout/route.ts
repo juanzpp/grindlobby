@@ -1,12 +1,2 @@
-import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-
-export async function POST() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (user) {
-    await supabase.from('profiles').update({ status: 'offline', last_seen_at: new Date().toISOString() }).eq('id', user.id)
-  }
-  await supabase.auth.signOut()
-  return NextResponse.json({ ok: true })
-}
+import {createClient} from "@/lib/supabase/server";import {createAdminClient} from "@/lib/supabase/admin";import {assertTrustedMutation,InvalidRequestError,noStoreJson} from "@/lib/security/request";import {logSecurityEvent} from "@/lib/security/logging";
+export async function POST(request:Request){try{assertTrustedMutation(request);const supabase=await createClient(),{data:{user}}=await supabase.auth.getUser();if(user){const admin=createAdminClient();await admin.from("profiles").update({status:"offline",last_seen_at:new Date().toISOString()}).eq("id",user.id)}await supabase.auth.signOut();if(user)logSecurityEvent({event:"logout",outcome:"allowed",actorId:user.id,route:"/api/auth/logout"});return noStoreJson({ok:true})}catch(error){if(error instanceof InvalidRequestError)return noStoreJson({error:"Requisição inválida."},{status:400});return noStoreJson({error:"Não foi possível sair."},{status:500})}}

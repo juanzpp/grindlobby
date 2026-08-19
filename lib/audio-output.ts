@@ -17,5 +17,5 @@ export function saveAudioOutputPreferences(preferences:AudioOutputPreferences){
  listeners.forEach(listener=>listener(preferences));
 }
 export function subscribeAudioOutput(listener:(preferences:AudioOutputPreferences)=>void){
- listeners.add(listener);return()=>listeners.delete(listener);
+ listeners.add(listener);return()=>{listeners.delete(listener)};
 }

@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { requireEmailConfirmation } from '@/lib/auth-config'
+import { isConfiguredAdmin } from '@/lib/admin-config'
 
 export async function getCurrentUser() {
   const supabase = await createClient()
@@ -12,8 +13,10 @@ export async function getCurrentUser() {
     .eq('id', user.id)
     .single()
 
-  const configuredAdmins=(process.env.GRINDLOBBY_ADMIN_USER_IDS??'').split(',').map(value=>value.trim()).filter(Boolean)
-  if (profile) return configuredAdmins.includes(user.id) ? {...profile,app_role:'admin',account_tier:'pro'} : profile
+  const configuredAdmin=isConfiguredAdmin(user.id)
+  if (profile) return configuredAdmin
+    ? {...profile,app_role:'admin',account_tier:'pro'}
+    : {...profile,app_role:'user'}
 
   return {
     id: user.id,
@@ -22,7 +25,7 @@ export async function getCurrentUser() {
     display_name: user.user_metadata?.display_name ?? 'Player',
     avatar: null,
     status: 'online',
-    account_tier: 'free',
-    app_role: 'user',
+    account_tier: configuredAdmin ? 'pro' : 'free',
+    app_role: configuredAdmin ? 'admin' : 'user',
   }
 }

@@ -1,44 +1,98 @@
-import {NextResponse} from "next/server";
-import {AccessToken,TokenVerifier} from "livekit-server-sdk";
+import {z} from "zod";
+import {AccessToken,TokenVerifier,TrackSource} from "livekit-server-sdk";
 import {createClient} from "@/lib/supabase/server";
+import {createAdminClient} from "@/lib/supabase/admin";
+import {getAgeAssurance,getAgeCapabilities} from "@/lib/age-assurance";
+import {assertTrustedMutation,InvalidRequestError,noStoreJson} from "@/lib/security/request";
+import {enforceRateLimit,RateLimitExceededError,RateLimitUnavailableError,rateLimitResponse} from "@/lib/security/rate-limit";
+import {logSecurityEvent} from "@/lib/security/logging";
+import {isConfiguredAdmin} from "@/lib/admin-config";
+import {getScreenSharePolicy} from "@/lib/livekit-screen-policy";
 
 export const runtime="nodejs";
 
+const idSchema=z.string().uuid();
+
 function normalizeServerEnv(value:string|undefined){
- const trimmed=value?.trim();
- if(!trimmed)return "";
- const first=trimmed[0],last=trimmed.at(-1);
- return first===last&&(first==='"'||first==="'")?trimmed.slice(1,-1).trim():trimmed;
+  const trimmed=value?.trim();
+  if(!trimmed)return "";
+  const first=trimmed[0],last=trimmed.at(-1);
+  return first===last&&(first==='"'||first==="'")?trimmed.slice(1,-1).trim():trimmed;
 }
 
-function maskApiKey(value:string){
- if(!value)return "missing";
- if(value.length<7)return `${value.slice(0,1)}***${value.slice(-1)}`;
- return `${value.slice(0,3)}***${value.slice(-3)}`;
-}
+export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){
+  let actorId:string|null=null;
+  try{
+    assertTrustedMutation(request);
+    const id=idSchema.parse((await params).id);
+    const supabase=await createClient();
+    const {data:{user}}=await supabase.auth.getUser();
+    if(!user)return noStoreJson({error:"Não autorizado."},{status:401});
+    actorId=user.id;
 
-function readJwtPayload(jwt:string){
- const encoded=jwt.split(".")[1];
- if(!encoded)throw new Error("JWT payload ausente");
- return JSON.parse(Buffer.from(encoded,"base64url").toString("utf8")) as {iss?:string;sub?:string;nbf?:number;iat?:number;exp?:number;video?:{room?:string;roomJoin?:boolean}};
-}
+    await enforceRateLimit(request,{scope:"livekit-token",limit:20,windowSeconds:600,subject:user.id});
+    const age=getAgeCapabilities(await getAgeAssurance(user.id));
+    if(!age.canUseVoice)return noStoreJson({error:age.reason||"Voz indisponível para esta conta."},{status:403});
 
-function toIso(value:number|undefined){return typeof value==="number"?new Date(value*1000).toISOString():null}
+    const admin=createAdminClient();
+    const {data:member}=await admin.from("lobby_members")
+      .select("user_id")
+      .eq("lobby_id",id)
+      .eq("user_id",user.id)
+      .gt("last_seen_at",new Date(Date.now()-30_000).toISOString())
+      .maybeSingle();
+    if(!member)return noStoreJson({error:"Você não está presente neste lobby."},{status:403});
 
-export async function POST(_request:Request,{params}:{params:Promise<{id:string}>}){
- const {id}=await params,supabase=await createClient(),{data:{user}}=await supabase.auth.getUser();
- if(!user)return NextResponse.json({error:"Não autorizado."},{status:401});
- const {data:member}=await supabase.from("lobby_members").select("user_id").eq("lobby_id",id).eq("user_id",user.id).gt("last_seen_at",new Date(Date.now()-30000).toISOString()).maybeSingle();
- if(!member)return NextResponse.json({error:"Você não está presente neste lobby."},{status:403});
- const url=normalizeServerEnv(process.env.NEXT_PUBLIC_LIVEKIT_URL),apiKey=normalizeServerEnv(process.env.LIVEKIT_API_KEY),apiSecret=normalizeServerEnv(process.env.LIVEKIT_API_SECRET),room=`lobby-${id}`;
- const auditBase={apiKeyPresent:Boolean(apiKey),apiSecretPresent:Boolean(apiSecret),apiKeyPrefixSuffix:maskApiKey(apiKey),issuerMatchesConfiguredKey:false,identity:user.id,room,roomJoin:false,issuedAt:null as string|null,expiresAt:null as string|null};
- if(!url||!apiKey||!apiSecret){console.info("[LiveKit Token Audit]",auditBase);return NextResponse.json({error:"LiveKit não configurado."},{status:503})}
- const {data:profile}=await supabase.from("profiles").select("display_name,username").eq("id",user.id).maybeSingle();
- const token=new AccessToken(apiKey,apiSecret,{identity:user.id,name:profile?.display_name||profile?.username||"Player",metadata:JSON.stringify({username:profile?.username||"player"}),ttl:"15m"});
- token.addGrant({roomJoin:true,room,canPublish:true,canSubscribe:true,canPublishData:false});
- const jwt=await token.toJwt(),payload=readJwtPayload(jwt);
- let signatureValid=false;
- try{await new TokenVerifier(apiKey,apiSecret).verify(jwt);signatureValid=true}catch{}
- console.info("[LiveKit Token Audit]",{...auditBase,issuerMatchesConfiguredKey:signatureValid&&payload.iss===apiKey,identity:payload.sub??user.id,room:payload.video?.room??room,roomJoin:payload.video?.roomJoin===true,issuedAt:toIso(payload.iat??payload.nbf),expiresAt:toIso(payload.exp)});
- return NextResponse.json({token:jwt,url});
+    const url=normalizeServerEnv(process.env.NEXT_PUBLIC_LIVEKIT_URL);
+    const apiKey=normalizeServerEnv(process.env.LIVEKIT_API_KEY);
+    const apiSecret=normalizeServerEnv(process.env.LIVEKIT_API_SECRET);
+    if(!url||!apiKey||!apiSecret){
+      logSecurityEvent({event:"livekit_token",outcome:"failed",actorId:user.id,reason:"server_configuration",route:"/api/lobbies/[id]/voice/token"});
+      return noStoreJson({error:"LiveKit não configurado."},{status:503});
+    }
+
+    const {data:profile}=await admin.from("profiles").select("display_name,username,account_tier").eq("id",user.id).maybeSingle();
+    const pro=isConfiguredAdmin(user.id)||profile?.account_tier==="pro";
+    const screenShare=getScreenSharePolicy(pro);
+    const room=`lobby-${id}`;
+    const accessToken=new AccessToken(apiKey,apiSecret,{
+      identity:user.id,
+      name:profile?.display_name||profile?.username||"Player",
+      ttl:"15m",
+      attributes:{
+        "grindlobby.tier":screenShare.tier,
+        "grindlobby.screen.maxWidth":String(screenShare.maxWidth),
+        "grindlobby.screen.maxHeight":String(screenShare.maxHeight),
+        "grindlobby.screen.maxFps":String(screenShare.maxFps),
+      },
+    });
+    accessToken.addGrant({
+      roomJoin:true,
+      room,
+      canSubscribe:true,
+      canPublishData:false,
+      canUpdateOwnMetadata:false,
+      canPublishSources:[TrackSource.MICROPHONE,TrackSource.SCREEN_SHARE,TrackSource.SCREEN_SHARE_AUDIO],
+    });
+    const jwt=await accessToken.toJwt();
+
+    // Validate the exact token locally before it leaves the trusted server boundary.
+    const verified=await new TokenVerifier(apiKey,apiSecret).verify(jwt);
+    if(
+      verified.sub!==user.id
+      ||verified.video?.room!==room
+      ||verified.video?.roomJoin!==true
+      ||verified.attributes?.["grindlobby.tier"]!==screenShare.tier
+    ){
+      throw new Error("livekit_claim_validation_failed");
+    }
+
+    logSecurityEvent({event:"livekit_token",outcome:"allowed",actorId:user.id,route:"/api/lobbies/[id]/voice/token"});
+    return noStoreJson({token:jwt,url});
+  }catch(error){
+    if(error instanceof RateLimitExceededError||error instanceof RateLimitUnavailableError)return rateLimitResponse(error);
+    if(error instanceof z.ZodError||error instanceof InvalidRequestError)return noStoreJson({error:"Requisição inválida."},{status:400});
+    logSecurityEvent({event:"livekit_token",outcome:"failed",actorId,reason:"token_issue_failed",route:"/api/lobbies/[id]/voice/token"});
+    return noStoreJson({error:"Não foi possível iniciar a conexão de voz."},{status:500});
+  }
 }

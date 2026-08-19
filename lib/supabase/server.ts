@@ -15,10 +15,17 @@ export async function createClient(options:{persistent?:boolean}={}) {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options: cookieOptions }) => {
+              const hardenedOptions = {
+                ...cookieOptions,
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax' as const,
+                path: '/',
+              }
               if (options.persistent === false) {
-                const { maxAge: _maxAge, expires: _expires, ...sessionOptions } = cookieOptions
+                const { maxAge: _maxAge, expires: _expires, ...sessionOptions } = hardenedOptions
                 cookieStore.set(name, value, sessionOptions)
-              } else cookieStore.set(name, value, cookieOptions)
+              } else cookieStore.set(name, value, hardenedOptions)
             })
           } catch {
             // Server Components cannot always write cookies. Route handlers can.
