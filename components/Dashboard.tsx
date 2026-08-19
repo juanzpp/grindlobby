@@ -2,6 +2,7 @@
 import {useEffect,useMemo,useState} from "react";
 import {useRouter} from "next/navigation";
 import AudioSettings from './AudioSettings';
+import GrindLobbyLogo from '@/components/brand/GrindLobbyLogo';
 import {Home,Gamepad2,Trophy,Users,Radio,Settings,Search,Bell,Plus,Activity,Crown,LogOut,Mic2,MonitorUp,ShieldCheck,Sparkles,ChevronRight,Zap,Loader2} from "lucide-react";
 
 type GameCard={id:number;name:string;slug:string;rank:string;points:number;winRate:number;progress:number};
@@ -25,12 +26,12 @@ export default function Dashboard({user}:{user:any}){
  const online=data?.online??[]; const stats=data?.stats??{online:1,activeLobbies:0,myLobbies:0,rank:0};
  return <main className="app-shell min-h-screen text-white"><div className="ambient a1"/><div className="ambient a2"/><div className="relative flex min-h-screen">
   <aside className="sidebar hidden w-[268px] shrink-0 lg:flex lg:flex-col">
-   <div className="brand"><div className="brand-mark">G</div><div><b>GRIND<span>LOBBY</span></b><small>COMPETITIVE NETWORK</small></div></div>
+   <GrindLobbyLogo variant="full" size="md"/>
   <div className="nav-label">NETWORK</div><nav className="space-y-1">{[[Home,"Overview"],[Gamepad2,"Games"],[Trophy,"Rankings"],[Users,"Lobbies"],[Radio,"Live"]].map(([I,l])=><button key={l as string} onClick={()=>setView(String(l).toLowerCase())} className={`nav-item ${view===String(l).toLowerCase()?"active":""}`}><I size={18}/>{l as string}{l==="Lobbies"&&<em>{stats.activeLobbies}</em>}</button>)}</nav>
    <div className="pro-card"><div><Zap size={14}/> GRIND PRO</div><p>1080p 60fps, perfil premium e recursos competitivos.</p><button>Ver benefícios →</button></div>
   <div className="mt-auto"><button onClick={()=>setView("settings")} className={`nav-item ${view==="settings"?"active":""}`}><Settings size={18}/>Settings</button><button onClick={logout} className="nav-item"><LogOut size={18}/>Sair</button><div className="profile-mini"><div className="avatar">{display.slice(0,2).toUpperCase()}<i/></div><div><b>{display}</b><span>Online agora</span></div></div></div>
   </aside>
-  <section className="min-w-0 flex-1"><header className="topbar"><div className="lg:hidden font-black">GRIND<span className="text-violet-400">LOBBY</span></div><div className="search"><Search size={16}/><input placeholder="Buscar players, jogos, lobbies..."/></div><button className="icon-btn" onClick={()=>setView("settings")} aria-label="Configurações"><Settings size={18}/></button><button className="icon-btn"><Bell size={18}/><i/></button><button onClick={()=>setCreate(true)} className="primary hidden sm:flex"><Plus size={17}/> Criar lobby</button></header>
+  <section className="min-w-0 flex-1"><header className="topbar"><GrindLobbyLogo variant="symbol" size="sm" className="lg:hidden"/><div className="search"><Search size={16}/><input placeholder="Buscar players, jogos, lobbies..."/></div><button className="icon-btn" onClick={()=>setView("settings")} aria-label="Configurações"><Settings size={18}/></button><button className="icon-btn"><Bell size={18}/><i/></button><button onClick={()=>setCreate(true)} className="primary hidden sm:flex"><Plus size={17}/> Criar lobby</button></header>
   <div className={`mx-auto max-w-[1540px] p-4 pb-24 lg:p-8 ${view!=="overview"?"hidden":""}`}>
     <section className="hero"><div className="gridfx"/><div className="glow"/><div className="relative z-10 max-w-2xl"><div className="eyebrow"><Activity size={13}/> SESSION READY · {stats.online} PLAYERS ONLINE</div><h1>YOUR NEXT<br/><span>GRIND STARTS HERE.</span></h1><p>Monte sua squad, encontre partidas no seu nível e entre em voz sem sair do fluxo. Uma central competitiva feita para jogar.</p><div className="mt-7 flex flex-wrap gap-3"><button onClick={()=>setCreate(true)} className="primary"><Plus size={17}/> Criar lobby</button><button className="secondary"><Users size={17}/> Encontrar squad</button></div></div><div className="hero-status hidden xl:block"><small>NETWORK STATUS</small><b><i/> ALL SYSTEMS READY</b><div><span>VOICE</span><strong>LOW LATENCY</strong></div><div><span>STREAM</span><strong>1080P · 60FPS PRO</strong></div></div></section>
     {error&&<div className="dash-error">{error}</div>}
