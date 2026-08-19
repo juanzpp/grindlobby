@@ -3,7 +3,7 @@ import {useEffect,useRef,useState} from "react";
 import {playAudioEvent} from "@/lib/audio";
 import {AudioOutputPreferences,loadAudioOutputPreferences,saveAudioOutputPreferences} from "@/lib/audio-output";
 import {unlockRemoteAudioContexts} from "./RemoteVoiceAudio";
-import {setLiveKitMicrophoneMuted,switchLiveKitMicrophoneDevice} from "@/lib/webrtc/useLobbyVoice";
+import {disconnectActiveLiveKitVoice,getActiveMicrophoneStream,setLiveKitMicrophoneMuted,subscribeActiveLiveKitRoom,switchLiveKitMicrophoneDevice} from "@/lib/webrtc/useLobbyVoice";
 import {
   Mic,MicOff,Headphones,SlidersHorizontal,Radio,PhoneOff,
   X,Settings2,Volume2,Play
@@ -136,11 +136,13 @@ export default function AudioHost({enabled,onStreamChange}:Props){
  }
  function disconnect(){
   stopMicTest();
-  stream.current?.getTracks().forEach(t=>t.stop());
+  const current=stream.current;
   stream.current=null;
+  current?.getTracks().forEach(t=>t.stop());
   onStreamChange?.(null);
   stopMeter();
   setActive(false);
+  void disconnectActiveLiveKitVoice(false);
  }
  function toggleMute(){
   const wasMuted=muted;
@@ -183,7 +185,18 @@ export default function AudioHost({enabled,onStreamChange}:Props){
   }
   setTesting(false);
  }
- useEffect(()=>{setOutputSupported(typeof HTMLMediaElement!="undefined"&&"setSinkId" in HTMLMediaElement.prototype);refreshDevices().catch(()=>{});return()=>disconnect()},[]);
+ useEffect(()=>{
+  setOutputSupported(typeof HTMLMediaElement!=="undefined"&&"setSinkId" in HTMLMediaElement.prototype);
+  refreshDevices().catch(()=>{});
+  const existing=getActiveMicrophoneStream();
+  if(existing){stream.current=existing;setActive(true);updateApplied(existing);startMeter(existing);onStreamChange?.(existing)}
+  const unsubscribe=subscribeActiveLiveKitRoom(room=>{
+   if(!room){if(stream.current){stopMeter();stream.current=null;setActive(false)};return}
+   const live=getActiveMicrophoneStream();
+   if(live&&!stream.current){stream.current=live;setActive(true);updateApplied(live);startMeter(live);onStreamChange?.(live)}
+  });
+  return()=>{unsubscribe();stopMicTest();stopMeter()};
+ },[]);
  useEffect(()=>{
   if(testAudio.current)testAudio.current.volume=1;
   setSmoothGain(gain.current,input/100);
