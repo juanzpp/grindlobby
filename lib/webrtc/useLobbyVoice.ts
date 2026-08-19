@@ -17,6 +17,7 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,members:string[]
  const cursor=useRef(0);
  const pollBusy=useRef(false);
  const mounted=useRef(true);
+ const localStreamRef=useRef<MediaStream|null>(localStream);
  const memberKey=members.filter(id=>id!==localUserId).sort().join(",");
  const activeMembers=useRef(members);
  activeMembers.current=members;
@@ -75,20 +76,22 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,members:string[]
   if(entry?.retryTimer)return;
   updatePeer(userId,{status:"Reconnecting",stream:null,speaking:false});
   const retry=window.setTimeout(()=>{
-   if(!activeMembers.current.includes(userId)||!localStream)return;
+  if(!activeMembers.current.includes(userId)||!localStreamRef.current)return;
    closePeer(userId,true);
    createPeer(userId,localUserId<userId).catch(()=>{});
   },1500);
   if(entry)entry.retryTimer=retry;
  }
- async function createPeerInternal(userId:string,initiator:boolean){
-  if(!localStream||entries.current.has(userId))return;
+  async function createPeerInternal(userId:string,initiator:boolean){
+  const currentStream=localStreamRef.current;
+  if(!currentStream||entries.current.has(userId))return;
   devLog("peer-created",{userId,role:initiator?"offerer":"receiver",localUserId});
   addPeerState(userId);
   const pc=new RTCPeerConnection({iceServers:voiceIceServers});
   const entry:PeerEntry={pc,remoteStream:null,iceQueue:[]};
   entries.current.set(userId,entry);
-  localStream.getAudioTracks().forEach(track=>{
+  currentStream.getAudioTracks().forEach(track=>{
+   track.onended=()=>devLog("local-track-ended",{userId,trackId:track.id});
    const transceiver=pc.addTransceiver(track,{direction:"sendrecv"});
    const codecs=RTCRtpSender.getCapabilities?.("audio")?.codecs??[];
    const opus=codecs.filter(codec=>codec.mimeType.toLowerCase()==="audio/opus");
@@ -100,6 +103,7 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,members:string[]
   pc.onicecandidate=event=>{if(event.candidate)sendSignal(userId,"ice-candidate",event.candidate.toJSON()).catch(error=>devLog("ice-send-error",{userId,error:String(error)}));};
   pc.ontrack=event=>{
    const stream=event.streams[0]||new MediaStream([event.track]);
+    devLog("remote-track-received",{userId,trackId:event.track.id});
    entry.remoteStream=stream;
    updatePeer(userId,{stream,status:"Connected"});
    startAnalyser(userId,entry,stream);
@@ -127,7 +131,7 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,members:string[]
  async function handleSignal(signal:Signal){
   if(signal.sender_id===localUserId)return;
   if(signal.signal_type==="leave"){closePeer(signal.sender_id);return;}
-  if(!activeMembers.current.includes(signal.sender_id)||!localStream)return;
+  if(!activeMembers.current.includes(signal.sender_id)||!localStreamRef.current)return;
   if(signal.signal_type==="offer"){
     devLog("offer-received",{senderId:signal.sender_id});
    if(!entries.current.has(signal.sender_id))await createPeer(signal.sender_id,false);
@@ -165,7 +169,7 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,members:string[]
  }
  useEffect(()=>{
   mounted.current=true;
-  if(!localStream){setRemotePeers([]);return()=>{mounted.current=false};}
+  if(!localStreamRef.current){setRemotePeers([]);return()=>{mounted.current=false};}
     const otherMembers=activeMembers.current.filter(id=>id!==localUserId);
   for(const userId of otherMembers)createPeer(userId,localUserId<userId).catch(()=>{});
   const timer=window.setInterval(()=>poll().catch(()=>{}),500);
@@ -175,9 +179,26 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,members:string[]
    for(const userId of [...entries.current.keys()])closePeer(userId);
    entries.current.clear();setRemotePeers([]);
   };
- },[lobbyId,localUserId,localStream]);
+ },[lobbyId,localUserId]);
  useEffect(()=>{
-    if(!localStream)return;
+  const previous=localStreamRef.current;
+  localStreamRef.current=localStream;
+  if(!localStream)return;
+  if(previous&&previous!==localStream){
+  const newTrack=localStream.getAudioTracks()[0];
+  for(const [userId,entry] of entries.current){
+   const sender=entry.pc.getSenders().find(item=>item.track?.kind==="audio");
+    if(sender&&newTrack){
+     newTrack.onended=()=>devLog("local-track-ended",{userId,trackId:newTrack.id});
+     sender.replaceTrack(newTrack).then(()=>devLog("local-track-replaced",{userId,trackId:newTrack.id})).catch(error=>devLog("local-track-replace-failed",{userId,error:String(error)}));
+    }
+  }
+  return;
+  }
+  for(const userId of activeMembers.current.filter(id=>id!==localUserId))createPeer(userId,localUserId<userId).catch(()=>{});
+ },[localStream,localUserId]);
+ useEffect(()=>{
+   if(!localStreamRef.current)return;
     for(const userId of [...entries.current.keys()])if(!members.includes(userId)){
      sendSignal(userId,"leave",{}).catch(()=>{});
      closePeer(userId);

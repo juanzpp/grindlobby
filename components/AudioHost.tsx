@@ -22,9 +22,9 @@ export default function AudioHost({enabled,onStreamChange}:Props){
   const d=await navigator.mediaDevices.enumerateDevices();
   setDevices(d);
  }
- function constraints(processed=true){
+ function constraints(processed=true,device=micId){
   return {
-   deviceId:micId?{exact:micId}:undefined,
+   deviceId:device?{exact:device}:undefined,
    sampleRate:{ideal:48000},
    sampleSize:{ideal:16},
    channelCount:{ideal:1},
@@ -103,6 +103,20 @@ export default function AudioHost({enabled,onStreamChange}:Props){
    alert("Não foi possível acessar o microfone. Confira a permissão do navegador.");
   }
  }
+ async function changeMicrophone(device:string){
+  setMicId(device);
+  if(!active||!stream.current)return;
+  try{
+   const nextStream=await navigator.mediaDevices.getUserMedia({audio:constraints(true,device),video:false});
+   const previous=stream.current;
+   stream.current=nextStream;
+   nextStream.getAudioTracks().forEach(track=>track.enabled=!muted);
+   onStreamChange?.(nextStream);
+   previous.getTracks().forEach(track=>track.stop());
+   updateApplied(nextStream);
+   startMeter(nextStream);
+  }catch(error){console.error(error);alert("Não foi possível trocar o microfone.");}
+ }
  function disconnect(){
   stopMicTest();
   stream.current?.getTracks().forEach(t=>t.stop());
@@ -121,8 +135,8 @@ export default function AudioHost({enabled,onStreamChange}:Props){
  async function runMicTest(mode=testMode){
   try{
    stopMicTest();
-  const s=await navigator.mediaDevices.getUserMedia({audio:constraints(mode==="processed"),video:false});
-   testStream.current=s;
+   const s=stream.current??await navigator.mediaDevices.getUserMedia({audio:constraints(mode==="processed"),video:false});
+   if(!stream.current)testStream.current=s;
   playAudioEvent("mic_test");
    updateApplied(s);
    const audio=new Audio();
@@ -142,7 +156,7 @@ export default function AudioHost({enabled,onStreamChange}:Props){
   testAudio.current?.pause();
   if(testAudio.current)testAudio.current.srcObject=null;
   testAudio.current=null;
-  testStream.current?.getTracks().forEach(t=>t.stop());
+  if(testStream.current!==stream.current)testStream.current?.getTracks().forEach(t=>t.stop());
   testStream.current=null;
   stopMeter();
   if(active&&stream.current){
@@ -152,7 +166,6 @@ export default function AudioHost({enabled,onStreamChange}:Props){
   setTesting(false);
  }
  useEffect(()=>{refreshDevices().catch(()=>{});return()=>disconnect()},[]);
- useEffect(()=>{if(active)connect()},[micId]);
  useEffect(()=>{
   if(testAudio.current)testAudio.current.volume=1;
   setSmoothGain(gain.current,input/100);
@@ -200,7 +213,7 @@ export default function AudioHost({enabled,onStreamChange}:Props){
    <div className="voice-settings-grid">
     <section className="voice-group microphone-group">
      <div className="voice-group-title"><Headphones size={15}/><div><b>Microfone</b><span>Dispositivo, ganho e detecção de voz</span></div></div>
-     <label>Microfone<select value={micId} onChange={e=>setMicId(e.target.value)}><option value="">Padrão do sistema</option>{devices.filter(d=>d.kind==="audioinput").map(d=><option key={d.deviceId} value={d.deviceId}>{d.label||"Microfone"}</option>)}</select></label>
+    <label>Microfone<select value={micId} onChange={e=>changeMicrophone(e.target.value)}><option value="">Padrão do sistema</option>{devices.filter(d=>d.kind==="audioinput").map(d=><option key={d.deviceId} value={d.deviceId}>{d.label||"Microfone"}</option>)}</select></label>
      <label>Volume do microfone <b>{input}%</b><input type="range" min="0" max="200" value={input} onChange={e=>setInput(+e.target.value)}/></label>
      <label>Sensibilidade <b>{sensitivity}%</b><input type="range" min="1" max="100" value={sensitivity} onChange={e=>setSensitivity(+e.target.value)}/></label>
      <div className="voice-meter large"><i style={{width:`${Math.max(2,level)}%`}}/><span>{level>sensitivity?"Sua voz está sendo detectada":"Fale para calibrar"}</span></div>
