@@ -12,8 +12,8 @@ type Lobby={id:string;owner_id:string;name:string;description:string|null;visibi
 export default function LobbyRoom({id,user}:{id:string;user:any}){
  const [lobby,setLobby]=useState<Lobby|null>(null); const [loading,setLoading]=useState(true); const [busy,setBusy]=useState(false); const [copied,setCopied]=useState(false); const [error,setError]=useState(''); const router=useRouter();
  const [localStream,setLocalStream]=useState<MediaStream|null>(null);
- const memberIds=lobby?.members.map(member=>member.user_id)??[];
- const {remotePeers,voiceMembers,setPeerVolume,togglePeerMuted,notifyVoiceLeave}=useLobbyVoice(id,user.id,memberIds,localStream);
+ const voiceLobbyMembers=lobby?.members.map(member=>({userId:member.user_id,name:member.profile?.display_name||member.profile?.username||"Player",profileId:member.profile?.id??null,membershipId:null}))??[];
+ const {remotePeers,voiceMembers,setPeerVolume,togglePeerMuted,notifyVoiceLeave}=useLobbyVoice(id,user.id,voiceLobbyMembers,localStream);
  const roomConnected=useRef(false); const roomExitAnnounced=useRef(false);
  async function load(){try{const r=await fetch(`/api/lobbies/${id}`,{cache:'no-store'});const j=await r.json();if(!r.ok)throw new Error(j.error||'Falha');setLobby(j.lobby)}catch(e:any){setError(e.message)}finally{setLoading(false)}}
  useEffect(()=>{load();const t=setInterval(load,10000);return()=>clearInterval(t)},[id]);
