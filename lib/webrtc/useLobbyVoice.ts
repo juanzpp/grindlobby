@@ -5,7 +5,7 @@ import {voiceIceServers} from "@/lib/webrtc/config";
 type Signal={id:number;sender_id:string;target_id:string|null;signal_type:"offer"|"answer"|"ice-candidate"|"leave";payload:RTCSessionDescriptionInit|RTCIceCandidateInit};
 export type RemoteVoicePeer={userId:string;stream:MediaStream|null;status:"Connecting"|"Connected"|"Reconnecting";speaking:boolean;volume:number;muted:boolean};
 
-type PeerEntry={pc:RTCPeerConnection;remoteStream:MediaStream|null;iceQueue:RTCIceCandidateInit[];retryTimer?:number;answering?:boolean;lastOffer?:string;analyser?:AnalyserNode;audioContext?:AudioContext;raf?:number};
+type PeerEntry={pc:RTCPeerConnection;remoteStream:MediaStream|null;iceQueue:RTCIceCandidateInit[];retryTimer?:number;disconnectTimer?:number;statsTimer?:number;lastStats?:{timestamp:number;bytesSent:number;bytesReceived:number};answering?:boolean;lastOffer?:string;analyser?:AnalyserNode;audioContext?:AudioContext;raf?:number};
 
 const devLog=(event:string,details:Record<string,unknown>={})=>{
  if(process.env.NODE_ENV==="development")console.debug(`[GrindLobby Voice] ${event}`,details);
@@ -73,11 +73,40 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,members:string[]
   const entry=entries.current.get(userId);
   if(!entry)return;
   if(entry.retryTimer)window.clearTimeout(entry.retryTimer);
+  if(entry.disconnectTimer)window.clearTimeout(entry.disconnectTimer);
+  if(entry.statsTimer)window.clearInterval(entry.statsTimer);
   stopAnalyser(entry);
   entry.pc.onicecandidate=null;entry.pc.ontrack=null;entry.pc.onconnectionstatechange=null;
   entry.pc.close();
   entries.current.delete(userId);
   if(!keepState)setRemotePeers(current=>current.filter(peer=>peer.userId!==userId));
+ }
+ async function logPeerStats(userId:string,entry:PeerEntry){
+  if(entry.pc.connectionState==="closed")return;
+  try{
+   const report=await entry.pc.getStats();
+   let bytesSent=0,bytesReceived=0;
+   const outbound:Array<Record<string,unknown>>=[],inbound:Array<Record<string,unknown>>=[];
+   report.forEach(item=>{
+    if(item.kind!=="audio"&&item.mediaType!=="audio")return;
+    if(item.type==="outbound-rtp"&&!item.isRemote){
+     const sample={ssrc:item.ssrc,bytesSent:item.bytesSent??0,packetsSent:item.packetsSent??0,audioLevel:item.audioLevel,active:item.active};
+     bytesSent+=Number(item.bytesSent??0);outbound.push(sample);
+    }
+    if(item.type==="inbound-rtp"&&!item.isRemote){
+     const sample={ssrc:item.ssrc,bytesReceived:item.bytesReceived??0,packetsReceived:item.packetsReceived??0,packetsLost:item.packetsLost??0,jitter:item.jitter??0,audioLevel:item.audioLevel};
+     bytesReceived+=Number(item.bytesReceived??0);inbound.push(sample);
+    }
+   });
+   const now=Date.now(),previous=entry.lastStats;
+   devLog("rtp-stats",{peerId:userId,connectionState:entry.pc.connectionState,outbound,inbound,bytesSentDelta:previous?bytesSent-previous.bytesSent:null,bytesReceivedDelta:previous?bytesReceived-previous.bytesReceived:null,intervalMs:previous?now-previous.timestamp:null});
+   entry.lastStats={timestamp:now,bytesSent,bytesReceived};
+  }catch(error){devError("rtp-stats-failed",{peerId:userId,error:String(error)});}
+ }
+ function startPeerStats(userId:string,entry:PeerEntry){
+  if(entry.statsTimer)return;
+  logPeerStats(userId,entry);
+  entry.statsTimer=window.setInterval(()=>logPeerStats(userId,entry),5000);
  }
  function scheduleReconnect(userId:string){
   const entry=entries.current.get(userId);
@@ -102,7 +131,8 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,members:string[]
   devLog("local-tracks-before-negotiation",{peerId:userId,count:localTracks.length,tracks:localTracks.map(track=>({id:track.id,kind:track.kind,enabled:track.enabled,readyState:track.readyState,muted:track.muted}))});
   localTracks.forEach(track=>{
    track.onended=()=>devLog("local-track-ended",{peerId:userId,trackId:track.id});
-   const transceiver=pc.addTransceiver(track,{direction:"sendrecv"});
+   const transceiver=pc.addTransceiver(track,{direction:"sendrecv",streams:[currentStream]});
+   devLog("sender-attached",{peerId:userId,trackId:transceiver.sender.track?.id,transceiverDirection:transceiver.direction});
    const codecs=RTCRtpSender.getCapabilities?.("audio")?.codecs??[];
    const opus=codecs.filter(codec=>codec.mimeType.toLowerCase()==="audio/opus");
   if(opus.length){
@@ -115,7 +145,8 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,members:string[]
   pc.oniceconnectionstatechange=()=>devLog("ice-connection-state",{peerId:userId,state:pc.iceConnectionState});
   pc.onicegatheringstatechange=()=>devLog("ice-gathering-state",{peerId:userId,state:pc.iceGatheringState});
   pc.ontrack=event=>{
-   const stream=event.streams[0]||new MediaStream([event.track]);
+   const stream=event.streams[0]??entry.remoteStream??new MediaStream();
+   if(!stream.getTracks().some(track=>track.id===event.track.id))stream.addTrack(event.track);
     devLog("ontrack",{peerId:userId,trackKind:event.track.kind,trackId:event.track.id,trackReadyState:event.track.readyState,streamCount:event.streams.length,audioTrackCount:stream.getAudioTracks().length});
    entry.remoteStream=stream;
    updatePeer(userId,{stream,status:"Connected"});
@@ -123,15 +154,25 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,members:string[]
   };
   pc.onconnectionstatechange=()=>{
     devLog("connection-state",{peerId:userId,state:pc.connectionState,signalingState:pc.signalingState,iceConnectionState:pc.iceConnectionState,iceGatheringState:pc.iceGatheringState});
-   if(pc.connectionState==="connected")updatePeer(userId,{status:"Connected"});
-   if(["failed","disconnected","closed"].includes(pc.connectionState))scheduleReconnect(userId);
+   if(pc.connectionState==="connected"){
+    if(entry.disconnectTimer)window.clearTimeout(entry.disconnectTimer);
+    entry.disconnectTimer=undefined;
+    updatePeer(userId,{status:"Connected"});startPeerStats(userId,entry);
+   }
+   if(pc.connectionState==="failed")scheduleReconnect(userId);
+   if(pc.connectionState==="disconnected"&&!entry.disconnectTimer){
+    updatePeer(userId,{status:"Reconnecting"});
+    entry.disconnectTimer=window.setTimeout(()=>{entry.disconnectTimer=undefined;if(pc.connectionState==="disconnected")scheduleReconnect(userId)},5000);
+   }
   };
   if(initiator){
     const offer=await pc.createOffer({offerToReceiveAudio:true});
     devLog("offer-created",{peerId:userId,offerType:offer.type,sdpLength:offer.sdp?.length??0});
     await pc.setLocalDescription(offer);
     devLog("set-local-description",{peerId:userId,type:pc.localDescription?.type,signalingState:pc.signalingState});
-    await sendSignal(userId,"offer",offer);
+    const localDescription=pc.localDescription;
+    if(!localDescription)throw new Error("Local offer was not applied");
+    await sendSignal(userId,"offer",localDescription.toJSON());
   }
  }
  async function createPeer(userId:string,initiator:boolean){
@@ -176,7 +217,9 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,members:string[]
     devLog("answer-created",{peerId:senderId,answerType:answer.type,sdpLength:answer.sdp?.length??0});
     await entry.pc.setLocalDescription(answer);
     devLog("set-local-description",{peerId:senderId,type:entry.pc.localDescription?.type,signalingState:entry.pc.signalingState});
-    const sent=await sendSignal(senderId,"answer",answer);
+    const localDescription=entry.pc.localDescription;
+    if(!localDescription)throw new Error("Local answer was not applied");
+    const sent=await sendSignal(senderId,"answer",localDescription.toJSON());
     if(!sent)devLog("answer-send-failed",{senderId});
    }catch(error){
     devError("answer-create-failed",{peerId:senderId,error:String(error),signalingState:entry.pc.signalingState});
@@ -205,16 +248,15 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,members:string[]
   if(session!==pollingSession.current)return;
   if(pollBusy.current)return;
   pollBusy.current=true;
-  let response:Response;
-  try{response=await fetch(`/api/lobbies/${lobbyId}/voice/signals?after=${cursor.current}`,{cache:"no-store"});}
-  catch(error){devError("poll-failed",{error:String(error)});throw error;}
   try{
+    const response=await fetch(`/api/lobbies/${lobbyId}/voice/signals?after=${cursor.current}`,{cache:"no-store"});
     if(session!==pollingSession.current||!response?.ok)return;
    const result=await response.json() as {signals:Signal[];cursor:number};
     if(session!==pollingSession.current)return;
    for(const signal of result.signals)await handleSignal(signal);
     if(session===pollingSession.current)cursor.current=result.cursor;
-    }finally{if(session===pollingSession.current)pollBusy.current=false;}
+    }catch(error){devError("poll-failed",{error:String(error),session});}
+    finally{if(session===pollingSession.current)pollBusy.current=false;}
  }
  function stopPolling(){
     pollingSession.current+=1;
