@@ -18,8 +18,9 @@ export async function GET() {
   const gameIds = Array.from(new Set((lobbies ?? []).map(l => l.game_id).filter(Boolean))) as number[]
   const ownerIds = Array.from(new Set((lobbies ?? []).map(l => l.owner_id))) as string[]
 
+  const cutoff = new Date(Date.now() - 30000).toISOString()
   const [{ data: memberships }, { data: lobbyGames }, { data: owners }, { data: myMemberships }] = await Promise.all([
-    lobbyIds.length ? admin.from('lobby_members').select('lobby_id,user_id').in('lobby_id', lobbyIds) : Promise.resolve({data: [] as any[]}),
+    lobbyIds.length ? admin.from('lobby_members').select('lobby_id,user_id').in('lobby_id', lobbyIds).gt('last_seen_at', cutoff) : Promise.resolve({data: [] as any[]}),
     gameIds.length ? admin.from('games').select('id,name,slug').in('id',gameIds) : Promise.resolve({data: [] as any[]}),
     ownerIds.length ? admin.from('profiles').select('id,username,display_name,avatar,status').in('id',ownerIds) : Promise.resolve({data: [] as any[]}),
     admin.from('lobby_members').select('lobby_id').eq('user_id',user.id),

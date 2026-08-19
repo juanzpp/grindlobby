@@ -17,7 +17,7 @@ export default function Dashboard({user}:{user:any}){
  const router=useRouter(); const display=user.display_name||user.username||"Player";
  const games=data?.games?.length?data.games:fallbackGames;
  const load=async()=>{setLoading(true);try{const r=await fetch('/api/dashboard',{cache:'no-store'});const j=await r.json();if(!r.ok)throw new Error(j.error||'Falha ao carregar');setData(j);if(!gameId&&j.games?.[0]?.id)setGameId(String(j.games[0].id));}catch(e:any){setError(e.message)}finally{setLoading(false)}};
- useEffect(()=>{load()},[]);
+ useEffect(()=>{load();const timer=setInterval(load,10000);return()=>clearInterval(timer)},[]);
  async function logout(){await fetch("/api/auth/logout",{method:"POST"});router.push("/login");router.refresh()}
  async function createLobby(){setError("");if(!name.trim()||!gameId)return setError('Preencha nome e jogo.');setBusy('create');try{const r=await fetch('/api/lobbies',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,gameId:Number(gameId),maxMembers:Number(maxMembers),visibility})});const j=await r.json();if(!r.ok)throw new Error(j.error||'Falha ao criar lobby');setCreate(false);setName('');await load();router.push(`/lobby/${j.lobbyId}`)}catch(e:any){setError(e.message)}finally{setBusy(null)}}
  async function enterLobby(l:LobbyCard){setBusy(l.id);setError('');try{if(!l.joined){const r=await fetch(`/api/lobbies/${l.id}/join`,{method:'POST'});const j=await r.json();if(!r.ok)throw new Error(j.error||'Não foi possível entrar.')}router.push(`/lobby/${l.id}`)}catch(e:any){setError(e.message)}finally{setBusy(null)}}
