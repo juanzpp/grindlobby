@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { requireEmailConfirmation } from '@/lib/auth-config'
 
 const schema = z.object({
   username: z.string().min(3).max(24).regex(/^[a-zA-Z0-9_]+$/),
@@ -70,6 +71,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       ok: true,
       requiresEmailVerification: !data.session,
+      confirmationPolicyEnabled: requireEmailConfirmation(),
     })
   } catch (error) {
     if (error instanceof z.ZodError) {

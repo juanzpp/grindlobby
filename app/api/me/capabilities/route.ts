@@ -1,0 +1,2 @@
+import {NextResponse} from "next/server";import {getCurrentUser} from "@/lib/auth";
+export async function GET(){const user=await getCurrentUser();if(!user)return NextResponse.json({error:"Não autorizado."},{status:401});const pro=user.account_tier==="pro"||user.app_role==="admin";return NextResponse.json({screenShare:{tier:pro?"pro":"free",maxWidth:pro?1920:1280,maxHeight:pro?1080:720,maxFps:pro?60:30}})}
