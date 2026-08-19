@@ -16,17 +16,21 @@ create table if not exists public.age_assurance (
   user_id uuid primary key references public.profiles(id) on delete cascade,
   age_band text check (age_band is null or age_band in ('under_13', '13_15', '16_17', '18_plus')),
   age_assurance_status text not null default 'not_started'
-    check (age_assurance_status in ('not_started', 'pending', 'verified', 'guardian_required', 'guardian_pending', 'rejected', 'expired')),
+    check (age_assurance_status in ('not_started', 'pending', 'verified', 'review_requested', 'rejected', 'expired')),
   age_verified_at timestamptz,
   age_verification_method text check (age_verification_method is null or char_length(age_verification_method) between 2 and 64),
   age_verification_expires_at timestamptz,
-  guardian_link_status text not null default 'not_required'
-    check (guardian_link_status in ('not_required', 'required', 'pending', 'verified', 'rejected', 'expired')),
-  guardian_verified_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  check (age_assurance_status <> 'verified' or (age_band is not null and age_verified_at is not null)),
-  check (guardian_link_status <> 'verified' or guardian_verified_at is not null)
+  constraint age_assurance_verified_result_check check (
+    age_assurance_status <> 'verified'
+    or (
+      age_band is not null
+      and age_verified_at is not null
+      and age_verification_method is not null
+      and age_verification_method not like 'onboarding_fallback%'
+    )
+  )
 );
 
 create table if not exists public.guardian_links (
@@ -266,7 +270,7 @@ $$;
 revoke execute on function public.join_lobby_member(uuid, uuid) from public, anon, authenticated;
 grant execute on function public.join_lobby_member(uuid, uuid) to service_role;
 
-comment on table public.age_assurance is 'Minimal age-band and assurance state. Never store full birth dates or verification documents here.';
+comment on table public.age_assurance is 'Minimal age-assurance result: band, status, method and timestamps only. Never store full birth dates or raw verification evidence here.';
 comment on table public.guardian_links is 'Hashed, expiring relationship workflow between a minor account and a guardian account.';
 comment on function public.consume_rate_limit(text, integer, integer) is 'Atomic distributed rate limit for trusted server routes only.';
 comment on function public.join_lobby_member(uuid, uuid) is 'Server-only serialized lobby join preserving role and max capacity.';
