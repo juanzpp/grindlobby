@@ -1,2 +1,2 @@
-import GrindLoading from "@/components/feedback/GrindLoading";
-export default function Loading(){return <GrindLoading variant="fullscreen" label="Carregando perfil…"/>}
+import GrindPortalLoading from "@/components/feedback/GrindPortalLoading";
+export default function Loading(){return <GrindPortalLoading variant="fullscreen" label="Sincronizando perfil…"/>}
