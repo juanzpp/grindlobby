@@ -28,6 +28,17 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const url = new URL(request.url)
   const after = Number(url.searchParams.get('after') || 0)
   await auth.admin.from('voice_signals').delete().lt('expires_at', new Date().toISOString())
+  if (url.searchParams.get('latest') === '1') {
+    const { data, error } = await auth.admin
+      .from('voice_signals')
+      .select('id')
+      .eq('lobby_id', id)
+      .or(`target_id.is.null,target_id.eq.${auth.user.id}`)
+      .order('id', { ascending: false })
+      .limit(1)
+    if (error) return NextResponse.json({ error: 'Não foi possível iniciar a sinalização.' }, { status: 500 })
+    return NextResponse.json({ signals: [], cursor: data?.[0]?.id ?? 0 })
+  }
   const { data, error } = await auth.admin
     .from('voice_signals')
     .select('id,sender_id,target_id,signal_type,payload,created_at')
