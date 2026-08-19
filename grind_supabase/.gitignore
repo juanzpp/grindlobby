@@ -1,7 +1,0 @@
-node_modules
-.next
-.env*
-!.env.example
-data/*.db
-data/*.db-shm
-data/*.db-wal
