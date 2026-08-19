@@ -1,0 +1,23 @@
+services:
+  redis:
+    image: redis:7.4-alpine
+    network_mode: host
+    command: ["redis-server", "--appendonly", "yes"]
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+
+  livekit:
+    image: livekit/livekit-server:v1.12.0
+    network_mode: host
+    restart: unless-stopped
+    depends_on: [redis]
+    env_file: .env
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
+    command: ["--config", "/etc/livekit/livekit.yaml"]
+    volumes:
+      - ./livekit.yaml:/etc/livekit/livekit.yaml:ro
+
+volumes:
+  redis-data:
