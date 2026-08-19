@@ -3,7 +3,7 @@
 import {useCallback,useEffect,useRef,useState} from "react";
 import {useRouter} from "next/navigation";
 import {
-  ArrowLeft,Check,Copy,Crown,Gamepad2,Globe,Loader2,LogOut,Mic,MicOff,
+  ArrowLeft,Check,Copy,Crown,Gamepad2,Globe,Loader2,LogOut,MessageSquare,Mic,MicOff,
   MonitorUp,MoreVertical,Radio,Settings,Shield,UserPlus,Users,
 } from "lucide-react";
 import AudioHost from "@/components/AudioHost";
@@ -11,6 +11,7 @@ import RemoteVoiceAudio from "@/components/RemoteVoiceAudio";
 import LovableBrand from "@/components/brand/LovableBrand";
 import GrindLoading from "@/components/feedback/GrindLoading";
 import ScreenShare from "@/components/stream/ScreenShare";
+import LobbyChat from "@/components/lobby/LobbyChat";
 import {useLobbyVoice} from "@/lib/webrtc/useLobbyVoice";
 import {loadAudioPreferences,playAudioEvent} from "@/lib/audio";
 
@@ -39,6 +40,7 @@ export default function LobbyRoom({id,user}:{id:string;user:LobbyUser}){
   const [copied,setCopied]=useState(false);
   const [error,setError]=useState("");
   const [localStream,setLocalStream]=useState<MediaStream|null>(null);
+  const [roomTab,setRoomTab]=useState<"members"|"chat">("members");
   const router=useRouter();
   const voiceLobbyMembers=lobby?.members.map(member=>({
     userId:member.user_id,
@@ -88,7 +90,7 @@ export default function LobbyRoom({id,user}:{id:string;user:LobbyUser}){
     void heartbeat();
     const timer=window.setInterval(()=>void heartbeat(),10_000);
     window.addEventListener("pagehide",expire);
-    return()=>{window.clearInterval(timer);window.removeEventListener("pagehide",expire);expire()};
+    return()=>{window.clearInterval(timer);window.removeEventListener("pagehide",expire)};
   },[id,lobby?.isMember]);
 
   async function join(){
@@ -134,8 +136,8 @@ export default function LobbyRoom({id,user}:{id:string;user:LobbyUser}){
       {error?<div className="lovable-feedback lovable-feedback-error mt-4" role="alert">{error}</div>:null}
       <div className="room-grid">
         <section className="room-panel lovable-panel">
-          <div className="section-head"><div><small>MEMBROS</small><h2>Squad ({lobby.members.length}/{lobby.max_members})</h2></div><span className="room-count">LIVEKIT</span></div>
-          <ul className="lovable-member-list mt-3 rounded-xl border border-border bg-panel/40 px-3">
+          <div className="section-head"><div><small>SALA</small><h2>{roomTab==="members"?`Squad (${lobby.members.length}/${lobby.max_members})`:"Chat da sala"}</h2></div><div className="room-tabs"><button className={roomTab==="members"?"active":""} onClick={()=>setRoomTab("members")}><Users size={13}/>Membros</button><button className={roomTab==="chat"?"active":""} onClick={()=>setRoomTab("chat")}><MessageSquare size={13}/>Chat</button></div></div>
+          {roomTab==="members"?<ul className="lovable-member-list mt-3 rounded-xl border border-border bg-panel/40 px-3">
             {lobby.members.map(member=>{
               const voice=voiceMembers.find(item=>item.userId===member.user_id);
               const peer=remotePeers.find(item=>item.userId===member.user_id);
@@ -149,7 +151,7 @@ export default function LobbyRoom({id,user}:{id:string;user:LobbyUser}){
                 {peer?<div className="remote-voice-controls w-full"><RemoteVoiceAudio stream={peer.stream} volume={peer.volume} muted={peer.muted}/><button onClick={()=>togglePeerMuted(member.user_id)}>{peer.muted?"Desmutar":"Mutar"}</button><label>Volume <input aria-label={`Volume de ${memberName}`} type="range" min="0" max="200" value={peer.volume} onChange={event=>setPeerVolume(member.user_id,Number(event.target.value))}/><b>{peer.volume}%</b></label></div>:null}
               </li>;
             })}
-          </ul>
+          </ul>:<LobbyChat lobbyId={id} members={voiceLobbyMembers.map(member=>({userId:member.userId,name:member.name}))}/>}
         </section>
 
         <aside className="room-side">

@@ -1,7 +1,7 @@
 "use client";
 
 import {useEffect,useRef,useState} from "react";
-import {Expand,MonitorUp,Radio,Square,Volume2,X} from "lucide-react";
+import {Expand,MonitorUp,Radio,Square,Volume2,X,Zap} from "lucide-react";
 import {
   AudioPresets,
   ConnectionState,
@@ -47,6 +47,13 @@ type ScreenAudioState={
   available:boolean|null;
   published:boolean;
 };
+type QualityPreset={height:360|480|720|1080;width:number;fps:number;bitrate:number;label:string};
+const qualityPresets:QualityPreset[]=[
+  {height:360,width:640,fps:24,bitrate:650_000,label:"360p"},
+  {height:480,width:854,fps:30,bitrate:1_100_000,label:"480p"},
+  {height:720,width:1280,fps:30,bitrate:2_200_000,label:"720p"},
+  {height:1080,width:1920,fps:60,bitrate:5_000_000,label:"1080p"},
+];
 
 const freeEntitlement:Entitlement={tier:"free",maxWidth:1280,maxHeight:720,maxFps:30,allowed:true,reason:null};
 
@@ -148,6 +155,7 @@ export default function ScreenShare({isPro=false}:{isPro?:boolean}){
   const [busy,setBusy]=useState(false);
   const [reconnecting,setReconnecting]=useState(false);
   const [surface,setSurface]=useState<"monitor"|"window"|"browser">("browser");
+  const [quality,setQuality]=useState<360|480|720|1080>(isPro?1080:720);
   const [volume,setVolume]=useState(100);
   const [error,setError]=useState("");
   const [entitlement,setEntitlement]=useState<Entitlement>(initialEntitlement);
@@ -231,10 +239,13 @@ export default function ScreenShare({isPro=false}:{isPro?:boolean}){
     setBusy(true);setError("");setScreenAudio(current=>({...current,available:null,published:false}));
     let createdTracks:LocalTrack[]=[];
     try{
+      const selected=qualityPresets.find(item=>item.height===quality)??qualityPresets[2];
+      if(selected.height>entitlement.maxHeight){setError(`Seu plano permite transmissão até ${entitlement.maxHeight}p.`);setBusy(false);return}
+      const maxFps=Math.min(selected.fps,entitlement.maxFps);
       const capturePromise=room.localParticipant.createScreenTracks({
         audio:true,
         video:{displaySurface:surface},
-        resolution:{width:entitlement.maxWidth,height:entitlement.maxHeight,frameRate:entitlement.maxFps},
+        resolution:{width:selected.width,height:selected.height,frameRate:maxFps},
         contentHint:"motion",
         surfaceSwitching:"include",
         systemAudio:"include",
@@ -248,12 +259,18 @@ export default function ScreenShare({isPro=false}:{isPro?:boolean}){
       const audio=tracks.find(track=>track instanceof LocalAudioTrack) as LocalAudioTrack|undefined;
       if(!video)throw new Error("O navegador não retornou uma faixa de vídeo da tela.");
       await video.mediaStreamTrack.applyConstraints({
-        width:{max:capability.maxWidth},
-        height:{max:capability.maxHeight},
-        frameRate:{max:capability.maxFps},
+        width:{max:Math.min(selected.width,capability.maxWidth)},
+        height:{max:Math.min(selected.height,capability.maxHeight)},
+        frameRate:{max:Math.min(maxFps,capability.maxFps)},
       }).catch(()=>{});
       setScreenAudio(current=>({...current,available:Boolean(audio),published:false}));
-      await room.localParticipant.publishTrack(video,{source:Track.Source.ScreenShare,simulcast:true});
+      await room.localParticipant.publishTrack(video,{
+        source:Track.Source.ScreenShare,
+        simulcast:true,
+        videoCodec:"vp8",
+        degradationPreference:"balanced",
+        screenShareEncoding:{maxBitrate:selected.bitrate,maxFramerate:Math.min(maxFps,capability.maxFps)},
+      });
       if(audio){
         try{
           await room.localParticipant.publishTrack(audio,{
@@ -300,9 +317,9 @@ export default function ScreenShare({isPro=false}:{isPro?:boolean}){
   return <section className="stream-card">
     <header><div><small>LIVEKIT STREAM</small><h2>Compartilhamento de tela</h2></div>{localShare?<span className="stream-live"><Radio size={12}/>{reconnecting?"RECONECTANDO":"LIVE"}</span>:null}</header>
     {localShare?<div className="stream-active"><b>{localShare.quality}</b><span>{localAudioLabel}</span><span>{Math.max(0,(room?.numParticipants||1)-1)} participante(s) na sala</span><div><button onClick={()=>setViewerId(localShare.ownerId)}><Expand size={14}/>Abrir tela</button><button onClick={stop} disabled={busy}><Square size={13}/>Parar</button></div></div>:<button className="stream-start" onClick={openPanel} disabled={!room||reconnecting}><MonitorUp size={16}/>Compartilhar tela</button>}
-    {remoteShares.map(share=><button className="stream-available" key={share.ownerId} onClick={()=>setViewerId(share.ownerId)}><span><Radio size={12}/>{share.ownerName} está transmitindo · {share.audioPublished?"com áudio":"só vídeo"}</span><b>Abrir tela</b></button>)}
+    {remoteShares.length?<div className="stream-friends-live"><small>AMIGOS TRANSMITINDO</small>{remoteShares.map(share=><button className="stream-available stream-available-rich" key={share.ownerId} onClick={()=>setViewerId(share.ownerId)}><span className="stream-share-icon"><MonitorUp size={16}/><i/></span><span className="stream-share-copy"><b>{share.ownerName}</b><small><Radio size={10}/> AO VIVO · {share.quality} · {share.audioPublished?"com áudio":"só vídeo"}</small></span><strong>Assistir</strong></button>)}</div>:null}
     {error?<p className="stream-error">{error}</p>:null}
-    {panel?<div className="stream-modal-bg" role="dialog" aria-modal="true" aria-labelledby="share-title"><div className="stream-modal"><button className="modal-close" onClick={()=>setPanel(false)} aria-label="Fechar"><X/></button><small>PREPARAR TRANSMISSÃO</small><h2 id="share-title">O que você quer compartilhar?</h2><p>A escolha final e a disponibilidade de áudio dependem do seletor seguro do navegador.</p><div className="source-grid">{[["browser","Aba"],["window","Janela"],["monitor","Tela inteira"]].map(([value,label])=><button type="button" className={surface===value?"selected":""} onClick={()=>setSurface(value as typeof surface)} key={value}><MonitorUp/>{label}</button>)}</div><div className="stream-capability"><Volume2 size={16}/><span>{screenAudio.supported?"Áudio da tela disponível quando a fonte e o navegador oferecerem essa opção.":"Áudio da tela não disponível neste navegador."}</span></div><div className="quality-row"><span>Plano {entitlement.tier.toUpperCase()}</span><b>{entitlement.maxHeight}p · até {entitlement.maxFps} FPS</b></div><button className="auth-primary" onClick={start} disabled={busy}>{busy?<GrindPortalLoading label="Preparando transmissão…"/>:"Abrir seletor do navegador"}</button></div></div>:null}
+    {panel?<div className="stream-modal-bg" role="dialog" aria-modal="true" aria-labelledby="share-title"><div className="stream-modal"><button className="modal-close" onClick={()=>setPanel(false)} aria-label="Fechar"><X/></button><small>PREPARAR TRANSMISSÃO</small><h2 id="share-title">O que você quer compartilhar?</h2><p>A escolha final e a disponibilidade de áudio dependem do seletor seguro do navegador.</p><div className="source-grid">{[["browser","Aba"],["window","Janela"],["monitor","Tela inteira"]].map(([value,label])=><button type="button" className={surface===value?"selected":""} onClick={()=>setSurface(value as typeof surface)} key={value}><MonitorUp/>{label}</button>)}</div><div className="stream-capability"><Volume2 size={16}/><span>{screenAudio.supported?"Áudio da tela disponível quando a fonte e o navegador oferecerem essa opção.":"Áudio da tela não disponível neste navegador."}</span></div><div className="stream-quality-picker"><div><span>Qualidade da transmissão</span><small><Zap size={12}/> Menor resolução reduz atraso e uso de banda</small></div><div className="stream-quality-options">{qualityPresets.map(option=>{const locked=option.height>entitlement.maxHeight;return <button type="button" key={option.height} disabled={locked} className={quality===option.height?"selected":""} onClick={()=>setQuality(option.height)}><b>{option.label}</b><small>{option.fps} FPS{locked?" · PRO":""}</small></button>})}</div></div><div className="quality-row"><span>Plano {entitlement.tier.toUpperCase()}</span><b>Selecionado: {quality}p · até {Math.min(qualityPresets.find(item=>item.height===quality)?.fps??30,entitlement.maxFps)} FPS</b></div><button className="auth-primary" onClick={start} disabled={busy}>{busy?<GrindPortalLoading label="Preparando transmissão…"/>:"Abrir seletor do navegador"}</button></div></div>:null}
     {viewer?<div className="stream-viewer" role="dialog" aria-modal="true"><header><div><span>LIVE</span><b>{viewer.ownerName}</b><small>{viewer.local?"Prévia local":"Transmissão LiveKit"} · {viewer.audioPublished?"com áudio":"somente vídeo"}</small></div><button onClick={()=>setViewerId(null)} aria-label="Fechar viewer"><X/></button></header><div className="stream-stage"><StreamVideo share={viewer} volume={volume}/></div><footer><span>{viewer.quality}</span><label><Volume2 size={14}/><input aria-label="Volume da transmissão" type="range" min="0" max="100" value={volume} onChange={event=>setVolume(Number(event.target.value))}/></label><button onClick={()=>document.querySelector<HTMLDivElement>(".stream-stage")?.requestFullscreen()}><Expand size={14}/>Fullscreen</button></footer></div>:null}
   </section>;
 }
