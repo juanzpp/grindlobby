@@ -2,14 +2,17 @@
 import {useEffect,useRef,useState} from "react";
 import {voiceIceServers} from "@/lib/webrtc/config";
 
-type Signal={id:number;sender_id:string;target_id:string|null;signal_type:"offer"|"answer"|"ice-candidate"|"leave";payload:RTCSessionDescriptionInit|RTCIceCandidateInit};
+type DescriptionSignalPayload={negotiationId:string;description:RTCSessionDescriptionInit};
+type IceSignalPayload={negotiationId:string;candidate:RTCIceCandidateInit};
+type Signal={id:number;sender_id:string;target_id:string|null;signal_type:"offer"|"answer"|"ice-candidate"|"leave";payload:DescriptionSignalPayload|IceSignalPayload|Record<string,never>};
 export type RemoteVoicePeer={userId:string;stream:MediaStream|null;status:"Connecting"|"Connected"|"Reconnecting";speaking:boolean;volume:number;muted:boolean};
 
 declare global{
  interface Window{__GRINDLOBBY_VOICE_DEBUG__?:boolean}
 }
 
-type PeerEntry={pc:RTCPeerConnection;remoteStream:MediaStream|null;iceQueue:RTCIceCandidateInit[];retryTimer?:number;disconnectTimer?:number;statsTimer?:number;lastStats?:{timestamp:number;bytesSent:number;bytesReceived:number};answering?:boolean;lastOffer?:string;analyser?:AnalyserNode;audioContext?:AudioContext;raf?:number};
+type QueuedIce={negotiationId:string;candidate:RTCIceCandidateInit};
+type PeerEntry={pc:RTCPeerConnection;remoteStream:MediaStream|null;iceQueue:QueuedIce[];retryTimer?:number;disconnectTimer?:number;statsTimer?:number;lastStats?:{timestamp:number;bytesSent:number;bytesReceived:number};answering?:boolean;negotiationId?:string;localAnswer?:RTCSessionDescriptionInit;reconnecting?:boolean;analyser?:AnalyserNode;audioContext?:AudioContext;raf?:number};
 
 const voiceDebug=process.env.NODE_ENV==="development"||process.env.NEXT_PUBLIC_VOICE_DEBUG==="true";
 const productionVoiceDebug=process.env.NEXT_PUBLIC_VOICE_DEBUG==="true";
@@ -18,6 +21,7 @@ export const getRemoteVoicePeerId=(stream:MediaStream|null)=>stream?remoteStream
 const devLog=(event:string,details:Record<string,unknown>={})=>{if(voiceDebug)console.debug(`[GrindLobby Voice] ${event}`,details)};
 const devError=(event:string,details:Record<string,unknown>={})=>{if(voiceDebug)console.error(`[GrindLobby Voice] ${event}`,details)};
 const trackSummary=(track:MediaStreamTrack|null)=>track?{enabled:track.enabled,muted:track.muted,readyState:track.readyState}:null;
+const newNegotiationId=()=>crypto.randomUUID();
 
 export function useLobbyVoice(lobbyId:string,localUserId:string,members:string[],localStream:MediaStream|null){
  const [remotePeers,setRemotePeers]=useState<RemoteVoicePeer[]>([]);
@@ -117,14 +121,16 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,members:string[]
  }
  function scheduleReconnect(userId:string){
   const entry=entries.current.get(userId);
-  if(entry?.retryTimer)return;
+  if(!entry||entry.retryTimer||entry.reconnecting)return;
+  entry.reconnecting=true;
   updatePeer(userId,{status:"Reconnecting",stream:null,speaking:false});
   const retry=window.setTimeout(()=>{
-  if(!activeMembers.current.includes(userId)||!localStreamRef.current)return;
+   entry.retryTimer=undefined;
+   if(!activeMembers.current.includes(userId)||!localStreamRef.current){entry.reconnecting=false;return;}
    closePeer(userId,true);
   createPeer(userId,localUserId<userId).catch(error=>devError("peer-reconnect-failed",{peerId:userId,error:String(error)}));
   },1500);
-  if(entry)entry.retryTimer=retry;
+  entry.retryTimer=retry;
  }
   async function createPeerInternal(userId:string,initiator:boolean){
   const currentStream=localStreamRef.current;
@@ -132,7 +138,7 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,members:string[]
   devLog("peer-created",{peerId:userId,remoteUserId:userId,role:initiator?"offerer":"receiver",localUserId});
   addPeerState(userId);
   const pc=new RTCPeerConnection({iceServers:voiceIceServers});
-  const entry:PeerEntry={pc,remoteStream:null,iceQueue:[]};
+  const entry:PeerEntry={pc,remoteStream:null,iceQueue:[],reconnecting:false};
   entries.current.set(userId,entry);
   const localTracks=currentStream.getAudioTracks();
   devLog("local-audio-tracks",{peerId:userId,count:localTracks.length,tracks:localTracks.map(trackSummary)});
@@ -147,7 +153,10 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,members:string[]
   catch(error){devError("codec-preference-failed",{peerId:userId,error:String(error)});}
   }
   });
-  pc.onicecandidate=event=>{if(event.candidate)sendSignal(userId,"ice-candidate",event.candidate.toJSON()).catch(error=>devError("ice-send-error",{peerId:userId,error:String(error)}));};
+  pc.onicecandidate=event=>{
+   if(!event.candidate||!entry.negotiationId)return;
+   sendSignal(userId,"ice-candidate",{negotiationId:entry.negotiationId,candidate:event.candidate.toJSON()}).catch(error=>devError("ice-send-error",{peerId:userId,error:String(error)}));
+  };
   pc.onsignalingstatechange=()=>devLog("signaling-state",{peerId:userId,state:pc.signalingState});
   pc.oniceconnectionstatechange=()=>devLog("ice-connection-state",{peerId:userId,state:pc.iceConnectionState});
   pc.onicegatheringstatechange=()=>devLog("ice-gathering-state",{peerId:userId,state:pc.iceGatheringState});
@@ -174,13 +183,14 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,members:string[]
    }
   };
   if(initiator){
+    entry.negotiationId=newNegotiationId();
     const offer=await pc.createOffer({offerToReceiveAudio:true});
-    devLog("offer-created",{peerId:userId,offerType:offer.type,sdpLength:offer.sdp?.length??0});
+    devLog("offer-created",{peerId:userId,negotiationId:entry.negotiationId,offerType:offer.type,sdpLength:offer.sdp?.length??0});
     await pc.setLocalDescription(offer);
     devLog("set-local-description",{peerId:userId,type:pc.localDescription?.type,signalingState:pc.signalingState});
     const localDescription=pc.localDescription;
     if(!localDescription)throw new Error("Local offer was not applied");
-    await sendSignal(userId,"offer",localDescription.toJSON());
+    await sendSignal(userId,"offer",{negotiationId:entry.negotiationId,description:localDescription.toJSON()});
   }
  }
  async function createPeer(userId:string,initiator:boolean){
@@ -194,30 +204,40 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,members:string[]
  async function applyQueuedCandidates(entry:PeerEntry,userId:string){
   if(!entry.pc.remoteDescription)return;
   const queued=entry.iceQueue.splice(0);
-  for(const candidate of queued){
-   try{await entry.pc.addIceCandidate(candidate);devLog("ice-applied",{peerId:userId});}
+  for(const queuedCandidate of queued){
+   if(queuedCandidate.negotiationId!==entry.negotiationId){devLog("ice-ignored-stale",{peerId:userId,negotiationId:queuedCandidate.negotiationId,activeNegotiationId:entry.negotiationId});continue;}
+   try{await entry.pc.addIceCandidate(queuedCandidate.candidate);devLog("ice-applied",{peerId:userId,negotiationId:entry.negotiationId});}
    catch(error){devError("ice-apply-failed",{peerId:userId,error:String(error)});throw error;}
   }
  }
- async function handleSignal(signal:Signal){
+ async function handleSignal(signal:Signal,session:number){
+  if(session!==pollingSession.current)return;
   if(signal.sender_id===localUserId)return;
   if(signal.signal_type==="leave"){closePeer(signal.sender_id);return;}
   if(!activeMembers.current.includes(signal.sender_id)||!localStreamRef.current)return;
   if(signal.signal_type==="offer"){
    const senderId=signal.sender_id;
-   const offer=signal.payload as RTCSessionDescriptionInit;
-   const offerKey=offer.sdp||JSON.stringify(offer);
-  devLog("offer-received",{peerId:senderId,signalingState:entries.current.get(senderId)?.pc.signalingState,hasSdp:Boolean(offer.sdp)});
+   const payload=signal.payload as DescriptionSignalPayload;
+   if(!payload.negotiationId||payload.description?.type!=="offer"){devLog("offer-ignored-stale",{peerId:senderId,reason:"missing-negotiation-id"});return;}
+   const offer=payload.description;
+   const negotiationId=payload.negotiationId;
+  devLog("offer-received",{peerId:senderId,negotiationId,signalingState:entries.current.get(senderId)?.pc.signalingState,hasSdp:Boolean(offer.sdp)});
    let entry=entries.current.get(senderId);
-   if(!entry){await createPeer(senderId,false);entry=entries.current.get(senderId);}
+   if(entry?.retryTimer){window.clearTimeout(entry.retryTimer);entry.retryTimer=undefined;entry.reconnecting=false;}
+   if(entry&&["failed","closed"].includes(entry.pc.connectionState)){closePeer(senderId,true);entry=undefined;}
+   if(!entry){await createPeer(senderId,false);if(session!==pollingSession.current)return;entry=entries.current.get(senderId);}
    if(!entry){devLog("answer-create-failed",{senderId,error:"peer-not-created"});return;}
-  if(entry.lastOffer===offerKey)return;
-   entry.answering=true;entry.lastOffer=offerKey;
+   if(entry.negotiationId===negotiationId){
+    devLog("offer-ignored-duplicate",{peerId:senderId,negotiationId,signalingState:entry.pc.signalingState});
+    if(entry.localAnswer)await sendSignal(senderId,"answer",{negotiationId,description:entry.localAnswer});
+    return;
+   }
+   if(entry.answering||entry.pc.signalingState!=="stable"){
+    devLog("offer-ignored-stale",{peerId:senderId,negotiationId,activeNegotiationId:entry.negotiationId,signalingState:entry.pc.signalingState});
+    return;
+   }
+   entry.answering=true;entry.negotiationId=negotiationId;entry.localAnswer=undefined;entry.iceQueue=[];
    try{
-    if(entry.pc.signalingState==="have-local-offer"){
-     devLog("answer-create-failed",{senderId,error:"peer-already-has-local-offer"});
-     return;
-    }
     await entry.pc.setRemoteDescription(offer);
     devLog("set-remote-description",{peerId:senderId,type:entry.pc.remoteDescription?.type,signalingState:entry.pc.signalingState});
     await applyQueuedCandidates(entry,senderId);
@@ -227,25 +247,34 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,members:string[]
     devLog("set-local-description",{peerId:senderId,type:entry.pc.localDescription?.type,signalingState:entry.pc.signalingState});
     const localDescription=entry.pc.localDescription;
     if(!localDescription)throw new Error("Local answer was not applied");
-    const sent=await sendSignal(senderId,"answer",localDescription.toJSON());
+    entry.localAnswer=localDescription.toJSON();
+    const sent=await sendSignal(senderId,"answer",{negotiationId,description:entry.localAnswer});
     if(!sent)devLog("answer-send-failed",{senderId});
    }catch(error){
     devError("answer-create-failed",{peerId:senderId,error:String(error),signalingState:entry.pc.signalingState});
    }finally{entry.answering=false;}
   }else if(signal.signal_type==="answer"){
-  devLog("answer-received",{peerId:signal.sender_id,signalingState:entries.current.get(signal.sender_id)?.pc.signalingState});
-   const entry=entries.current.get(signal.sender_id);if(!entry)return;
+   const payload=signal.payload as DescriptionSignalPayload;
+   const entry=entries.current.get(signal.sender_id);
+   const signalingStateBefore=entry?.pc.signalingState;
+   devLog("signaling-state-before-answer",{peerId:signal.sender_id,negotiationId:payload.negotiationId,signalingState:signalingStateBefore});
+   if(!entry||!payload.negotiationId||payload.description?.type!=="answer"||payload.negotiationId!==entry.negotiationId||entry.pc.signalingState!=="have-local-offer"||!entry.pc.localDescription||entry.pc.localDescription.type!=="offer"){
+    devLog("answer-ignored-stale",{peerId:signal.sender_id,negotiationId:payload.negotiationId,activeNegotiationId:entry?.negotiationId,signalingState:signalingStateBefore,localDescriptionType:entry?.pc.localDescription?.type??null});
+    return;
+   }
     try{
-     await entry.pc.setRemoteDescription(signal.payload as RTCSessionDescriptionInit);
-    devLog("set-remote-description",{peerId:signal.sender_id,type:entry.pc.remoteDescription?.type,signalingState:entry.pc.signalingState});
+     await entry.pc.setRemoteDescription(payload.description);
+     devLog("answer-applied",{peerId:signal.sender_id,negotiationId:payload.negotiationId});
+     devLog("negotiation-id",{peerId:signal.sender_id,negotiationId:entry.negotiationId});
+     devLog("signaling-state-after-answer",{peerId:signal.sender_id,negotiationId:payload.negotiationId,signalingState:entry.pc.signalingState});
      await applyQueuedCandidates(entry,signal.sender_id);
     }catch(error){devError("answer-received-failed",{peerId:signal.sender_id,error:String(error)});}
   }else if(signal.signal_type==="ice-candidate"){
-   if(!entries.current.has(signal.sender_id))await createPeer(signal.sender_id,localUserId<signal.sender_id);
-   const entry=entries.current.get(signal.sender_id);if(!entry)return;
-   const candidate=signal.payload as RTCIceCandidateInit;
-  devLog("ice-received",{peerId:signal.sender_id});
-   if(entry.pc.remoteDescription)await applyCandidate(entry,candidate,signal.sender_id);else entry.iceQueue.push(candidate);
+   const payload=signal.payload as IceSignalPayload;
+   const entry=entries.current.get(signal.sender_id);
+   if(!entry||!payload.negotiationId||payload.negotiationId!==entry.negotiationId){devLog("ice-ignored-stale",{peerId:signal.sender_id,negotiationId:payload.negotiationId,activeNegotiationId:entry?.negotiationId});return;}
+   devLog("ice-received",{peerId:signal.sender_id,negotiationId:payload.negotiationId});
+   if(entry.pc.remoteDescription)await applyCandidate(entry,payload.candidate,signal.sender_id);else entry.iceQueue.push(payload);
   }
  }
  async function applyCandidate(entry:PeerEntry,candidate:RTCIceCandidateInit,userId:string){
@@ -261,7 +290,7 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,members:string[]
     if(session!==pollingSession.current||!response?.ok)return;
    const result=await response.json() as {signals:Signal[];cursor:number};
     if(session!==pollingSession.current)return;
-   for(const signal of result.signals)await handleSignal(signal);
+   for(const signal of result.signals){if(session!==pollingSession.current)return;await handleSignal(signal,session);}
     if(session===pollingSession.current)cursor.current=result.cursor;
     }catch(error){devError("poll-failed",{error:String(error),session});}
     finally{if(session===pollingSession.current)pollBusy.current=false;}
@@ -280,6 +309,15 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,members:string[]
   for(const userId of [...entries.current.keys()])closePeer(userId);
   entries.current.clear();
   setRemotePeers([]);
+ }
+ async function initializeCursor(session:number){
+  const response=await fetch(`/api/lobbies/${lobbyId}/voice/signals?latest=1`,{cache:"no-store"});
+  if(session!==pollingSession.current||!response.ok)return false;
+  const result=await response.json() as {cursor:number};
+  if(session!==pollingSession.current)return false;
+  cursor.current=result.cursor;
+  devLog("signal-cursor-initialized",{session,cursor:cursor.current});
+  return true;
  }
  useEffect(()=>{
   if(!productionVoiceDebug||window.__GRINDLOBBY_VOICE_DEBUG__)return;
@@ -307,8 +345,11 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,members:string[]
   cursor.current=0;
   pollBusy.current=false;
   const session=++pollingSession.current;
-  poll(session).catch(error=>devLog("poll-failed",{error:String(error),session}));
-  pollTimer.current=window.setInterval(()=>poll(session).catch(error=>devLog("poll-failed",{error:String(error),session})),500);
+  initializeCursor(session).then(initialized=>{
+   if(!initialized||session!==pollingSession.current)return;
+   poll(session).catch(error=>devLog("poll-failed",{error:String(error),session}));
+   pollTimer.current=window.setInterval(()=>poll(session).catch(error=>devLog("poll-failed",{error:String(error),session})),500);
+  }).catch(error=>devError("signal-cursor-init-failed",{error:String(error),session}));
   return stopPolling;
  },[Boolean(localStream),lobbyId,localUserId]);
  useEffect(()=>{
