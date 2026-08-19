@@ -7,10 +7,15 @@ export type RemoteVoicePeer={userId:string;stream:MediaStream|null;status:"Conne
 
 type PeerEntry={pc:RTCPeerConnection;remoteStream:MediaStream|null;iceQueue:RTCIceCandidateInit[];retryTimer?:number;analyser?:AnalyserNode;audioContext?:AudioContext;raf?:number};
 
+const devLog=(event:string,details:Record<string,unknown>={})=>{
+ if(process.env.NODE_ENV==="development")console.debug(`[voice] ${event}`,details);
+};
+
 export function useLobbyVoice(lobbyId:string,localUserId:string,members:string[],localStream:MediaStream|null){
  const [remotePeers,setRemotePeers]=useState<RemoteVoicePeer[]>([]);
  const entries=useRef(new Map<string,PeerEntry>());
  const cursor=useRef(0);
+ const pollBusy=useRef(false);
  const mounted=useRef(true);
  const memberKey=members.filter(id=>id!==localUserId).sort().join(",");
  const activeMembers=useRef(members);
@@ -24,7 +29,12 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,members:string[]
   setRemotePeers(current=>current.some(peer=>peer.userId===userId)?current:[...current,{userId,stream:null,status,speaking:false,volume:100,muted:false}]);
  }
  async function sendSignal(targetId:string,type:Signal["signal_type"],payload:Signal["payload"]){
-  await fetch(`/api/lobbies/${lobbyId}/voice/signals`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({targetId,type,payload})}).catch(()=>{});
+  const response=await fetch(`/api/lobbies/${lobbyId}/voice/signals`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({targetId,type,payload})}).catch(()=>null);
+  if(!response?.ok){devLog("signal-post-failed",{type,targetId,status:response?.status,error:response?await response.text().catch(()=>"unreadable"):"network-error"});return false;}
+  if(type==="offer")devLog("offer-sent",{targetId});
+  if(type==="answer")devLog("answer-sent",{targetId});
+  if(type==="ice-candidate")devLog("ice-sent",{targetId});
+  return true;
  }
  function stopAnalyser(entry:PeerEntry){
   if(entry.raf)cancelAnimationFrame(entry.raf);
@@ -71,8 +81,9 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,members:string[]
   },1500);
   if(entry)entry.retryTimer=retry;
  }
- async function createPeer(userId:string,initiator:boolean){
+ async function createPeerInternal(userId:string,initiator:boolean){
   if(!localStream||entries.current.has(userId))return;
+  devLog("peer-created",{userId,role:initiator?"offerer":"receiver",localUserId});
   addPeerState(userId);
   const pc=new RTCPeerConnection({iceServers:voiceIceServers});
   const entry:PeerEntry={pc,remoteStream:null,iceQueue:[]};
@@ -81,9 +92,12 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,members:string[]
    const transceiver=pc.addTransceiver(track,{direction:"sendrecv"});
    const codecs=RTCRtpSender.getCapabilities?.("audio")?.codecs??[];
    const opus=codecs.filter(codec=>codec.mimeType.toLowerCase()==="audio/opus");
-   if(opus.length)transceiver.setCodecPreferences([...opus,...codecs.filter(codec=>codec.mimeType.toLowerCase()!=="audio/opus")]);
+  if(opus.length){
+   try{transceiver.setCodecPreferences([...opus,...codecs.filter(codec=>codec.mimeType.toLowerCase()!=="audio/opus")]);}
+   catch(error){devLog("codec-preference-failed",{userId,error:String(error)});}
+  }
   });
-  pc.onicecandidate=event=>{if(event.candidate)sendSignal(userId,"ice-candidate",event.candidate.toJSON()).catch(()=>{})};
+  pc.onicecandidate=event=>{if(event.candidate)sendSignal(userId,"ice-candidate",event.candidate.toJSON()).catch(error=>devLog("ice-send-error",{userId,error:String(error)}));};
   pc.ontrack=event=>{
    const stream=event.streams[0]||new MediaStream([event.track]);
    entry.remoteStream=stream;
@@ -91,13 +105,23 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,members:string[]
    startAnalyser(userId,entry,stream);
   };
   pc.onconnectionstatechange=()=>{
+    devLog("connection-state",{userId,state:pc.connectionState});
    if(pc.connectionState==="connected")updatePeer(userId,{status:"Connected"});
    if(["failed","disconnected","closed"].includes(pc.connectionState))scheduleReconnect(userId);
   };
   if(initiator){
-   const offer=await pc.createOffer({offerToReceiveAudio:true});
-   await pc.setLocalDescription(offer);
-   await sendSignal(userId,"offer",offer);
+    const offer=await pc.createOffer({offerToReceiveAudio:true});
+    devLog("offer-created",{userId});
+    await pc.setLocalDescription(offer);
+    await sendSignal(userId,"offer",offer);
+  }
+ }
+ async function createPeer(userId:string,initiator:boolean){
+  try{await createPeerInternal(userId,initiator);}
+  catch(error){
+   devLog("peer-create-failed",{userId,initiator,error:String(error)});
+   closePeer(userId);
+   updatePeer(userId,{status:"Reconnecting"});
   }
  }
  async function handleSignal(signal:Signal){
@@ -105,6 +129,7 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,members:string[]
   if(signal.signal_type==="leave"){closePeer(signal.sender_id);return;}
   if(!activeMembers.current.includes(signal.sender_id)||!localStream)return;
   if(signal.signal_type==="offer"){
+    devLog("offer-received",{senderId:signal.sender_id});
    if(!entries.current.has(signal.sender_id))await createPeer(signal.sender_id,false);
    const entry=entries.current.get(signal.sender_id);if(!entry)return;
    await entry.pc.setRemoteDescription(signal.payload as RTCSessionDescriptionInit);
@@ -114,6 +139,7 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,members:string[]
    await entry.pc.setLocalDescription(answer);
    await sendSignal(signal.sender_id,"answer",answer);
   }else if(signal.signal_type==="answer"){
+  devLog("answer-received",{senderId:signal.sender_id});
    const entry=entries.current.get(signal.sender_id);if(!entry)return;
    await entry.pc.setRemoteDescription(signal.payload as RTCSessionDescriptionInit);
    for(const candidate of entry.iceQueue)await entry.pc.addIceCandidate(candidate).catch(()=>{});
@@ -122,15 +148,20 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,members:string[]
    if(!entries.current.has(signal.sender_id))await createPeer(signal.sender_id,localUserId<signal.sender_id);
    const entry=entries.current.get(signal.sender_id);if(!entry)return;
    const candidate=signal.payload as RTCIceCandidateInit;
+  devLog("ice-received",{senderId:signal.sender_id});
    if(entry.pc.remoteDescription)await entry.pc.addIceCandidate(candidate).catch(()=>{});else entry.iceQueue.push(candidate);
   }
  }
  async function poll(){
+  if(pollBusy.current)return;
+  pollBusy.current=true;
   const response=await fetch(`/api/lobbies/${lobbyId}/voice/signals?after=${cursor.current}`,{cache:"no-store"}).catch(()=>null);
-  if(!response?.ok)return;
-  const result=await response.json() as {signals:Signal[];cursor:number};
-  cursor.current=result.cursor;
-  for(const signal of result.signals)await handleSignal(signal);
+  try{
+   if(!response?.ok)return;
+   const result=await response.json() as {signals:Signal[];cursor:number};
+   for(const signal of result.signals)await handleSignal(signal);
+   cursor.current=result.cursor;
+  }finally{pollBusy.current=false;}
  }
  useEffect(()=>{
   mounted.current=true;

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-const signalTypes = new Set(['offer', 'answer', 'ice-candidate', 'leave'])
+const signalTypes = new Set(['offer', 'answer', 'ice-candidate', 'candidate', 'leave'])
 const presenceCutoff = () => new Date(Date.now() - 30000).toISOString()
 
 async function authorizedMember(id: string) {
@@ -37,6 +37,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     .order('id')
     .limit(100)
   if (error) return NextResponse.json({ error: 'Não foi possível ler a sinalização.' }, { status: 500 })
+  if (process.env.NODE_ENV === 'development') console.debug('[voice] signals-get', { lobbyId: id, userId: auth.user.id, count: data?.length ?? 0, cursor: data?.at(-1)?.id ?? after })
   return NextResponse.json({ signals: data ?? [], cursor: data?.at(-1)?.id ?? after })
 }
 
@@ -49,6 +50,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Sinal inválido.' }, { status: 400 })
   }
   const targetId = body.targetId || null
+  const signalType = body.type === 'candidate' ? 'ice-candidate' : body.type
+  if (process.env.NODE_ENV === 'development') console.debug('[voice] signals-post', { lobbyId: id, senderId: auth.user.id, targetId, type: signalType })
   if (targetId) {
     const { data: target } = await auth.admin
       .from('lobby_members')
@@ -63,7 +66,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     lobby_id: id,
     sender_id: auth.user.id,
     target_id: targetId,
-    signal_type: body.type,
+    signal_type: signalType,
     payload: body.payload,
   })
   if (error) return NextResponse.json({ error: 'Não foi possível enviar a sinalização.' }, { status: 500 })
