@@ -50,7 +50,7 @@ export default function AudioHost({enabled}:Props){
    const destination=ac.createMediaStreamDestination();
    inputGain.connect(destination);
    const audio=testAudio.current;
-   if(audio){audio.srcObject=destination.stream;audio.volume=output/100}
+   if(audio){audio.srcObject=destination.stream;audio.volume=Math.min(1,output/100)}
    ac.resume().catch(()=>{});
   }
   const data=new Uint8Array(an.frequencyBinCount);
@@ -126,7 +126,7 @@ export default function AudioHost({enabled}:Props){
  useEffect(()=>{refreshDevices().catch(()=>{});return()=>disconnect()},[]);
  useEffect(()=>{if(active)connect()},[micId,noise,echo,agc]);
  useEffect(()=>{
-  if(testAudio.current)testAudio.current.volume=output/100;
+  if(testAudio.current)testAudio.current.volume=Math.min(1,output/100);
   if(gain.current)gain.current.gain.value=input/100;
  },[input,output]);
 
