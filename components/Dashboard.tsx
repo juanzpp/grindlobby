@@ -1,14 +1,15 @@
 "use client";
 
+import Image from "next/image";
 import {useCallback,useEffect,useMemo,useState} from "react";
 import {useRouter} from "next/navigation";
 import {
-  Activity,ArrowRight,Bell,ChevronRight,Crown,Gamepad2,Headphones,Home,Loader2,
-  LogOut,Medal,Mic2,MonitorUp,Plus,Radio,Search,Settings,ShoppingBag,
-  Sparkles,Trophy,Users,Zap,
+  Activity,Bell,ChevronDown,ChevronRight,Crown,Gift,Globe,Info,LayoutGrid,Loader2,
+  LogOut,Mic,Monitor,MonitorUp,MoreVertical,Plus,Radio,Search,Server,Settings,
+  ShoppingCart,SignalHigh,Sparkles,Star,Store,Trophy,UserPlus,Users,Video,Volume2,Wifi,
 } from "lucide-react";
 import AudioSettings from "@/components/AudioSettings";
-import GrindLobbyLogo from "@/components/brand/GrindLobbyLogo";
+import LovableBrand from "@/components/brand/LovableBrand";
 import GrindPortalLoading from "@/components/feedback/GrindPortalLoading";
 import AgeAssuranceOnboarding,{AgeAssuranceStatus} from "@/components/age/AgeAssuranceOnboarding";
 import type {AgeAssuranceSnapshot,AgeCapabilities} from "@/lib/age-assurance-types";
@@ -37,15 +38,51 @@ type DashboardData={
   stats:{online:number;activeLobbies:number;myLobbies:number;rank:number};
 };
 type View="dashboard"|"lobbies"|"rank"|"store"|"pro"|"settings";
+type DashboardUser={id:string;username:string;display_name:string;email?:string;account_tier?:string;app_role?:string};
 
 const fallbackGames:GameCard[]=[
   {id:0,name:"EA FC 27",slug:"ea-fc-27",rank:"Sem rank",points:0,wins:0,losses:0,matches:0,winRate:0,progress:0,nextDivision:"Complete sua primeira partida ranqueada"},
 ];
+const storeItems=[
+  {img:"/lovable/store-effects.jpg",tag:"NOVO",title:"Efeitos Personalizados",desc:"Efeitos únicos para seu perfil",price:"R$ 14,90"},
+  {img:"/lovable/store-bundles.jpg",title:"Pacote de Bundles",desc:"Acesse todos os bundles",price:"R$ 39,90"},
+  {img:"/lovable/store-rank.jpg",title:"Efeitos de Rank",desc:"Destaque seu progresso",price:"R$ 18,90"},
+  {img:"/lovable/store-quality.jpg",badge:"1080p60",title:"Pro 1080p60",desc:"Qualidade máxima",price:"R$ 24,90"},
+];
+const events=[
+  {day:"24",month:"MAI",title:"Copa GrindLobby",sub:"Campeonato oficial",cta:"Inscrever-se",soon:false},
+  {day:"01",month:"JUN",title:"Torneio 5v5",sub:"Premiação em dinheiro",cta:"Inscrever-se",soon:false},
+  {day:"15",month:"JUN",title:"Night Cup",sub:"Somente convidados",cta:"Em breve",soon:true},
+];
+const nav:Array<{key:View;label:string;icon:typeof LayoutGrid}>=[
+  {key:"dashboard",label:"Dashboard",icon:LayoutGrid},
+  {key:"lobbies",label:"Lobbies",icon:Users},
+  {key:"rank",label:"Rank",icon:Trophy},
+  {key:"store",label:"Loja",icon:Store},
+  {key:"pro",label:"Pro",icon:Star},
+  {key:"settings",label:"Configurações",icon:Settings},
+];
 
-function initials(value:string){return value.trim().split(/\s+/).map(part=>part[0]).join("").slice(0,2).toUpperCase()}
-function roleLabel(role:string){return role==="owner"?"Líder":role==="moderator"?"Moderador":"Membro"}
+function initials(value:string){return value.trim().split(/\s+/).map(part=>part[0]).join("").slice(0,2).toUpperCase()||"GL"}
+function roleLabel(role:string){return role==="owner"?"HOST":role==="moderator"?"MODERADOR":"MEMBRO"}
+function visibilityLabel(value:string){return value==="public"?"Pública":value==="friends"?"Amigos":"Privada"}
 
-export default function Dashboard({user}:{user:{id:string;username:string;display_name:string;account_tier?:string;app_role?:string}}){
+function Avatar({name,size=32}:{name:string;size?:number}){
+  return <span className="lovable-avatar grid shrink-0 place-items-center rounded-full font-display text-xs font-bold text-white" style={{width:size,height:size}}>{initials(name).slice(0,1)}</span>;
+}
+
+function Waveform({bars=18,active=false}:{bars?:number;active?:boolean}){
+  return <span className="lovable-wave flex items-end gap-[2px]" aria-hidden="true">{Array.from({length:bars}).map((_,index)=><span key={index} className={active&&index<bars*.55?"bg-primary-glow":"bg-muted"} style={{height:6+(index*7)%12}}/>)}</span>;
+}
+
+function StoreGrid(){
+  return <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{storeItems.map(item=><article key={item.title} className="lovable-store-card overflow-hidden rounded-xl border border-border bg-panel/60">
+    <div className="relative h-28 overflow-hidden"><Image src={item.img} alt={item.title} fill sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 260px" className="object-cover"/>{item.tag?<span className="absolute left-2 top-2 rounded-md bg-warning px-2 py-0.5 text-[10px] font-bold text-background">{item.tag}</span>:null}{item.badge?<span className="absolute right-2 top-2 rounded-md border border-primary/50 bg-background/70 px-2 py-0.5 text-[11px] font-semibold">{item.badge}</span>:null}</div>
+    <div className="p-3"><h3 className="text-sm font-semibold">{item.title}</h3><p className="mt-0.5 text-xs text-muted-foreground">{item.desc}</p><div className="mt-3 flex items-center justify-between"><p className="text-sm font-semibold">{item.price}</p><button aria-label={`Comprar ${item.title}`} className="grid h-8 w-8 place-items-center rounded-md border border-border bg-secondary"><ShoppingCart size={16}/></button></div></div>
+  </article>)}</div>;
+}
+
+export default function Dashboard({user}:{user:DashboardUser}){
   const router=useRouter();
   const [data,setData]=useState<DashboardData|null>(null);
   const [loading,setLoading]=useState(true);
@@ -54,14 +91,20 @@ export default function Dashboard({user}:{user:{id:string;username:string;displa
   const [error,setError]=useState("");
   const [view,setView]=useState<View>("dashboard");
   const [selectedGameId,setSelectedGameId]=useState<number|null>(null);
+  const [search,setSearch]=useState("");
   const [create,setCreate]=useState(false);
   const [name,setName]=useState("");
   const [gameId,setGameId]=useState("");
-  const [maxMembers,setMaxMembers]=useState("5");
+  const [maxMembers,setMaxMembers]=useState("8");
   const [visibility,setVisibility]=useState("public");
   const display=user.display_name||user.username||"Player";
   const games=data?.games?.length?data.games:fallbackGames;
-  const selectedGame=useMemo(()=>games.find(game=>game.id===selectedGameId)??games[0], [games,selectedGameId]);
+  const selectedGame=useMemo(()=>games.find(game=>game.id===selectedGameId)??games[0],[games,selectedGameId]);
+  const filteredLobbies=useMemo(()=>{
+    const term=search.trim().toLocaleLowerCase("pt-BR");
+    if(!term)return data?.lobbies??[];
+    return (data?.lobbies??[]).filter(lobby=>`${lobby.name} ${lobby.game?.name??""} ${lobby.owner?.display_name??""} ${lobby.owner?.username??""}`.toLocaleLowerCase("pt-BR").includes(term));
+  },[data?.lobbies,search]);
 
   const load=useCallback(async(initial=false)=>{
     initial?setLoading(true):setRefreshing(true);
@@ -73,217 +116,117 @@ export default function Dashboard({user}:{user:{id:string;username:string;displa
       setSelectedGameId(current=>current??body.games?.[0]?.id??null);
       setGameId(current=>current||String(body.games?.[0]?.id??""));
       setError("");
-      if(typeof window!=="undefined")sessionStorage.removeItem("grindlobby.portalTransition");
-    }catch(cause){
-      setError(cause instanceof Error?cause.message:"Falha ao carregar o dashboard.");
-    }finally{setLoading(false);setRefreshing(false)}
+      sessionStorage.removeItem("grindlobby.portalTransition");
+    }catch(cause){setError(cause instanceof Error?cause.message:"Falha ao carregar o dashboard.")}
+    finally{setLoading(false);setRefreshing(false)}
   },[]);
 
   useEffect(()=>{
-    load(true);
-    const timer=window.setInterval(()=>load(false),15_000);
+    void load(true);
+    const timer=window.setInterval(()=>void load(false),15_000);
     return()=>window.clearInterval(timer);
   },[load]);
 
-  async function logout(){
-    await fetch("/api/auth/logout",{method:"POST"});
-    router.push("/login");router.refresh();
-  }
-
+  async function logout(){await fetch("/api/auth/logout",{method:"POST"});router.push("/login");router.refresh()}
   async function createLobby(){
     setError("");
     if(!name.trim()||!gameId){setError("Preencha nome e jogo.");return}
     setBusy("create");
     try{
-      const response=await fetch("/api/lobbies",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({name,gameId:Number(gameId),maxMembers:Number(maxMembers),visibility}),
-      });
+      const response=await fetch("/api/lobbies",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,gameId:Number(gameId),maxMembers:Number(maxMembers),visibility})});
       const body=await response.json();
       if(!response.ok)throw new Error(body.error||"Falha ao criar lobby.");
-      setCreate(false);setName("");
-      router.push("/lobby/"+body.lobbyId);
+      setCreate(false);setName("");router.push("/lobby/"+body.lobbyId);
     }catch(cause){setError(cause instanceof Error?cause.message:"Falha ao criar lobby.")}
     finally{setBusy(null)}
   }
-
   async function enterLobby(lobby:LobbyCard){
     setBusy(lobby.id);setError("");
     try{
-      if(!lobby.joined){
-        const response=await fetch("/api/lobbies/"+lobby.id+"/join",{method:"POST"});
-        const body=await response.json();
-        if(!response.ok)throw new Error(body.error||"Não foi possível entrar.");
-      }
-      router.push("/lobby/"+lobby.id);
+      if(!lobby.joined){const response=await fetch(`/api/lobbies/${lobby.id}/join`,{method:"POST"});const body=await response.json();if(!response.ok)throw new Error(body.error||"Não foi possível entrar.")}
+      router.push(`/lobby/${lobby.id}`);
     }catch(cause){setError(cause instanceof Error?cause.message:"Não foi possível entrar.")}
     finally{setBusy(null)}
   }
-
   async function leaveCurrentLobby(){
-    if(!currentLobby)return;
+    const lobby=data?.currentLobby;if(!lobby)return;
     setBusy("leave-current");setError("");
-    try{
-      const response=await fetch("/api/lobbies/"+currentLobby.id+"/leave",{method:"POST"});
-      const body=await response.json();
-      if(!response.ok)throw new Error(body.error||"Não foi possível sair.");
-      await load(false);
-    }catch(cause){setError(cause instanceof Error?cause.message:"Não foi possível sair.")}
+    try{const response=await fetch(`/api/lobbies/${lobby.id}/leave`,{method:"POST"});const body=await response.json();if(!response.ok)throw new Error(body.error||"Não foi possível sair.");await load(false)}
+    catch(cause){setError(cause instanceof Error?cause.message:"Não foi possível sair.")}
     finally{setBusy(null)}
   }
-
   async function inviteCurrentLobby(){
-    if(!currentLobby)return;
-    try{await navigator.clipboard.writeText(location.origin+"/lobby/"+currentLobby.id)}
-    catch{setError("Não foi possível copiar o convite neste navegador.")}
+    const lobby=data?.currentLobby;
+    if(!lobby){setError("Entre em um lobby antes de criar um convite.");return}
+    try{await navigator.clipboard.writeText(`${location.origin}/lobby/${lobby.id}`)}catch{setError("Não foi possível copiar o convite neste navegador.")}
   }
 
   if(loading&&!data)return <GrindPortalLoading variant="fullscreen" label="Sincronizando seu Grind"/>;
 
-  const stats=data?.stats??{online:1,activeLobbies:0,myLobbies:0,rank:0};
   const currentLobby=data?.currentLobby;
+  const stats=data?.stats??{online:1,activeLobbies:0,myLobbies:0,rank:0};
   const account=data?.account??{level:1,xp:0};
-  const levelProgress=Math.max(0,Math.min(100,account.xp%1000/10));
+  const xpWithinLevel=account.xp%1000;
+  const levelProgress=Math.max(0,Math.min(100,xpWithinLevel/10));
   const isPro=data?.entitlements.tier==="pro";
   const isAdmin=Boolean(data?.entitlements.isAdmin);
-  const nav:Array<{key:View;label:string;icon:typeof Home}>=[
-    {key:"dashboard",label:"Dashboard",icon:Home},
-    {key:"lobbies",label:"Lobbies",icon:Users},
-    {key:"rank",label:"Rank",icon:Trophy},
-    {key:"store",label:"Loja",icon:ShoppingBag},
-    {key:"pro",label:"Pro",icon:Crown},
-    {key:"settings",label:"Configurações",icon:Settings},
-  ];
 
-  return <main className="app-shell dashboard-rebuilt min-h-screen text-white">
-    <div className="ambient a1"/><div className="ambient a2"/>
-    <div className="relative flex min-h-screen">
-      <aside className="sidebar hidden w-[244px] shrink-0 lg:flex lg:flex-col">
-        <GrindLobbyLogo variant="full" size="md"/>
-        <div className="nav-label">GRIND NETWORK</div>
-        <nav className="space-y-1">
-          {nav.map(item=><button key={item.key} onClick={()=>setView(item.key)} className={"nav-item "+(view===item.key?"active":"")}>
-            <item.icon size={18}/>{item.label}
-            {item.key==="lobbies"&&stats.activeLobbies>0&&<em>{stats.activeLobbies}</em>}
-          </button>)}
-        </nav>
-        <div className="sidebar-pro">
-          <Crown size={17}/>
-          <div><small>{isAdmin?"ADMIN · PRO":"GRIND PRO"}</small><p>{isPro?"1080p60 e benefícios premium ativos.":"Conheça 1080p60 e recursos premium."}</p></div>
+  return <div className="lovable-surface">
+    <div className="flex min-h-screen">
+      <aside className="lovable-dashboard-sidebar hidden w-64 shrink-0 flex-col justify-between border-r border-border bg-card/60 px-5 py-6 lg:flex">
+        <div>
+          <LovableBrand/>
+          <nav className="lovable-sidebar-nav mt-8 space-y-1">{nav.map(({key,label,icon:Icon})=><button key={key} onClick={()=>setView(key)} className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-sm font-medium ${view===key?"border-primary/40 bg-primary/15 text-foreground shadow-[0_0_20px_oklch(0.58_0.24_300/0.25)]":"border-transparent text-muted-foreground hover:bg-secondary hover:text-foreground"}`}><Icon size={16}/>{label}{key==="lobbies"&&stats.activeLobbies?<span className="ml-auto rounded-full bg-primary/20 px-2 text-[10px] text-primary-glow">{stats.activeLobbies}</span>:null}</button>)}</nav>
+          <div className="mt-6 space-y-2"><button onClick={()=>setCreate(true)} disabled={!data?.age.capabilities.canJoinLobbies} className="lovable-btn-primary flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold"><Plus size={16}/>Criar lobby</button><button onClick={inviteCurrentLobby} className="lovable-btn-ghost flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium"><UserPlus size={16}/>Convidar amigos</button></div>
+          <div className="mt-8"><p className="lovable-label">Atividade recente</p><ul className="mt-3 space-y-3">{data?.online.slice(0,4).map(person=><li key={person.id} className="flex items-start gap-2.5"><Avatar name={person.display_name||person.username} size={28}/><div className="text-xs leading-tight"><p><span className="font-semibold">{person.display_name||person.username}</span> <span className="text-muted-foreground">está online</span></p><p className="mt-0.5 text-muted-foreground">agora</p></div></li>)}{!data?.online.length?<li className="text-xs text-muted-foreground">Sua rede aparecerá aqui.</li>:null}</ul></div>
         </div>
-        <div className="mt-auto">
-          <button onClick={logout} className="nav-item"><LogOut size={18}/>Sair</button>
-          <div className="profile-mini"><div className="avatar">{initials(display)}<i/></div><div><b>{display}</b><span>{isAdmin?"Administrador · PRO":isPro?"Membro PRO":"Membro Free"}</span></div></div>
-        </div>
+        <div className="mt-8 rounded-xl border border-border bg-panel p-3"><div className="flex items-center gap-3"><Avatar name={display} size={38}/><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{display}</p><p className="truncate text-[11px] text-muted-foreground">{user.email||`@${user.username}`}</p><p className="mt-0.5 flex items-center gap-1 text-[11px] text-success"><span className="h-1.5 w-1.5 rounded-full bg-success"/>Online</p></div><button onClick={logout} aria-label="Sair" className="text-muted-foreground hover:text-foreground"><LogOut size={17}/></button></div></div>
       </aside>
 
-      <section className="min-w-0 flex-1">
-        <header className="topbar">
-          <GrindLobbyLogo variant="symbol" size="sm" className="lg:hidden"/>
-          <div className="search"><Search size={16}/><input aria-label="Buscar" placeholder="Buscar players, jogos e lobbies"/></div>
-          {refreshing&&<Loader2 className="animate-spin text-violet-300" size={16}/>}
-          <button className="icon-btn" aria-label="Notificações"><Bell size={18}/></button>
-          <div className="top-profile"><div>{initials(display)}</div><span><b>{display}</b><small>{isAdmin?"ADMIN · PRO":isPro?"PRO":"FREE"}</small></span></div>
+      <main className="lovable-dashboard-main flex-1 space-y-4 p-4 md:p-6">
+        <header className="lovable-panel flex flex-wrap items-center justify-between gap-3 px-5 py-3">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-sm"><LovableBrand compact emblemSize={34} className="lg:hidden"/>{isAdmin?<><Crown size={16} className="text-primary-glow"/><span className="font-semibold">Admin ativo</span><span className="text-muted-foreground">•</span><span className="font-semibold text-primary-glow">PRO liberado gratuitamente</span></>:isPro?<><Star size={16} className="text-primary-glow"/><span className="font-semibold text-primary-glow">Grind PRO ativo</span></>:<span className="font-semibold">Plano Free</span>}<span className="mx-1 hidden h-4 w-px bg-border sm:block"/><span className="max-w-[16rem] truncate text-muted-foreground">{user.email||`@${user.username}`}</span></div>
+          <div className="flex items-center gap-4 text-muted-foreground">{refreshing?<Loader2 size={17} className="animate-spin"/>:<Gift size={18}/>}<span className="relative"><Bell size={18}/><span className="absolute -right-1.5 -top-1.5 grid h-4 w-4 place-items-center rounded-full bg-primary text-[10px] font-bold text-white">2</span></span><SignalHigh size={18} className="text-success"/></div>
         </header>
 
-        <div className="dashboard-ready mx-auto max-w-[1540px] p-4 pb-24 lg:p-8">
-          {error&&<div className="dash-error" role="alert">{error}</div>}
-          {data&&!data.age.capabilities.onboardingRequired&&<AgeAssuranceStatus
-            assurance={data.age.assurance}
-            capabilities={data.age.capabilities}
-            onChange={result=>setData(current=>current?{...current,age:result}:current)}
-          />}
+        <div className="lovable-mobile-nav flex gap-2 overflow-x-auto pb-1 lg:hidden">{nav.map(({key,label,icon:Icon})=><button key={key} onClick={()=>setView(key)} className={`flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-xs ${view===key?"border-primary/40 bg-primary/15 text-foreground":"border-border bg-card text-muted-foreground"}`}><Icon size={14}/>{label}</button>)}</div>
+        <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={15}/><input value={search} onChange={event=>setSearch(event.target.value)} onFocus={()=>setView("lobbies")} aria-label="Buscar lobbies" placeholder="Buscar players, jogos e lobbies" className="h-10 w-full rounded-lg border border-border bg-card pl-9 pr-3 text-sm outline-none placeholder:text-muted-foreground focus:border-primary/60 lg:hidden"/></div>
+        {error?<div className="lovable-feedback lovable-feedback-error" role="alert">{error}</div>:null}
+        {data&&!data.age.capabilities.onboardingRequired?<AgeAssuranceStatus assurance={data.age.assurance} capabilities={data.age.capabilities} onChange={result=>setData(current=>current?{...current,age:result}:current)}/>:null}
 
-          {view==="dashboard"&&<>
-            <section className="rank-hero" key={selectedGame?.id}>
-              <div className="rank-grid"/><div className="rank-orbit"/>
-              <div className="rank-copy">
-                <div className="eyebrow"><Medal size={13}/> SUA JORNADA COMPETITIVA</div>
-                <label className="rank-game-picker">JOGO
-                  <select value={selectedGame?.id??""} onChange={event=>setSelectedGameId(Number(event.target.value))}>
-                    {games.map(game=><option key={game.id} value={game.id}>{game.name}</option>)}
-                  </select>
-                </label>
-                <h1>{selectedGame?.rank??"Sem rank"}</h1>
-                <p>{selectedGame?.name??"Selecione um jogo"} · {selectedGame?.points.toLocaleString("pt-BR")??0} RP</p>
-                <div className="rank-progress"><i style={{width:(selectedGame?.progress??0)+"%"}}/></div>
-                <div className="rank-next"><span>{selectedGame?.nextDivision}</span><b>{selectedGame?.progress??0}%</b></div>
-              </div>
-              <div className="rank-emblem" aria-hidden="true"><span>GL</span><i/><b>{selectedGame?.rank==="Sem rank"?"UNRANKED":selectedGame?.rank}</b></div>
-              <div className="rank-metrics">
-                <div><small>VITÓRIAS</small><b>{selectedGame?.wins??0}</b></div>
-                <div><small>PARTIDAS</small><b>{selectedGame?.matches??0}</b></div>
-                <div><small>WIN RATE</small><b>{selectedGame?.winRate??0}%</b></div>
-                <div className="account-progress"><small>NÍVEL {account.level}</small><b>{account.xp.toLocaleString("pt-BR")} XP</b><span><i style={{width:levelProgress+"%"}}/></span></div>
-              </div>
+        {view==="dashboard"?<>
+          <section className="lovable-panel lovable-hero relative overflow-hidden px-5 py-6">
+            <div className="grid items-center gap-6 xl:grid-cols-[auto_1fr_1fr_auto]">
+              <Image src="/lovable/rank-emblem.png" alt={`Emblema do rank ${selectedGame?.rank??"Sem rank"}`} width={176} height={176} priority sizes="176px" className="lovable-rank-emblem mx-auto h-44 w-44 object-contain"/>
+              <div><p className="lovable-label">Seu rank atual</p><div className="mt-1 flex flex-wrap items-center gap-3"><h1 className="font-display text-4xl font-bold">{selectedGame?.rank??"Sem rank"}</h1><span className="rounded-md border border-primary/50 bg-primary/20 px-2 py-1 text-[11px] font-bold tracking-wide">DIVISÃO</span></div><p className="mt-2 font-display text-4xl font-bold text-primary-glow">{(selectedGame?.points??0).toLocaleString("pt-BR")} <span className="text-lg text-muted-foreground">RP</span></p><p className="mt-3 flex items-center gap-1.5 text-sm text-muted-foreground">{selectedGame?.matches?`${selectedGame.winRate}% de vitórias`:"Complete partidas para entrar no ranking"}<Info size={16}/></p></div>
+              <div><div className="mb-5 flex justify-end"><label className="relative"><select className="lovable-select pr-9 text-sm font-medium" value={selectedGame?.id??""} onChange={event=>setSelectedGameId(Number(event.target.value))}>{games.map(game=><option key={game.id} value={game.id}>{game.name}</option>)}</select><ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={15}/></label></div><p className="lovable-label">Progresso da temporada</p><div className="mt-3 h-2.5 overflow-hidden rounded-full bg-secondary"><div className="lovable-rank-progress h-full rounded-full" style={{width:`${selectedGame?.progress??0}%`}}/></div><p className="mt-1.5 text-right text-xs text-muted-foreground"><span className="font-semibold text-foreground">{selectedGame?.points.toLocaleString("pt-BR")??0}</span> RP</p><p className="mt-3 text-sm text-muted-foreground">Próxima recompensa</p><p className="mt-1 flex items-center gap-2 text-sm font-medium"><Trophy size={16} className="text-primary-glow"/>{selectedGame?.nextDivision}</p></div>
+              <div className="flex flex-wrap items-center justify-center gap-6 xl:border-l xl:border-border xl:pl-6"><div className="lovable-level-ring relative grid h-28 w-28 shrink-0 place-items-center rounded-full" style={{background:`conic-gradient(oklch(var(--gl-primary-glow)) ${levelProgress}%, oklch(var(--gl-secondary)) ${levelProgress}% 100%)`}}><div className="absolute inset-[7px] rounded-full bg-card"/><div className="relative text-center"><p className="lovable-label">Nível</p><p className="font-display text-3xl font-bold">{account.level}</p></div></div><div><p className="text-sm text-muted-foreground">XP para o próximo nível</p><p className="mt-1 text-sm"><span className="font-display text-lg font-bold">{xpWithinLevel.toLocaleString("pt-BR")}</span><span className="text-muted-foreground"> / 1.000 XP</span></p><div className="mt-2 h-1.5 w-56 max-w-full overflow-hidden rounded-full bg-secondary"><div className="h-full rounded-full bg-primary-glow" style={{width:`${levelProgress}%`}}/></div><dl className="mt-5 grid grid-cols-3 divide-x divide-border text-center">{[["Vitórias",selectedGame?.wins??0],["Partidas",selectedGame?.matches??0],["Taxa win",`${selectedGame?.winRate??0}%`]].map(([key,value])=><div key={key} className="px-3"><dt className="lovable-label">{key}</dt><dd className="mt-1 font-display text-xl font-bold text-primary-glow">{value}</dd></div>)}</dl></div></div>
+            </div>
+          </section>
+
+          <div className="grid gap-4 xl:grid-cols-[1.7fr_1fr]">
+            <section className="lovable-panel p-5">
+              <p className="lovable-label">Lobby atual</p>
+              {currentLobby?<><div className="mt-2 flex flex-wrap items-center justify-between gap-4"><div><h2 className="font-display text-2xl font-bold">{currentLobby.name}</h2><div className="mt-2 flex flex-wrap gap-2 text-xs"><span className="flex items-center gap-1.5 rounded-md border border-border bg-panel px-2 py-1"><Globe size={14}/>{visibilityLabel(currentLobby.visibility)}</span><span className="flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/15 px-2 py-1"><Trophy size={14} className="text-warning"/>Competitiva</span><span className="flex items-center gap-1.5 rounded-md border border-border bg-panel px-2 py-1"><Sparkles size={14} className="text-primary-glow"/>{currentLobby.game?.name??"Jogo livre"}</span></div></div><div className="flex flex-wrap items-center gap-3"><div className="flex items-center gap-2"><Avatar name={currentLobby.owner?.display_name||currentLobby.owner?.username||"Host"} size={34}/><div className="text-xs"><p className="text-muted-foreground">Host</p><p className="flex items-center gap-1 font-semibold">{currentLobby.owner?.display_name||currentLobby.owner?.username||"Player"}<Crown size={14} className="text-warning"/></p></div></div><p className="flex items-center gap-2 text-sm"><Users size={16} className="text-muted-foreground"/><b>{currentLobby.memberCount}</b><span className="text-muted-foreground">/ {currentLobby.max_members}</span></p><button onClick={inviteCurrentLobby} className="lovable-btn-ghost flex items-center gap-2 rounded-lg px-3 py-2 text-sm"><UserPlus size={15}/>Convidar</button></div></div><div className="mt-5 rounded-xl border border-border bg-panel/50 p-3"><p className="lovable-label px-1">Membros ({currentLobby.memberCount}/{currentLobby.max_members})</p><ul className="lovable-member-list mt-2">{currentLobby.members?.map(member=>{const memberName=member.profile?.display_name||member.profile?.username||"Player";return <li key={member.userId} className="flex items-center gap-3 px-1 py-2.5 text-sm"><span className="relative"><Avatar name={memberName}/><span className="lovable-presence-dot absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-muted"/></span><div className="min-w-0"><p className="font-semibold">{memberName}</p><p className="text-xs text-muted-foreground">@{member.profile?.username??"player"}</p></div><div className="ml-auto flex items-center gap-3"><Mic size={16} className="text-muted-foreground"/><Waveform bars={14}/><span className={member.role==="owner"?"rounded-md border border-primary/40 bg-primary/20 px-2 py-1 text-[10px] font-bold":"lovable-label"}>{roleLabel(member.role)}</span><MoreVertical size={16} className="text-muted-foreground"/></div></li>})}</ul></div><div className="mt-4 flex flex-wrap items-center justify-between gap-3"><button onClick={leaveCurrentLobby} disabled={busy==="leave-current"} className="lovable-btn-ghost flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm"><LogOut size={15}/>{busy==="leave-current"?"Saindo…":"Sair do lobby"}</button><button onClick={()=>enterLobby(currentLobby)} className="lovable-btn-primary flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm"><Settings size={15}/>Abrir lobby</button></div></>:<div className="mt-5 grid min-h-56 place-items-center rounded-xl border border-dashed border-border bg-panel/30 p-6 text-center"><div><Users className="mx-auto text-primary-glow" size={32}/><h2 className="mt-3 font-display text-2xl font-bold">Nenhum lobby atual</h2><p className="mt-1 text-sm text-muted-foreground">Crie ou entre em uma sala para reunir sua squad.</p><button onClick={()=>setCreate(true)} disabled={!data?.age.capabilities.canJoinLobbies} className="lovable-btn-primary mx-auto mt-5 flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm"><Plus size={16}/>Criar lobby</button></div></div>}
             </section>
 
-            <div className="dashboard-priority-grid">
-              <div className="dashboard-primary-column">
-                <section className="current-lobby-panel">
-                  <header><div><small>SEGUNDA PRIORIDADE</small><h2>Lobby atual</h2></div>{currentLobby&&<button onClick={()=>enterLobby(currentLobby)}>Abrir lobby <ArrowRight size={15}/></button>}</header>
-                  {currentLobby?<div className="current-lobby-body">
-                    <div className="current-lobby-title"><div><Gamepad2 size={21}/></div><span><h3>{currentLobby.name}</h3><p>{currentLobby.game?.name??"Jogo livre"} · {currentLobby.visibility} · host {currentLobby.owner?.display_name??currentLobby.owner?.username??"Player"} · {currentLobby.memberCount}/{currentLobby.max_members}</p></span><b>ATIVO</b></div>
-                    <div className="lobby-member-grid">
-                      {currentLobby.members?.map(member=><article key={member.userId}>
-                        <div>{initials(member.profile?.display_name||member.profile?.username||"P")}</div>
-                        <span><b>{member.profile?.display_name||member.profile?.username||"Player"}</b><small>{roleLabel(member.role)}</small></span>
-                        <em title="O estado LiveKit é exibido em tempo real dentro da sala"><Mic2 size={13}/> Na sala</em>
-                      </article>)}
-                    </div>
-                    <p className="presence-truth"><Activity size={14}/> Fala e mute são estados LiveKit em tempo real e aparecem ao abrir o lobby; o dashboard não inventa presença fora da conexão.</p>
-                    <div className="current-lobby-actions"><button onClick={inviteCurrentLobby}>Convidar</button><button onClick={leaveCurrentLobby} disabled={busy==="leave-current"}>{busy==="leave-current"?"Saindo…":"Sair"}</button>{currentLobby.owner_id===user.id&&<button onClick={()=>enterLobby(currentLobby)}>Gerenciar</button>}</div>
-                  </div>:<div className="current-lobby-empty"><Users size={25}/><div><h3>Nenhum lobby atual</h3><p>Crie ou entre em uma sala para reunir a squad, voz e transmissão.</p></div><button className="primary" onClick={()=>setCreate(true)} disabled={!data?.age.capabilities.canJoinLobbies}><Plus size={16}/>Criar lobby</button></div>}
-                </section>
+            <div className="space-y-4"><section className="lovable-panel p-5"><div className="flex items-center justify-between"><p className="lovable-label">Controles de áudio</p><Activity size={16} className="text-primary-glow"/></div><div className="mt-4 space-y-4"><div><p className="text-sm text-muted-foreground">Microfone</p><div className="mt-2 flex items-center gap-3"><div className="flex min-w-0 flex-1 items-center justify-between rounded-lg border border-border bg-panel px-3 py-2.5 text-sm"><span className="truncate">{currentLobby?"Disponível no lobby":"Aguardando lobby"}</span><ChevronRight size={15} className="text-muted-foreground"/></div><Waveform active={Boolean(currentLobby)}/><span className="grid h-10 w-10 place-items-center rounded-lg border border-border bg-panel"><Mic size={16}/></span></div></div><div><p className="text-sm text-muted-foreground">Saída de áudio</p><div className="mt-2 flex items-center gap-3"><div className="flex min-w-0 flex-1 items-center justify-between rounded-lg border border-border bg-panel px-3 py-2.5 text-sm"><span className="truncate">Gerenciada dentro da sala</span><ChevronRight size={15} className="text-muted-foreground"/></div><Waveform/><span className="grid h-10 w-10 place-items-center rounded-lg border border-border bg-panel"><Volume2 size={16}/></span></div></div><div className="grid gap-3 sm:grid-cols-2"><button disabled={!currentLobby} onClick={()=>currentLobby&&enterLobby(currentLobby)} className="flex items-center justify-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-3 py-3 text-sm font-medium disabled:opacity-50"><Monitor size={16}/>Compartilhar tela</button><button disabled={!currentLobby} onClick={()=>currentLobby&&enterLobby(currentLobby)} className="lovable-btn-primary flex items-center justify-center gap-2 rounded-lg px-3 py-3 text-sm font-semibold"><MonitorUp size={16}/>Abrir lobby</button></div></div></section><section className="lovable-panel p-5"><p className="lovable-label">Status do sistema</p><ul className="mt-3 space-y-2.5 text-sm"><li className="flex items-center justify-between"><span className="flex items-center gap-2 text-muted-foreground"><Video size={16}/>Qualidade da transmissão</span><span className="font-medium">{isPro?"1080p60":"720p30"}</span></li><li className="flex items-center justify-between"><span className="flex items-center gap-2 text-muted-foreground"><Wifi size={16}/>Conexão</span><span className="font-medium text-success">Online</span></li><li className="flex items-center justify-between"><span className="flex items-center gap-2 text-muted-foreground"><Server size={16}/>Serviços</span><span className="font-medium text-success">Disponíveis</span></li></ul></section></div>
+          </div>
 
-                <section className="store-teaser"><Sparkles size={18}/><small>LOJA</small><h3>Personalize seu Grind</h3><p>Efeitos, borders e crosshairs aparecem como destaque secundário, abaixo do lobby.</p><button onClick={()=>setView("store")}>Ver destaques <ArrowRight size={14}/></button></section>
+          <div className="grid gap-4 xl:grid-cols-[1.7fr_1fr]"><section className="lovable-panel p-5"><div className="flex items-center justify-between"><p className="lovable-label">Destaques da loja</p><button onClick={()=>setView("store")} className="flex items-center gap-1 text-sm text-primary-glow">Ver loja completa<ChevronRight size={16}/></button></div><StoreGrid/></section><section className="lovable-panel p-5"><div className="flex items-center justify-between"><p className="lovable-label">Próximos eventos</p><span className="text-sm text-primary-glow">Calendário</span></div><ul className="mt-4 space-y-3">{events.map(event=><li key={event.title} className="flex items-center gap-3"><div className="grid h-12 w-12 shrink-0 place-items-center rounded-lg border border-primary/40 bg-primary/15"><span className="font-display text-lg font-bold leading-none">{event.day}</span><span className="text-[10px] text-muted-foreground">{event.month}</span></div><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{event.title}</p><p className="flex items-center gap-1.5 truncate text-xs text-muted-foreground"><Trophy size={14} className="text-warning"/>{event.sub}</p></div><button disabled={event.soon} className="rounded-lg border border-primary/40 bg-primary/15 px-3 py-2 text-xs font-semibold disabled:border-border disabled:bg-secondary disabled:text-muted-foreground">{event.cta}</button></li>)}</ul></section></div>
+        </>:null}
 
-                <section className="secondary-activity">
-                  <header><div><small>REDE</small><h2>Amigos e atividade</h2></div><span>{stats.online} online</span></header>
-                  <div className="activity-list">
-                    {data?.online.slice(0,5).map(person=><article key={person.id}><div>{initials(person.display_name||person.username)}<i/></div><span><b>{person.display_name||person.username}</b><small>@{person.username} · online</small></span></article>)}
-                    {!data?.online.length&&<p>A atividade da sua rede aparecerá aqui.</p>}
-                  </div>
-                </section>
-              </div>
+        {view==="lobbies"?<section className="lovable-dashboard-view lovable-panel p-5"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="lovable-label">Play now</p><h1 className="mt-1 font-display text-3xl font-bold">Lobbies disponíveis</h1></div><div className="flex flex-1 justify-end gap-3"><label className="relative hidden w-full max-w-sm sm:block"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={15}/><input value={search} onChange={event=>setSearch(event.target.value)} className="h-10 w-full rounded-lg border border-border bg-panel pl-9 pr-3 text-sm outline-none focus:border-primary/60" placeholder="Buscar lobby"/></label><button onClick={()=>setCreate(true)} disabled={!data?.age.capabilities.canJoinLobbies} className="lovable-btn-primary flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm"><Plus size={16}/>Criar lobby</button></div></div><div className="mt-6 grid gap-3 lg:grid-cols-2">{filteredLobbies.map(lobby=><article key={lobby.id} className="flex items-center gap-3 rounded-xl border border-border bg-panel/50 p-4"><Avatar name={lobby.name} size={44}/><div className="min-w-0 flex-1"><h2 className="truncate font-display text-lg font-bold">{lobby.name}</h2><p className="truncate text-xs text-muted-foreground">{lobby.game?.name??"Jogo livre"} · {lobby.owner?.display_name??lobby.owner?.username??"Player"}</p></div><div className="text-center"><p className="lovable-label">Membros</p><b className="text-sm">{lobby.memberCount}/{lobby.max_members}</b></div><button disabled={busy===lobby.id||lobby.memberCount>=lobby.max_members} onClick={()=>enterLobby(lobby)} className="lovable-btn-ghost rounded-lg px-3 py-2 text-sm font-semibold text-primary-glow">{busy===lobby.id?<Loader2 size={15} className="animate-spin"/>:lobby.joined?"Abrir":"Entrar"}</button></article>)}{!filteredLobbies.length?<div className="col-span-full grid min-h-64 place-items-center rounded-xl border border-dashed border-border text-muted-foreground">Nenhum lobby encontrado.</div>:null}</div></section>:null}
 
-              <aside className="dashboard-context-rail">
-                <section className="context-card"><header><Headphones size={17}/><span><small>ÁUDIO</small><b>{currentLobby?"Disponível no lobby":"Em espera"}</b></span></header><p>Microfone e saída são controlados somente quando você abre a sala.</p>{currentLobby&&<button onClick={()=>enterLobby(currentLobby)}>Abrir controles <ChevronRight size={14}/></button>}</section>
-                <section className="context-card"><header><MonitorUp size={17}/><span><small>TRANSMISSÃO</small><b>{isPro?"Até 1080p · 60 fps":"Até 720p · 30 fps"}</b></span></header><p>Tela e áudio da tela são publicados pelo LiveKit quando o navegador e a fonte oferecem suporte.</p>{currentLobby&&<button onClick={()=>enterLobby(currentLobby)}>Ir para transmissão <ChevronRight size={14}/></button>}</section>
-                <section className="context-card system-card"><header><Radio size={17}/><span><small>SISTEMA</small><b>Conexão sob demanda</b></span></header><p>Voz e tela não ficam conectadas em segundo plano no dashboard.</p></section>
-                <section className="context-card"><header><Activity size={17}/><span><small>EVENTOS</small><b>{stats.activeLobbies} lobbies ativos</b></span></header><p>{stats.online} jogadores estão online na rede agora.</p></section>
-              </aside>
-            </div>
-          </>}
+        {view==="rank"?<section className="lovable-dashboard-view lovable-panel lovable-view-hero p-5"><p className="lovable-label">Identidade competitiva</p><h1 className="mt-1 font-display text-3xl font-bold">Rank por jogo</h1><div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">{games.map(game=><article key={game.id} className="rounded-xl border border-border bg-card/70 p-5"><div className="flex items-center gap-4"><Image src="/lovable/rank-emblem.png" alt="" width={72} height={72} className="lovable-rank-emblem h-18 w-18 object-contain"/><div><h2 className="font-display text-xl font-bold">{game.name}</h2><p className="text-sm text-primary-glow">{game.rank}</p></div></div><div className="mt-4 h-2 overflow-hidden rounded-full bg-secondary"><div className="lovable-rank-progress h-full" style={{width:`${game.progress}%`}}/></div><dl className="mt-4 grid grid-cols-3 text-center"><div><dt className="lovable-label">RP</dt><dd className="font-bold">{game.points}</dd></div><div><dt className="lovable-label">Partidas</dt><dd className="font-bold">{game.matches}</dd></div><div><dt className="lovable-label">Win rate</dt><dd className="font-bold">{game.winRate}%</dd></div></dl></article>)}</div></section>:null}
 
-          {view==="lobbies"&&<section className="dashboard-view">
-            <div className="section-head"><div><small>PLAY NOW</small><h2>Lobbies disponíveis</h2></div><button disabled={!data?.age.capabilities.canJoinLobbies} onClick={()=>setCreate(true)}><Plus size={14}/>Criar lobby</button></div>
-            <div className="lobby-list">{data?.lobbies.map(lobby=><article className="lobby" key={lobby.id}><div className="lobby-logo"><Gamepad2 size={19}/></div><div className="lobby-main"><h3>{lobby.name}</h3><p>{lobby.game?.name??"Jogo livre"} · por {lobby.owner?.display_name??lobby.owner?.username??"Player"}</p></div><div className="slots"><small>MEMBROS</small><b>{lobby.memberCount}/{lobby.max_members}</b></div><button disabled={busy===lobby.id||lobby.memberCount>=lobby.max_members} onClick={()=>enterLobby(lobby)} className="join">{busy===lobby.id?<Loader2 size={14} className="animate-spin"/>:lobby.joined?"Abrir":"Entrar"}</button></article>)}{!data?.lobbies.length&&<div className="empty-state">Nenhum lobby visível agora.</div>}</div>
-          </section>}
-
-          {view==="rank"&&<section className="dashboard-view">
-            <div className="section-head"><div><small>IDENTIDADE COMPETITIVA</small><h2>Rank por jogo</h2></div></div>
-            <div className="rank-game-list">{games.map(game=><article key={game.id}><div className="game-logo">{initials(game.name)}</div><span><h3>{game.name}</h3><p>{game.rank} · {game.points.toLocaleString("pt-BR")} RP</p></span><div><b>{game.winRate}%</b><small>WIN RATE</small></div></article>)}</div>
-          </section>}
-
-          {view==="store"&&<section className="dashboard-view empty-view"><ShoppingBag size={28}/><small>LOJA E INVENTÁRIO</small><h2>Personalização sem dominar sua home</h2><p>O catálogo, inventário e equipar/desequipar serão uma fase própria. Acesso premium continuará decidido pelo servidor.</p><button className="secondary" onClick={()=>setView("dashboard")}>Voltar ao dashboard</button></section>}
-          {view==="pro"&&<section className="dashboard-view empty-view"><Crown size={28}/><small>GRIND PRO</small><h2>{isAdmin?"Admin com PRO de testes ativo":isPro?"Sua conta PRO está ativa":"Recursos para elevar a transmissão"}</h2><p>{isPro?"Seu tier server-side libera até 1080p e 60 fps.":"Free transmite até 720p e 30 fps; PRO libera até 1080p e 60 fps."}</p></section>}
-          {view==="settings"&&<AudioSettings/>}
-        </div>
-      </section>
+        {view==="store"?<section className="lovable-dashboard-view lovable-panel p-5"><p className="lovable-label">Loja e inventário</p><h1 className="mt-1 font-display text-3xl font-bold">Personalize seu Grind</h1><p className="mt-2 max-w-2xl text-sm text-muted-foreground">Catálogo visual preparado pela Lovable. Compras e inventário permanecem indisponíveis até a integração server-side da próxima fase.</p><StoreGrid/></section>:null}
+        {view==="pro"?<section className="lovable-dashboard-view lovable-panel lovable-view-hero grid place-items-center p-8 text-center"><div><Image src="/brand/ascent-portal.png" alt="" width={180} height={180} className="lovable-rank-emblem mx-auto"/><p className="lovable-label mt-4">Grind PRO</p><h1 className="mt-2 font-display text-4xl font-bold">{isAdmin?"Admin com PRO ativo":isPro?"Sua conta PRO está ativa":"Eleve sua experiência"}</h1><p className="mx-auto mt-3 max-w-xl text-muted-foreground">{isPro?"O servidor reconhece seu tier e libera transmissão de até 1080p60.":"Contas Free transmitem até 720p30. O PRO libera até 1080p60 e benefícios premium."}</p></div></section>:null}
+        {view==="settings"?<section className="lovable-dashboard-view lovable-panel p-5"><AudioSettings/></section>:null}
+      </main>
     </div>
 
-    <nav className="mobile-dashboard-nav lg:hidden" aria-label="Navegação principal">
-      {nav.map(item=><button key={item.key} onClick={()=>setView(item.key)} className={view===item.key?"active":""}><item.icon size={17}/><span>{item.label}</span></button>)}
-    </nav>
-
-    {data?.age.capabilities.onboardingRequired&&<AgeAssuranceOnboarding onComplete={result=>setData(current=>current?{...current,age:result}:current)}/>}
-
-    {create&&<div className="modal-bg"><div className="modal">
-      <div className="modal-head"><div><div className="eyebrow"><Sparkles size={13}/>QUICK CREATE</div><h2>Criar novo lobby</h2><p>Defina a sala e reúna sua squad.</p></div><button onClick={()=>setCreate(false)}>✕</button></div>
-      <div className="modal-fields"><label>Nome do lobby<input value={name} maxLength={80} onChange={event=>setName(event.target.value)} placeholder="Ex: Night Grind"/></label><label>Jogo<select value={gameId} onChange={event=>setGameId(event.target.value)}>{games.filter(game=>game.id>0).map(game=><option key={game.id} value={game.id}>{game.name}</option>)}</select></label><div className="grid grid-cols-2 gap-3"><label>Vagas<input type="number" min="2" max="100" value={maxMembers} onChange={event=>setMaxMembers(event.target.value)}/></label><label>Privacidade<select value={visibility} onChange={event=>setVisibility(event.target.value)}><option value="public">Público</option><option value="friends">Amigos</option><option value="private">Privado</option></select></label></div></div>
-      <button disabled={busy==="create"} onClick={createLobby} className="primary mt-6 w-full justify-center">{busy==="create"?<><Loader2 size={15} className="animate-spin"/>Criando…</>:<>Criar lobby</>}</button>
-    </div></div>}
-  </main>;
+    {data?.age.capabilities.onboardingRequired?<AgeAssuranceOnboarding onComplete={result=>setData(current=>current?{...current,age:result}:current)}/>:null}
+    {create?<div className="lovable-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="create-lobby-title"><section className="lovable-modal"><div className="flex items-start justify-between"><div><p className="lovable-label">Quick create</p><h2 id="create-lobby-title" className="mt-1 font-display text-2xl font-bold">Criar novo lobby</h2><p className="mt-1 text-sm text-muted-foreground">Defina a sala e reúna sua squad.</p></div><button onClick={()=>setCreate(false)} aria-label="Fechar" className="grid h-9 w-9 place-items-center rounded-lg border border-border bg-secondary">×</button></div><div className="mt-5 grid gap-4"><label className="lovable-label">Nome do lobby<input value={name} maxLength={80} onChange={event=>setName(event.target.value)} placeholder="Ex: Night Grind"/></label><label className="lovable-label">Jogo<select value={gameId} onChange={event=>setGameId(event.target.value)}>{games.filter(game=>game.id>0).map(game=><option key={game.id} value={game.id}>{game.name}</option>)}</select></label><div className="grid grid-cols-2 gap-3"><label className="lovable-label">Vagas<input type="number" min="2" max="100" value={maxMembers} onChange={event=>setMaxMembers(event.target.value)}/></label><label className="lovable-label">Privacidade<select value={visibility} onChange={event=>setVisibility(event.target.value)}><option value="public">Público</option><option value="friends">Amigos</option><option value="private">Privado</option></select></label></div></div><button disabled={busy==="create"} onClick={createLobby} className="lovable-btn-primary mt-6 flex w-full items-center justify-center gap-2 rounded-lg px-4 py-3 font-semibold">{busy==="create"?<><Loader2 size={16} className="animate-spin"/>Criando…</>:<>Criar lobby</>}</button></section></div>:null}
+  </div>;
 }
