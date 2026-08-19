@@ -119,6 +119,39 @@ h1,h2,h3,h4,.font-display{font-family:"Chakra Petch","Inter",ui-sans-serif,syste
 .animate-glitch-rgb{animation:glitch-rgb .5s steps(2) infinite}
 .animate-ink-wipe{animation:ink-wipe 1.9s cubic-bezier(.7,0,.3,1) forwards}
 .animate-shard{animation:shard-in 1.5s ease-out forwards}
+
+.lovable-loading-screen{
+  --gl-background:.05 .008 285;
+  --gl-foreground:.95 .008 285;
+  --gl-card:.09 .018 288;
+  --gl-panel:.12 .024 290;
+  --gl-primary:.44 .19 300;
+  --gl-primary-glow:.62 .19 305;
+  --gl-secondary:.15 .028 290;
+  --gl-muted:.15 .026 290;
+  --gl-muted-foreground:.62 .022 292;
+  --gl-accent:.20 .06 297;
+  --gl-border:.20 .03 292;
+  --gl-input:.20 .03 292;
+  --gl-gradient-primary:linear-gradient(120deg,oklch(var(--gl-primary)),oklch(var(--gl-primary-glow)));
+  --gl-shadow-glow:0 0 26px oklch(.50 .22 302/.4);
+  --gl-shadow-panel:0 12px 34px oklch(.02 .01 285/.75);
+  background:oklch(var(--gl-background));
+  color:oklch(var(--gl-foreground));
+}
+
+@keyframes ring-spin{to{transform:rotate(360deg)}}
+@keyframes ring-spin-rev{to{transform:rotate(-360deg)}}
+@keyframes orbit{from{transform:rotate(0deg) translateX(72px) rotate(0deg)}to{transform:rotate(360deg) translateX(72px) rotate(-360deg)}}
+@keyframes core-breathe{0%,100%{transform:scale(1);filter:drop-shadow(0 0 14px oklch(.5 .18 303/.55))}50%{transform:scale(1.07);filter:drop-shadow(0 0 26px oklch(.6 .19 304/.7))}}
+@keyframes bar-shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(400%)}}
+@keyframes step-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.animate-ring-slow{animation:ring-spin 5.5s linear infinite}
+.animate-ring-fast{animation:ring-spin-rev 2.6s linear infinite}
+.animate-orbit{animation:orbit 4.5s linear infinite}
+.animate-core-breathe{animation:core-breathe 2s ease-in-out infinite}
+.animate-bar-shimmer{animation:bar-shimmer 1.5s linear infinite}
+.animate-step-in{animation:step-in .35s ease-out both}
 .lovable-login-grid{display:grid;min-height:100svh;grid-template-columns:minmax(0,1.15fr) minmax(420px,.85fr);align-items:center;gap:3.5rem;padding:2.5rem 3.5rem;}
 .lovable-login-hero{position:relative;display:flex;min-width:0;flex-direction:column;align-items:center;transition:opacity .45s ease,filter .7s ease,transform 1.15s cubic-bezier(.2,.75,.2,1);}
 .lovable-login-art{position:relative;width:100%;max-width:620px;}

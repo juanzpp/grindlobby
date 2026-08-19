@@ -306,7 +306,12 @@ function LoginForm() {
 
       {entering ? <PortalTransition variant={transitionFx} /> : null}
       {phase === "loading" || phase === "completing" ? (
-        <GrindPortalLoading variant="fullscreen" label="Sincronizando perfil" complete={phase === "completing"} />
+        <GrindPortalLoading
+          variant="fullscreen"
+          label="Sincronizando perfil"
+          complete={phase === "completing"}
+          effect={transitionFx}
+        />
       ) : null}
     </main>
   );
