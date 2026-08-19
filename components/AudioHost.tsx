@@ -3,6 +3,7 @@ import {useEffect,useRef,useState} from "react";
 import {playAudioEvent} from "@/lib/audio";
 import {AudioOutputPreferences,loadAudioOutputPreferences,saveAudioOutputPreferences} from "@/lib/audio-output";
 import {unlockRemoteAudioContexts} from "./RemoteVoiceAudio";
+import {setLiveKitMicrophoneMuted,switchLiveKitMicrophoneDevice} from "@/lib/webrtc/useLobbyVoice";
 import {
   Mic,MicOff,Headphones,SlidersHorizontal,Radio,PhoneOff,
   X,Settings2,Volume2,Play
@@ -122,7 +123,8 @@ export default function AudioHost({enabled,onStreamChange}:Props){
   setMicId(device);
   if(!active||!stream.current)return;
   try{
-   const nextStream=await navigator.mediaDevices.getUserMedia({audio:constraints(true,device),video:false});
+   const liveKitTrack=await switchLiveKitMicrophoneDevice(device);
+   const nextStream=liveKitTrack?new MediaStream([liveKitTrack]):await navigator.mediaDevices.getUserMedia({audio:constraints(true,device),video:false});
    const previous=stream.current;
    stream.current=nextStream;
    nextStream.getAudioTracks().forEach(track=>track.enabled=!muted);
@@ -145,6 +147,7 @@ export default function AudioHost({enabled,onStreamChange}:Props){
   const next=!wasMuted;
   setMuted(next);
   stream.current?.getAudioTracks().forEach(t=>t.enabled=!next);
+  setLiveKitMicrophoneMuted(next).catch(error=>console.error("Não foi possível alterar o mute no LiveKit",error));
   playAudioEvent(wasMuted?"mic_active":"mic_muted");
  }
  async function runMicTest(mode=testMode){
