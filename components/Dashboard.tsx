@@ -4,13 +4,13 @@ import {useCallback,useEffect,useMemo,useState} from "react";
 import {useRouter} from "next/navigation";
 import {
   Activity,ArrowRight,Bell,ChevronRight,Crown,Gamepad2,Headphones,Home,Loader2,
-  LogOut,Medal,Mic2,MonitorUp,Plus,Radio,Search,Settings,ShieldCheck,ShoppingBag,
+  LogOut,Medal,Mic2,MonitorUp,Plus,Radio,Search,Settings,ShoppingBag,
   Sparkles,Trophy,Users,Zap,
 } from "lucide-react";
 import AudioSettings from "@/components/AudioSettings";
 import GrindLobbyLogo from "@/components/brand/GrindLobbyLogo";
 import GrindPortalLoading from "@/components/feedback/GrindPortalLoading";
-import AgeAssuranceOnboarding from "@/components/age/AgeAssuranceOnboarding";
+import AgeAssuranceOnboarding,{AgeAssuranceStatus} from "@/components/age/AgeAssuranceOnboarding";
 import type {AgeAssuranceSnapshot,AgeCapabilities} from "@/lib/age-assurance-types";
 
 type GameCard={
@@ -147,8 +147,6 @@ export default function Dashboard({user}:{user:{id:string;username:string;displa
   const levelProgress=Math.max(0,Math.min(100,account.xp%1000/10));
   const isPro=data?.entitlements.tier==="pro";
   const isAdmin=Boolean(data?.entitlements.isAdmin);
-  const blockedReason=data?.age.capabilities.reason;
-
   const nav:Array<{key:View;label:string;icon:typeof Home}>=[
     {key:"dashboard",label:"Dashboard",icon:Home},
     {key:"lobbies",label:"Lobbies",icon:Users},
@@ -191,7 +189,11 @@ export default function Dashboard({user}:{user:{id:string;username:string;displa
 
         <div className="dashboard-ready mx-auto max-w-[1540px] p-4 pb-24 lg:p-8">
           {error&&<div className="dash-error" role="alert">{error}</div>}
-          {blockedReason&&!data?.age.capabilities.onboardingRequired&&<div className="age-restriction"><ShieldCheck size={17}/><span>{blockedReason} O restante do dashboard continua disponível.</span></div>}
+          {data&&!data.age.capabilities.onboardingRequired&&<AgeAssuranceStatus
+            assurance={data.age.assurance}
+            capabilities={data.age.capabilities}
+            onChange={result=>setData(current=>current?{...current,age:result}:current)}
+          />}
 
           {view==="dashboard"&&<>
             <section className="rank-hero" key={selectedGame?.id}>

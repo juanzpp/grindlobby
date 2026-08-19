@@ -58,17 +58,16 @@ A fundação persiste apenas:
 
 - faixa etária;
 - status da aferição;
-- método/status do provedor;
-- timestamps de verificação e expiração;
-- status mínimo do vínculo com responsável.
+- método do provedor;
+- timestamps de criação, atualização, verificação e expiração.
 
-Não são armazenados data completa de nascimento, imagem de documento, biometria ou token de convite em claro. Convites de responsável foram modelados com hash e expiração. O provider atual é deliberadamente `deferred`: ele inicia o estado, mas nunca afirma que a idade foi verificada. Faixas que exigem responsável mantêm lobby, voz e transmissão bloqueados até integração real.
+Não são armazenados data completa de nascimento, documento, selfie, vídeo, biometria ou token de convite em claro. Convites de responsável ficam na tabela separada `guardian_links`, com hash e expiração; o status mostrado pela aplicação é derivado desse vínculo, não duplicado em `age_assurance`. O provider atual é deliberadamente `onboarding_fallback`: ele sempre retorna `pending` e uma trava impede que um provider não confiável produza `verified`. A faixa pode ser contestada pela rota autenticada de revisão, sem coletar evidência sensível. Faixas que exigem responsável mantêm lobby, voz e transmissão bloqueados até integração real.
 
 Pendências obrigatórias antes de produção regulada:
 
 1. selecionar e contratar provedor de aferição adequado ao risco;
 2. implementar jornada verificável do responsável;
-3. definir base legal, avisos, canal de contestação e revisão humana;
+3. definir base legal, avisos e operação humana para tratar as contestações já registradas;
 4. produzir RIPD/DPIA com jurídico/DPO;
 5. testar acessibilidade e cenários de falsa classificação;
 6. documentar exclusão e portabilidade de dados do fluxo.
@@ -91,7 +90,7 @@ Uma rotina agendada de expurgo ainda deve ser criada depois que os prazos forem 
 
 ## Ações operacionais externas
 
-- Aplicar e revisar a migration local `20260819150915_security_age_assurance.sql` em staging antes de produção.
+- Aplicar e revisar a migration local `20260819175155_normalize_age_assurance_review.sql` em staging antes de produção.
 - Reconciliar o drift do histórico de migrations remoto.
 - Habilitar proteção de senha vazada no Supabase Auth.
 - Revisar os rate limits nativos do Supabase Auth e SMTP.
