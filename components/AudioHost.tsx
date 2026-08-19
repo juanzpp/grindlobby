@@ -6,9 +6,9 @@ import {
   X,Settings2
 } from "lucide-react";
 
-type Props={enabled:boolean};
+type Props={enabled:boolean;onStreamChange?:(stream:MediaStream|null)=>void};
 
-export default function AudioHost({enabled}:Props){
+export default function AudioHost({enabled,onStreamChange}:Props){
  const [open,setOpen]=useState(false),[active,setActive]=useState(false),[muted,setMuted]=useState(false);
  const [input,setInput]=useState(125),[sensitivity,setSensitivity]=useState(38);
  const [noise,setNoise]=useState(true),[echo,setEcho]=useState(true),[agc,setAgc]=useState(false),[level,setLevel]=useState(0);
@@ -91,6 +91,7 @@ export default function AudioHost({enabled}:Props){
   disconnect();
    const s=await navigator.mediaDevices.getUserMedia({audio:constraints(),video:false});
    stream.current=s;
+  onStreamChange?.(s);
    s.getAudioTracks().forEach(t=>t.enabled=!muted);
   updateApplied(s);
    setActive(true);
@@ -106,6 +107,7 @@ export default function AudioHost({enabled}:Props){
   stopMicTest();
   stream.current?.getTracks().forEach(t=>t.stop());
   stream.current=null;
+  onStreamChange?.(null);
   stopMeter();
   setActive(false);
  }
