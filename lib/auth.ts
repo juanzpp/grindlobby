@@ -1,9 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
+import { requireEmailConfirmation } from '@/lib/auth-config'
 
 export async function getCurrentUser() {
   const supabase = await createClient()
   const { data: { user }, error } = await supabase.auth.getUser()
-  if (error || !user || !user.email_confirmed_at) return null
+  if (error || !user || (requireEmailConfirmation() && !user.email_confirmed_at)) return null
 
   const { data: profile } = await supabase
     .from('profiles')
