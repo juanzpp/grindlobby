@@ -16,6 +16,9 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,members:string[]
  const entries=useRef(new Map<string,PeerEntry>());
  const cursor=useRef(0);
  const pollBusy=useRef(false);
+ const pollTimer=useRef<number|null>(null);
+ const pollingSession=useRef(0);
+ const leaveSent=useRef(false);
  const mounted=useRef(true);
  const localStreamRef=useRef<MediaStream|null>(localStream);
  const memberKey=members.filter(id=>id!==localUserId).sort().join(",");
@@ -184,34 +187,68 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,members:string[]
   try{await entry.pc.addIceCandidate(candidate);devLog("ice-applied",{userId});}
   catch(error){devLog("ice-apply-failed",{userId,error:String(error)});}
  }
- async function poll(){
+ async function poll(session=pollingSession.current){
+  if(session!==pollingSession.current)return;
   if(pollBusy.current)return;
   pollBusy.current=true;
   const response=await fetch(`/api/lobbies/${lobbyId}/voice/signals?after=${cursor.current}`,{cache:"no-store"}).catch(()=>null);
   try{
-   if(!response?.ok)return;
+    if(session!==pollingSession.current||!response?.ok)return;
    const result=await response.json() as {signals:Signal[];cursor:number};
+    if(session!==pollingSession.current)return;
    for(const signal of result.signals)await handleSignal(signal);
-   cursor.current=result.cursor;
-  }finally{pollBusy.current=false;}
+    if(session===pollingSession.current)cursor.current=result.cursor;
+    }finally{if(session===pollingSession.current)pollBusy.current=false;}
+ }
+ function stopPolling(){
+    pollingSession.current+=1;
+  if(pollTimer.current!==null){window.clearInterval(pollTimer.current);pollTimer.current=null;}
+  pollBusy.current=false;
+ }
+ function sendLeaveOnce(){
+  if(leaveSent.current)return;
+  leaveSent.current=true;
+  for(const userId of [...entries.current.keys()])sendSignal(userId,"leave",{}).catch(()=>{});
+ }
+ function closeAllPeers(){
+  for(const userId of [...entries.current.keys()])closePeer(userId);
+  entries.current.clear();
+  setRemotePeers([]);
  }
  useEffect(()=>{
   mounted.current=true;
-  if(!localStreamRef.current){setRemotePeers([]);return()=>{mounted.current=false};}
-    const otherMembers=activeMembers.current.filter(id=>id!==localUserId);
-  for(const userId of otherMembers)createPeer(userId,localUserId<userId).catch(()=>{});
-  const timer=window.setInterval(()=>poll().catch(()=>{}),500);
   return()=>{
-   mounted.current=false;window.clearInterval(timer);
-     for(const userId of [...entries.current.keys()])sendSignal(userId,"leave",{}).catch(()=>{});
-   for(const userId of [...entries.current.keys()])closePeer(userId);
-   entries.current.clear();setRemotePeers([]);
+   mounted.current=false;
+   stopPolling();
+   sendLeaveOnce();
+   closeAllPeers();
   };
  },[lobbyId,localUserId]);
  useEffect(()=>{
+  if(!localStream){
+   stopPolling();
+   sendLeaveOnce();
+   closeAllPeers();
+   cursor.current=0;
+   return;
+  }
+  leaveSent.current=false;
+  cursor.current=0;
+  pollBusy.current=false;
+  const session=++pollingSession.current;
+  poll(session).catch(error=>devLog("poll-failed",{error:String(error),session}));
+  pollTimer.current=window.setInterval(()=>poll(session).catch(error=>devLog("poll-failed",{error:String(error),session})),500);
+  return stopPolling;
+ },[Boolean(localStream),lobbyId,localUserId]);
+ useEffect(()=>{
   const previous=localStreamRef.current;
   localStreamRef.current=localStream;
-  if(!localStream)return;
+  if(!localStream){
+   sendLeaveOnce();
+   closeAllPeers();
+   return;
+  }
+  leaveSent.current=false;
   if(previous&&previous!==localStream){
   const newTrack=localStream.getAudioTracks()[0];
   for(const [userId,entry] of entries.current){
@@ -236,8 +273,9 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,members:string[]
  function setPeerVolume(userId:string,volume:number){setRemotePeers(current=>current.map(peer=>peer.userId===userId?{...peer,volume}:peer));}
  function togglePeerMuted(userId:string){setRemotePeers(current=>current.map(peer=>peer.userId===userId?{...peer,muted:!peer.muted}:peer));}
  function notifyVoiceLeave(){
-  for(const userId of [...entries.current.keys()])sendSignal(userId,"leave",{}).catch(()=>{});
-  for(const userId of [...entries.current.keys()])closePeer(userId);
+  stopPolling();
+  sendLeaveOnce();
+  closeAllPeers();
  }
  return {remotePeers,setPeerVolume,togglePeerMuted,notifyVoiceLeave};
 }
