@@ -1,6 +1,6 @@
 import {z} from "zod";
 import {getCurrentUser} from "@/lib/auth";
-import {AGE_BANDS} from "@/lib/age-assurance-types";
+import {ageBandPostSchema} from "@/lib/age-band-validation";
 import {beginAgeVerification,getAgeAssurance,getAgeCapabilities,requestAgeVerificationReview} from "@/lib/age-assurance";
 import type {AgeVerificationDecision} from "@/lib/age-verification-provider";
 import {createAdminClient} from "@/lib/supabase/admin";
@@ -8,7 +8,6 @@ import {assertTrustedMutation,InvalidRequestError,noStoreJson,readJsonBody} from
 import {enforceRateLimit,RateLimitExceededError,RateLimitUnavailableError,rateLimitResponse} from "@/lib/security/rate-limit";
 import {logSecurityEvent} from "@/lib/security/logging";
 
-const onboardingSchema=z.object({ageBand:z.enum(AGE_BANDS)}).strict();
 const reviewSchema=z.object({action:z.literal("request_review")}).strict();
 
 async function persistDecision(userId:string,decision:AgeVerificationDecision){
@@ -40,7 +39,7 @@ export async function POST(request:Request){
     if(!user)return noStoreJson({error:"Não autorizado."},{status:401});
     actorId=user.id;
     await enforceRateLimit(request,{scope:"age-assurance",limit:8,windowSeconds:3600,subject:user.id});
-    const {ageBand}=onboardingSchema.parse(await readJsonBody(request,2048));
+    const {ageBand}=ageBandPostSchema.parse(await readJsonBody(request,2048));
     const current=await getAgeAssurance(user.id);
     if(current.ageBand||current.status!=="not_started"){
       return noStoreJson({error:"A faixa existente deve ser alterada pelo fluxo de revisão."},{status:409});
@@ -52,7 +51,8 @@ export async function POST(request:Request){
     return noStoreJson({assurance,capabilities:getAgeCapabilities(assurance)});
   }catch(error){
     if(error instanceof RateLimitExceededError||error instanceof RateLimitUnavailableError)return rateLimitResponse(error);
-    if(error instanceof z.ZodError||error instanceof InvalidRequestError)return noStoreJson({error:"Selecione uma faixa etária válida."},{status:400});
+    if(error instanceof z.ZodError)return noStoreJson({error:"Selecione uma faixa etária válida."},{status:400});
+    if(error instanceof InvalidRequestError)return noStoreJson({error:error.message},{status:400});
     logSecurityEvent({event:"age_assurance_started",outcome:"failed",actorId,reason:"write_failed",route:"/api/me/age-assurance"});
     return noStoreJson({error:"Não foi possível iniciar a aferição etária."},{status:500});
   }

@@ -8,13 +8,17 @@ export class InvalidRequestError extends Error {
 export function assertTrustedMutation(request:Request){
   const requestUrl=new URL(request.url);
   const origin=request.headers.get("origin");
+  const fetchSite=request.headers.get("sec-fetch-site");
   if(origin){
     let originUrl:URL;
     try{originUrl=new URL(origin)}catch{throw new InvalidRequestError()}
-    if(originUrl.origin!==requestUrl.origin)throw new InvalidRequestError();
-    return;
+    if(originUrl.origin===requestUrl.origin)return;
+    // Reverse proxies can expose an internal request URL to Next.js. Fetch
+    // Metadata remains browser-controlled and confirms the public request was
+    // initiated from the same origin without trusting forwarded host headers.
+    if(fetchSite==="same-origin")return;
+    throw new InvalidRequestError();
   }
-  const fetchSite=request.headers.get("sec-fetch-site");
   if(fetchSite!=="same-origin")throw new InvalidRequestError();
 }
 

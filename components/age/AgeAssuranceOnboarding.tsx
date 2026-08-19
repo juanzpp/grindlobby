@@ -3,22 +3,9 @@
 import {useState} from "react";
 import {ShieldCheck,Users,Loader2,ArrowRight,RefreshCcw} from "lucide-react";
 import type {AgeBand,AgeAssuranceSnapshot,AgeCapabilities} from "@/lib/age-assurance-types";
+import {AGE_BAND_LABELS,AGE_BAND_OPTIONS} from "@/lib/age-band";
 
 type AgeResponse={assurance:AgeAssuranceSnapshot;capabilities:AgeCapabilities};
-
-const choices:Array<{value:AgeBand;label:string;detail:string}>=[
-  {value:"under_13",label:"Menos de 13",detail:"Experiência infantil; lobby, voz e tela exigem responsável."},
-  {value:"13_15",label:"13 a 15",detail:"Experiência jovem; lobby, voz e tela exigem responsável."},
-  {value:"16_17",label:"16 ou 17",detail:"Experiência adolescente; compras permanecem restritas."},
-  {value:"18_plus",label:"18 ou mais",detail:"Compras exigem age assurance concluída por provedor confiável."},
-];
-
-const bandLabels:Record<AgeBand,string>={
-  under_13:"Menos de 13",
-  "13_15":"13 a 15",
-  "16_17":"16 ou 17",
-  "18_plus":"18 ou mais",
-};
 
 function assuranceCopy(assurance:AgeAssuranceSnapshot,capabilities:AgeCapabilities){
   if(capabilities.isVerified)return {
@@ -72,7 +59,7 @@ export function AgeAssuranceStatus({
   return <section className={`age-assurance-status age-experience-${capabilities.experience}`} aria-live="polite">
     <ShieldCheck size={18}/>
     <div>
-      <small>FAIXA {bandLabels[assurance.ageBand].toUpperCase()}</small>
+      <small>FAIXA {AGE_BAND_LABELS[assurance.ageBand].toUpperCase()}</small>
       <strong>{copy.label}</strong>
       <p>{copy.text}{capabilities.reason?` ${capabilities.reason}`:""}</p>
       {error&&<span className="age-inline-error" role="alert">{error}</span>}
@@ -113,7 +100,7 @@ export default function AgeAssuranceOnboarding({onComplete}:{onComplete:(result:
       <h1 id="age-title">Antes de entrar no Grind</h1>
       <p>Informe somente sua faixa etária para o fallback temporário. Não pedimos data de nascimento, documento, selfie, vídeo ou biometria. Esta seleção ficará pendente e não significa idade verificada.</p>
       <div className="age-options">
-        {choices.map(choice=><button
+        {AGE_BAND_OPTIONS.map(choice=><button
           key={choice.value}
           type="button"
           className={selected===choice.value?"selected":""}
