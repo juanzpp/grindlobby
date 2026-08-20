@@ -68,14 +68,14 @@ function Waveform({bars=18,active=false}:{bars?:number;active?:boolean}){
   return <span className="lovable-wave flex items-end gap-[2px]" aria-hidden="true">{Array.from({length:bars}).map((_,index)=><span key={index} className={active&&index<bars*.55?"bg-primary-glow":"bg-muted"} style={{height:6+(index*7)%12}}/>)}</span>;
 }
 
-export default function Dashboard({user}:{user:DashboardUser}){
+export default function Dashboard({user,initialView="dashboard"}:{user:DashboardUser;initialView?:View}){
   const router=useRouter();
   const [data,setData]=useState<DashboardData|null>(null);
   const [loading,setLoading]=useState(true);
   const [refreshing,setRefreshing]=useState(false);
   const [busy,setBusy]=useState<string|null>(null);
   const [error,setError]=useState("");
-  const [view,setView]=useState<View>("dashboard");
+  const [view,setView]=useState<View>(initialView);
   const [selectedGameId,setSelectedGameId]=useState<number|null>(null);
   const [search,setSearch]=useState("");
   const [create,setCreate]=useState(false);
