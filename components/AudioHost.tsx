@@ -3,7 +3,7 @@ import {useEffect,useRef,useState} from "react";
 import {playAudioEvent} from "@/lib/audio";
 import {AudioOutputPreferences,loadAudioOutputPreferences,saveAudioOutputPreferences} from "@/lib/audio-output";
 import {unlockRemoteAudioContexts} from "./RemoteVoiceAudio";
-import {disconnectActiveLiveKitVoice,getActiveMicrophoneStream,setLiveKitMicrophoneMuted,subscribeActiveLiveKitRoom,switchLiveKitMicrophoneDevice} from "@/lib/webrtc/useLobbyVoice";
+import {disconnectActiveLiveKitVoice,getActiveMicrophoneStream,setLiveKitMicrophoneGain,setLiveKitMicrophoneMuted,subscribeActiveLiveKitRoom} from "@/lib/webrtc/useLobbyVoice";
 import {
   Mic,MicOff,Headphones,SlidersHorizontal,Radio,PhoneOff,
   X,Settings2,Volume2,Play
@@ -123,8 +123,7 @@ export default function AudioHost({enabled,onStreamChange}:Props){
   setMicId(device);
   if(!active||!stream.current)return;
   try{
-   const liveKitTrack=await switchLiveKitMicrophoneDevice(device);
-   const nextStream=liveKitTrack?new MediaStream([liveKitTrack]):await navigator.mediaDevices.getUserMedia({audio:constraints(true,device),video:false});
+   const nextStream=await navigator.mediaDevices.getUserMedia({audio:constraints(true,device),video:false});
    const previous=stream.current;
    stream.current=nextStream;
    nextStream.getAudioTracks().forEach(track=>track.enabled=!muted);
@@ -190,16 +189,36 @@ export default function AudioHost({enabled,onStreamChange}:Props){
   refreshDevices().catch(()=>{});
   const existing=getActiveMicrophoneStream();
   if(existing){stream.current=existing;setActive(true);updateApplied(existing);startMeter(existing);onStreamChange?.(existing)}
+  const onExternalMute=(event:Event)=>{
+   const detail=(event as CustomEvent<{muted?:boolean}>).detail;
+   const next=Boolean(detail?.muted);
+   setMuted(next);
+   stream.current?.getAudioTracks().forEach(track=>track.enabled=!next);
+   setLiveKitMicrophoneMuted(next).catch(error=>console.error("Não foi possível alterar o mute no LiveKit",error));
+  };
+  const onExternalGain=(event:Event)=>{
+   const detail=(event as CustomEvent<{gain?:number}>).detail;
+   const next=Math.max(0,Math.min(200,Number(detail?.gain??100)));
+   setInput(next);setLiveKitMicrophoneGain(next);
+  };
+  window.addEventListener("grindlobby:set-mic-muted",onExternalMute);
+  window.addEventListener("grindlobby:set-mic-gain",onExternalGain);
   const unsubscribe=subscribeActiveLiveKitRoom(room=>{
    if(!room){if(stream.current){stopMeter();stream.current=null;setActive(false)};return}
    const live=getActiveMicrophoneStream();
    if(live&&!stream.current){stream.current=live;setActive(true);updateApplied(live);startMeter(live);onStreamChange?.(live)}
   });
-  return()=>{unsubscribe();stopMicTest();stopMeter()};
+  return()=>{
+   unsubscribe();
+   window.removeEventListener("grindlobby:set-mic-muted",onExternalMute);
+   window.removeEventListener("grindlobby:set-mic-gain",onExternalGain);
+   stopMicTest();stopMeter();
+  };
  },[]);
  useEffect(()=>{
   if(testAudio.current)testAudio.current.volume=1;
   setSmoothGain(gain.current,input/100);
+  setLiveKitMicrophoneGain(input);
  },[input]);
  useEffect(()=>{
   if(stream.current)applyProcessing(stream.current,true).catch(()=>{});
