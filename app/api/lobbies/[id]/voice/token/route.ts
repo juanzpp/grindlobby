@@ -2,7 +2,6 @@ import {z} from "zod";
 import {AccessToken,TokenVerifier,TrackSource} from "livekit-server-sdk";
 import {createClient} from "@/lib/supabase/server";
 import {createAdminClient} from "@/lib/supabase/admin";
-import {getAgeAssurance,getAgeCapabilities} from "@/lib/age-assurance";
 import {assertTrustedMutation,InvalidRequestError,noStoreJson} from "@/lib/security/request";
 import {enforceRateLimit,RateLimitExceededError,RateLimitUnavailableError,rateLimitResponse} from "@/lib/security/rate-limit";
 import {logSecurityEvent} from "@/lib/security/logging";
@@ -31,9 +30,6 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
     actorId=user.id;
 
     await enforceRateLimit(request,{scope:"livekit-token",limit:20,windowSeconds:600,subject:user.id});
-    const age=getAgeCapabilities(await getAgeAssurance(user.id));
-    if(!age.canUseVoice)return noStoreJson({error:age.reason||"Voz indisponível para esta conta."},{status:403});
-
     const admin=createAdminClient();
     const {data:member}=await admin.from("lobby_members")
       .select("user_id")

@@ -40,12 +40,10 @@ export async function POST(request:Request){
         user_id:data.user.id,
         terms_accepted_at:acceptedAt,
         privacy_accepted_at:acceptedAt,
-        age_declaration_at:null,
         terms_version:"2026-08-01",
         privacy_version:"2026-08-01",
       },{onConflict:"user_id"});
       if(consentError)throw new Error("consent_write_failed");
-      await admin.from("age_assurance").upsert({user_id:data.user.id,age_assurance_status:"not_started"},{onConflict:"user_id"});
       if(data.session)await admin.from("profiles").update({status:"online"}).eq("id",data.user.id);
       logSecurityEvent({event:"register",outcome:"allowed",actorId:data.user.id,route:"/api/auth/register"});
     }

@@ -31,7 +31,6 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
-  const [rememberEca, setRememberEca] = useState(true);
   const [phase, setPhase] = useState<LoginPhase>("idle");
   const [transitionFx, setTransitionFx] = useState<TransitionFx>("portal");
   const [error, setError] = useState("");
@@ -262,7 +261,6 @@ function LoginForm() {
 
             <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
               <LoginToggle checked={remember} onChange={() => setRemember((value) => !value)} label="Lembrar senha" disabled={disabled} />
-              <LoginToggle checked={rememberEca} onChange={() => setRememberEca((value) => !value)} label="Lembrar ECA digital" disabled={disabled} />
             </div>
 
             {error ? <div className="lovable-feedback lovable-feedback-error" role="alert">{error}</div> : null}

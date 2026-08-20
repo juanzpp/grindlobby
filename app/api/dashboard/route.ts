@@ -1,6 +1,5 @@
 import {getCurrentUser} from "@/lib/auth";
 import {createAdminClient} from "@/lib/supabase/admin";
-import {getAgeAssurance,getAgeCapabilities} from "@/lib/age-assurance";
 import {noStoreJson} from "@/lib/security/request";
 import {enforceRateLimit,RateLimitExceededError,RateLimitUnavailableError,rateLimitResponse} from "@/lib/security/rate-limit";
 
@@ -11,14 +10,13 @@ export async function GET(request:Request){
     await enforceRateLimit(request,{scope:"dashboard-read",limit:120,windowSeconds:600,subject:user.id});
 
     const admin=createAdminClient();
-    const [{data:games},{data:ranks},{data:allLobbies},{data:online},{data:myMemberships},{data:profile},assurance]=await Promise.all([
+    const [{data:games},{data:ranks},{data:allLobbies},{data:online},{data:myMemberships},{data:profile}]=await Promise.all([
       admin.from("games").select("id,name,slug").order("id").limit(12),
       admin.from("user_game_ranks").select("game_id,rank_name,points,wins,losses").eq("user_id",user.id),
       admin.from("lobbies").select("id,owner_id,game_id,name,description,visibility,max_members,status,created_at").eq("status","open").order("created_at",{ascending:false}).limit(40),
       admin.from("profiles").select("id,username,display_name,avatar,status").eq("status","online").neq("id",user.id).limit(12),
       admin.from("lobby_members").select("lobby_id,role,joined_at,last_seen_at").eq("user_id",user.id).order("joined_at",{ascending:false}),
       admin.from("profiles").select("account_level,account_xp").eq("id",user.id).maybeSingle(),
-      getAgeAssurance(user.id),
     ]);
 
     const cutoff=new Date(Date.now()-30_000).toISOString();
@@ -84,8 +82,6 @@ export async function GET(request:Request){
         profile:profileMap.get(member.user_id)??null,
       }))
       :[];
-    const age=getAgeCapabilities(assurance);
-
     return noStoreJson({
       games:gameCards,
       lobbies:lobbyCards,
@@ -96,7 +92,6 @@ export async function GET(request:Request){
         tier:user.account_tier==="pro"||user.app_role==="admin"?"pro":"free",
         isAdmin:user.app_role==="admin",
       },
-      age:{assurance,capabilities:age},
       stats:{
         online:(online??[]).length+1,
         activeLobbies:lobbies.length,
