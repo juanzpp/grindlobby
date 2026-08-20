@@ -4,7 +4,7 @@ import {useCallback,useEffect,useRef,useState} from "react";
 import {useRouter} from "next/navigation";
 import {
   ArrowLeft,Check,Copy,Crown,Gamepad2,Globe,Loader2,LogOut,MessageSquare,Mic,MicOff,
-  MonitorUp,MoreVertical,Radio,Settings,Shield,UserPlus,Users,
+  MonitorUp,MoreVertical,Radio,RotateCcw,Settings,Shield,UserPlus,Users,Volume2,
 } from "lucide-react";
 import AudioHost from "@/components/AudioHost";
 import RemoteVoiceAudio from "@/components/RemoteVoiceAudio";
@@ -12,7 +12,7 @@ import LovableBrand from "@/components/brand/LovableBrand";
 import GrindLoading from "@/components/feedback/GrindLoading";
 import ScreenShare from "@/components/stream/ScreenShare";
 import LobbyChat from "@/components/lobby/LobbyChat";
-import {useLobbyVoice} from "@/lib/webrtc/useLobbyVoice";
+import {setLiveKitMicrophoneGain,setLiveKitMicrophoneMuted,useLobbyVoice} from "@/lib/webrtc/useLobbyVoice";
 import {loadAudioPreferences,playAudioEvent} from "@/lib/audio";
 
 type Member={
@@ -40,6 +40,7 @@ export default function LobbyRoom({id,user}:{id:string;user:LobbyUser}){
   const [copied,setCopied]=useState(false);
   const [error,setError]=useState("");
   const [localStream,setLocalStream]=useState<MediaStream|null>(null);
+  const [localMicGain,setLocalMicGain]=useState(125);
   const [roomTab,setRoomTab]=useState<"members"|"chat">("members");
   const router=useRouter();
   const voiceLobbyMembers=lobby?.members.map(member=>({
@@ -141,14 +142,49 @@ export default function LobbyRoom({id,user}:{id:string;user:LobbyUser}){
             {lobby.members.map(member=>{
               const voice=voiceMembers.find(item=>item.userId===member.user_id);
               const peer=remotePeers.find(item=>item.userId===member.user_id);
+              const isLocal=member.user_id===user.id;
               const voiceActive=Boolean(voice?.connected);
               const speaking=Boolean(voice?.speaking||(voice?.audioLevel??0)>.02);
               const memberName=member.profile?.display_name||member.profile?.username||"Player";
-              return <li className={`flex flex-wrap items-center gap-3 py-3 ${speaking?"member-speaking":""}`} key={member.user_id}>
+              const locallyMuted=!isLocal&&Boolean(peer?.muted);
+              const micMuted=Boolean(voice?.microphoneMuted)||locallyMuted;
+              const volumeValue=isLocal?localMicGain:(peer?.volume??100);
+              const changeMute=()=>{
+                if(isLocal){
+                  void setLiveKitMicrophoneMuted(!Boolean(voice?.microphoneMuted));
+                  return;
+                }
+                if(peer)togglePeerMuted(member.user_id);
+              };
+              const changeVolume=(next:number)=>{
+                if(isLocal){
+                  setLocalMicGain(next);
+                  setLiveKitMicrophoneGain(next);
+                }else if(peer)setPeerVolume(member.user_id,next);
+              };
+              const copyHandle=()=>navigator.clipboard?.writeText(`@${member.profile?.username??"player"}`).catch(()=>{});
+              return <li className={`member-voice-row flex flex-wrap items-center gap-3 py-3 ${speaking?"member-speaking":""}`} key={member.user_id}>
                 <span className="relative"><span className="lovable-avatar grid h-9 w-9 place-items-center rounded-full font-display text-xs font-bold">{initials(memberName)}</span><span className={`lovable-presence-dot absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ${voiceActive?"bg-success":"bg-muted"}`}/></span>
                 <div className="min-w-0 flex-1"><p className="flex items-center gap-1.5 text-sm font-semibold">{memberName}{member.role==="owner"?<Crown size={14} className="text-warning"/>:null}</p><p className="text-xs text-muted-foreground">@{member.profile?.username??"player"}{voiceActive?` · ${voice?.status||"Connected"}`:" · OFF"}</p></div>
-                <div className="ml-auto flex items-center gap-3">{voice?.microphoneMuted?<MicOff size={16} className="text-destructive"/>:<Mic size={16} className="text-muted-foreground"/>}<Waveform level={voice?.audioLevel} muted={!voiceActive||voice?.microphoneMuted}/><span className={member.role==="owner"?"rounded-md border border-primary/40 bg-primary/20 px-2 py-1 text-[10px] font-bold":"lovable-label"}>{member.role==="owner"?"HOST":"MEMBRO"}</span><MoreVertical size={16} className="text-muted-foreground"/></div>
-                {peer?<div className="remote-voice-controls w-full"><RemoteVoiceAudio stream={peer.stream} volume={peer.volume} muted={peer.muted}/><button onClick={()=>togglePeerMuted(member.user_id)}>{peer.muted?"Desmutar":"Mutar"}</button><label>Volume <input aria-label={`Volume de ${memberName}`} type="range" min="0" max="200" value={peer.volume} onChange={event=>setPeerVolume(member.user_id,Number(event.target.value))}/><b>{peer.volume}%</b></label></div>:null}
+                <div className="member-voice-actions ml-auto flex items-center gap-2">
+                  {peer?<RemoteVoiceAudio stream={peer.stream} volume={peer.volume} muted={peer.muted}/>:null}
+                  <button type="button" onClick={changeMute} disabled={!voiceActive||(!isLocal&&!peer)} className={micMuted?"member-mic-btn is-muted":"member-mic-btn"} aria-label={isLocal?(voice?.microphoneMuted?"Ativar meu microfone":"Mutar meu microfone"):(peer?.muted?`Desmutar ${memberName} para mim`:`Mutar ${memberName} para mim`)} title={isLocal?"Mutar/desmutar meu microfone":"Mutar/desmutar este usuário apenas para você"}>
+                    {micMuted?<MicOff size={16}/>:<Mic size={16}/>}
+                  </button>
+                  <label className="member-volume" title={isLocal?"Ganho do seu microfone":"Volume deste usuário para você"}>
+                    <Volume2 size={13}/><input aria-label={isLocal?"Ganho do meu microfone":`Volume de ${memberName}`} type="range" min="0" max={isLocal?200:100} value={volumeValue} disabled={!voiceActive||(!isLocal&&!peer)} onChange={event=>changeVolume(Number(event.target.value))}/><b>{volumeValue}%</b>
+                  </label>
+                  <span className={member.role==="owner"?"rounded-md border border-primary/40 bg-primary/20 px-2 py-1 text-[10px] font-bold":"lovable-label"}>{member.role==="owner"?"HOST":"MEMBRO"}</span>
+                  <details className="member-more">
+                    <summary aria-label={`Mais opções de ${memberName}`}><MoreVertical size={16}/></summary>
+                    <div className="member-more-popover">
+                      <button type="button" onClick={changeMute} disabled={!voiceActive||(!isLocal&&!peer)}>{micMuted?<Mic size={14}/>:<MicOff size={14}/>} {micMuted?"Desmutar":"Mutar"}</button>
+                      <button type="button" onClick={()=>changeVolume(isLocal?125:100)} disabled={!voiceActive||(!isLocal&&!peer)}><RotateCcw size={14}/>Restaurar volume</button>
+                      {!isLocal?<><button type="button" onClick={()=>changeVolume(25)} disabled={!peer}><Volume2 size={14}/>Volume 25%</button><button type="button" onClick={()=>changeVolume(50)} disabled={!peer}><Volume2 size={14}/>Volume 50%</button><button type="button" onClick={()=>changeVolume(100)} disabled={!peer}><Volume2 size={14}/>Volume 100%</button></>:<><button type="button" onClick={()=>changeVolume(100)}><Volume2 size={14}/>Ganho 100%</button><button type="button" onClick={()=>changeVolume(125)}><Volume2 size={14}/>Ganho 125%</button></>}
+                      <button type="button" onClick={copyHandle}><Copy size={14}/>Copiar usuário</button>
+                    </div>
+                  </details>
+                </div>
               </li>;
             })}
           </ul>:<LobbyChat lobbyId={id} members={voiceLobbyMembers.map(member=>({userId:member.userId,name:member.name}))}/>}
