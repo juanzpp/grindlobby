@@ -234,7 +234,7 @@ export default function ScreenShare({isPro=false}:{isPro?:boolean}){
   }
 
   async function start(){
-    if(!room||room.state!==ConnectionState.Connected){setError("Entre na voz antes de compartilhar a tela.");return}
+    if(!room||room.state!==ConnectionState.Connected){setError("Entre no lobby antes de compartilhar a tela.");return}
     if(!screenAudio.supported){setError("Seu navegador não oferece captura de tela neste contexto.");return}
     setBusy(true);setError("");setScreenAudio(current=>({...current,available:null,published:false}));
     let createdTracks:LocalTrack[]=[];

@@ -98,7 +98,8 @@ async function processedMicrophoneStream(stream:MediaStream){
  micAudioContext=context;micGainNode=gain;micSourceTrackId=sourceTrack.id;micProcessedStream=destination.stream;
  return destination.stream;
 }
-async function publishOrReplaceMicrophone(room:Room,stream:MediaStream){
+async function publishOrReplaceMicrophone(room:Room,stream:MediaStream|null){
+ if(!stream)return;
  const raw=stream.getAudioTracks()[0];if(!raw)return;
  activeStream=stream;
  const processed=await processedMicrophoneStream(stream),next=processed?.getAudioTracks()[0];if(!next)return;
@@ -107,7 +108,7 @@ async function publishOrReplaceMicrophone(room:Room,stream:MediaStream){
  if(current)await room.localParticipant.unpublishTrack(current,false);
  await room.localParticipant.publishTrack(next,{source:Track.Source.Microphone,audioPreset:AudioPresets.speech,dtx:true,red:true,stopMicTrackOnMute:false});
 }
-async function ensureSession(lobbyId:string,userId:string,members:VoiceLobbyMember[],stream:MediaStream){
+async function ensureSession(lobbyId:string,userId:string,members:VoiceLobbyMember[],stream:MediaStream|null){
  activeMembers=members;
  if(activeRoom&&activeLobbyId===lobbyId&&activeRoom.state!==ConnectionState.Disconnected){await publishOrReplaceMicrophone(activeRoom,stream);syncPresence(activeRoom);return}
  await disconnectActiveLiveKitVoice(false);
@@ -118,7 +119,7 @@ async function ensureSession(lobbyId:string,userId:string,members:VoiceLobbyMemb
   if(!response.ok||!data.token||!data.url)throw new Error(data.error||"Token LiveKit indisponível");
   if(generation!==connectGeneration)return;
   await room.connect(data.url,data.token,{autoSubscribe:true});if(generation!==connectGeneration)return;
-  await publishOrReplaceMicrophone(room,stream);syncPresence(room);log("room-connected",{room:room.name,participantCount:room.numParticipants});
+  if(stream)await publishOrReplaceMicrophone(room,stream);syncPresence(room);log("room-connected",{room:room.name,participantCount:room.numParticipants,microphone: Boolean(stream)});
  }catch(error){logError("room-connect-failed",{error:String(error)});syncPresence(room)}
 }
 export async function disconnectActiveLiveKitVoice(stopTracks=true){
@@ -167,7 +168,7 @@ export function useLobbyVoice(lobbyId:string,localUserId:string,lobbyMembers:Voi
  useEffect(()=>{if(process.env.NEXT_PUBLIC_VOICE_DEBUG!=="true"||window.__GRINDLOBBY_VOICE_DEBUG__)return;window.__GRINDLOBBY_VOICE_DEBUG__=true;console.debug("[GrindLobby Voice] debug-enabled")},[]);
  useEffect(()=>{const listener=(value:Map<string,VoiceMemberState>)=>setVoicePresence(new Map(value));presenceListeners.add(listener);listener(activePresence);return()=>{presenceListeners.delete(listener)}},[]);
  useEffect(()=>{activeMembers=lobbyMembers;if(activeRoom&&activeLobbyId===lobbyId)syncPresence(activeRoom)},[lobbyMembers.map(member=>member.userId).join(","),lobbyId]);
- useEffect(()=>{if(!localStream)return;void ensureSession(lobbyId,localUserId,lobbyMembers,localStream)},[localStream,lobbyId,localUserId]);
+ useEffect(()=>{if(!lobbyId||!localUserId||!lobbyMembers.length)return;void ensureSession(lobbyId,localUserId,lobbyMembers,localStream)},[localStream,lobbyId,localUserId,lobbyMembers.map(member=>member.userId).join(",")]);
  const voiceMembers=[...voicePresence.values()],remotePeers=voiceMembers.filter(member=>member.userId!==localUserId&&member.connected);
  function setPeerVolume(userId:string,volume:number){const current=volumes.get(userId)??{volume:100,muted:false};volumes.set(userId,{...current,volume});syncPresence()}
  function togglePeerMuted(userId:string){const current=volumes.get(userId)??{volume:100,muted:false};volumes.set(userId,{...current,muted:!current.muted});syncPresence()}
