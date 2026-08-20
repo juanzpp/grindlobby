@@ -1,7 +1,6 @@
 import {z} from "zod";
 import {createClient} from "@/lib/supabase/server";
 import {createAdminClient} from "@/lib/supabase/admin";
-import {getAgeAssurance,getAgeCapabilities} from "@/lib/age-assurance";
 import {assertTrustedMutation,InvalidRequestError,noStoreJson,readJsonBody} from "@/lib/security/request";
 import {enforceRateLimit,RateLimitExceededError,RateLimitUnavailableError,rateLimitResponse} from "@/lib/security/rate-limit";
 
@@ -13,7 +12,7 @@ const createSchema=z.object({
   maxMembers:z.coerce.number().int().min(2).max(100),
 }).strict();
 
-type LobbyCreateStage="request"|"authentication"|"rate_limit"|"age_assurance"|"payload_validation"|"game_lookup"|"lobby_insert"|"host_insert"|"rollback"|"complete";
+type LobbyCreateStage="request"|"authentication"|"rate_limit"|"payload_validation"|"game_lookup"|"lobby_insert"|"host_insert"|"rollback"|"complete";
 
 class LobbyCreateError extends Error{
   code:string;
@@ -47,12 +46,6 @@ export async function POST(request:Request){
     logLobbyCreate({authenticated:true,userId,stage,outcome:"allowed",code:"authenticated"});
     stage="rate_limit";
     await enforceRateLimit(request,{scope:"create-lobby",limit:8,windowSeconds:3600,subject:user.id});
-    stage="age_assurance";
-    const age=getAgeCapabilities(await getAgeAssurance(user.id));
-    if(!age.canJoinLobbies){
-      logLobbyCreate({authenticated:true,userId,stage,outcome:"blocked",code:"age_restricted"});
-      return noStoreJson({error:age.reason||"Recurso indisponível."},{status:403});
-    }
     stage="payload_validation";
     const body=createSchema.parse(await readJsonBody(request,8192)),admin=createAdminClient();
     stage="game_lookup";
