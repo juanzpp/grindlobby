@@ -2,13 +2,27 @@ import {getCurrentUser} from "@/lib/auth";
 import {createAdminClient} from "@/lib/supabase/admin";
 import {noStoreJson} from "@/lib/security/request";
 import {enforceRateLimit,RateLimitExceededError,RateLimitUnavailableError,rateLimitResponse} from "@/lib/security/rate-limit";
+import {PROFILE_EFFECTS,PROFILE_FRAMES} from "@/lib/profile-cosmetics";
 
 type RankRow={user_id:string;game_id:number;rank_name:string;points:number;wins:number;losses:number;updated_at:string};
 type PlayerProfile={
   id:string;username:string;display_name:string;avatar:string|null;status:string;created_at:string;
   account_level:number|null;favorite_game:string|null;
   profile_banner:string|null;avatar_frame:string|null;profile_effect:string|null;profile_badge:string|null;profile_card_style:string|null;
+  cosmetic_owned:string[]|null;cosmetic_equipped:Record<string,string>|null;app_role:string|null;
 };
+
+
+const PROFILE_SELECT="id,username,display_name,avatar,status,created_at,account_level,favorite_game,profile_banner,avatar_frame,profile_effect,profile_badge,profile_card_style,cosmetic_owned,cosmetic_equipped,app_role";
+
+function ownedCosmetic(person:PlayerProfile,kind:"frame"|"effect",legacy:string|null|undefined){
+  const allowed=kind==="frame"?PROFILE_FRAMES.map(item=>item.id):PROFILE_EFFECTS.map(item=>item.id);
+  const selected=person.cosmetic_equipped?.[kind]||legacy||"none";
+  if(selected==="none")return "none";
+  if(!allowed.includes(selected))return "none";
+  if(person.app_role==="admin")return selected;
+  return (person.cosmetic_owned??[]).includes(selected)?selected:"none";
+}
 
 function rankMatches(rank:RankRow|null|undefined){return rank?(rank.wins??0)+(rank.losses??0):0}
 function rankWinRate(rank:RankRow|null|undefined){const matches=rankMatches(rank);return matches?Math.round(((rank?.wins??0)/matches)*100):null}
@@ -32,9 +46,9 @@ export async function GET(request:Request){
       admin.from("user_game_ranks").select("user_id,game_id,rank_name,points,wins,losses,updated_at").eq("user_id",user.id),
       admin.from("user_game_ranks").select("user_id,game_id,rank_name,points,wins,losses,updated_at").order("points",{ascending:false}).limit(200),
       admin.from("lobbies").select("id,owner_id,game_id,name,description,visibility,max_members,status,created_at").eq("status","open").order("created_at",{ascending:false}).limit(40),
-      admin.from("profiles").select("id,username,display_name,avatar,status,created_at,account_level,favorite_game,profile_banner,avatar_frame,profile_effect,profile_badge,profile_card_style,profile_banner,avatar_frame,profile_effect,profile_badge,profile_card_style,profile_banner,avatar_frame,profile_effect,profile_badge,profile_card_style").eq("status","online").neq("id",user.id).limit(20),
+      admin.from("profiles").select(PROFILE_SELECT).eq("status","online").neq("id",user.id).limit(20),
       admin.from("lobby_members").select("lobby_id,role,joined_at,last_seen_at").eq("user_id",user.id).order("joined_at",{ascending:false}),
-      admin.from("profiles").select("username,display_name,account_level,account_xp,created_at,favorite_game,avatar,profile_banner,avatar_frame,profile_effect,profile_badge,profile_card_style").eq("id",user.id).maybeSingle(),
+      admin.from("profiles").select("username,display_name,account_level,account_xp,created_at,favorite_game,avatar,profile_banner,avatar_frame,profile_effect,profile_badge,profile_card_style,cosmetic_owned,cosmetic_equipped,app_role").eq("id",user.id).maybeSingle(),
     ]);
 
     const allRanks=(allCompetitiveRanks??[]) as RankRow[];
@@ -48,7 +62,7 @@ export async function GET(request:Request){
 
     const topCandidateIds=Array.from(bestRankByUser.keys()).slice(0,80);
     const {data:topProfiles}=topCandidateIds.length
-      ?await admin.from("profiles").select("id,username,display_name,avatar,status,created_at,account_level,favorite_game,profile_banner,avatar_frame,profile_effect,profile_badge,profile_card_style,profile_banner,avatar_frame,profile_effect,profile_badge,profile_card_style,profile_banner,avatar_frame,profile_effect,profile_badge,profile_card_style").in("id",topCandidateIds)
+      ?await admin.from("profiles").select(PROFILE_SELECT).in("id",topCandidateIds)
       :{data:[] as PlayerProfile[]};
 
     const gameMap=new Map((games??[]).map(game=>[Number(game.id),game]));
@@ -68,8 +82,8 @@ export async function GET(request:Request){
       favoriteGame:person.favorite_game||gameMap.get(rank?.game_id??-1)?.name||"",
       memberSince:person.created_at??null,
       banner:person.profile_banner??null,
-      frame:person.avatar_frame??null,
-      effect:person.profile_effect??null,
+      frame:ownedCosmetic(person,"frame",person.avatar_frame),
+      effect:ownedCosmetic(person,"effect",person.profile_effect),
       badge:person.profile_badge??null,
       cardStyle:person.profile_card_style??null,
     });
@@ -90,12 +104,12 @@ export async function GET(request:Request){
 
     const [{data:memberships},{data:owners}]=await Promise.all([
       lobbyIds.length?admin.from("lobby_members").select("lobby_id,user_id,role,joined_at,last_seen_at").in("lobby_id",lobbyIds):Promise.resolve({data:[] as Array<{lobby_id:string;user_id:string;role:string;joined_at:string;last_seen_at:string|null}>}),
-      ownerIds.length?admin.from("profiles").select("id,username,display_name,avatar,status,created_at,account_level,favorite_game,profile_banner,avatar_frame,profile_effect,profile_badge,profile_card_style,profile_banner,avatar_frame,profile_effect,profile_badge,profile_card_style,profile_banner,avatar_frame,profile_effect,profile_badge,profile_card_style").in("id",ownerIds):Promise.resolve({data:[] as PlayerProfile[]}),
+      ownerIds.length?admin.from("profiles").select(PROFILE_SELECT).in("id",ownerIds):Promise.resolve({data:[] as PlayerProfile[]}),
     ]);
 
     const memberUserIds=currentLobbyId?Array.from(new Set((memberships??[]).filter(member=>member.lobby_id===currentLobbyId).map(member=>member.user_id))):[];
     const {data:currentProfiles}=memberUserIds.length
-      ?await admin.from("profiles").select("id,username,display_name,avatar,status,created_at,account_level,favorite_game,profile_banner,avatar_frame,profile_effect,profile_badge,profile_card_style,profile_banner,avatar_frame,profile_effect,profile_badge,profile_card_style,profile_banner,avatar_frame,profile_effect,profile_badge,profile_card_style").in("id",memberUserIds)
+      ?await admin.from("profiles").select(PROFILE_SELECT).in("id",memberUserIds)
       :{data:[] as PlayerProfile[]};
 
     const allRelevantIds=Array.from(new Set([...(onlineProfiles??[]).map(person=>person.id),...memberUserIds,...ownerIds]));
@@ -161,8 +175,8 @@ export async function GET(request:Request){
         xp:profile?.account_xp??0,
         avatar:profile?.avatar??null,
         banner:profile?.profile_banner??null,
-        frame:profile?.avatar_frame??null,
-        effect:profile?.profile_effect??null,
+        frame:(()=>{const selected=profile?.cosmetic_equipped?.frame||profile?.avatar_frame||"none";return selected!=="none"&&(profile?.app_role==="admin"||(profile?.cosmetic_owned??[]).includes(selected))?selected:"none"})(),
+        effect:(()=>{const selected=profile?.cosmetic_equipped?.effect||profile?.profile_effect||"none";return selected!=="none"&&(profile?.app_role==="admin"||(profile?.cosmetic_owned??[]).includes(selected))?selected:"none"})(),
         badge:profile?.profile_badge??null,
         cardStyle:profile?.profile_card_style??null
       },
