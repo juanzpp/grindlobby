@@ -82,15 +82,14 @@ function CosmeticBanner({ id, compact = false }: { id: string; compact?: boolean
   );
 }
 
-function AvatarFrame({ frameId, effectId, size = 82, children }: { frameId: string; effectId: string; size?: number; children: React.ReactNode }) {
-  const frame = PROFILE_FRAMES.find((item) => item.id === frameId) ?? PROFILE_FRAMES[0];
-  const effect = PROFILE_EFFECTS.find((item) => item.id === effectId) ?? PROFILE_EFFECTS[0];
+function AvatarFrame({ frameId, size = 82, children }: { frameId: string; effectId: string; size?: number; children: React.ReactNode }) {
+  const frame = PROFILE_FRAMES.find((item) => item.id === frameId) ?? PROFILE_FRAMES.find((item) => item.id === "none")!;
+  const hasFrame = frame.id !== "none";
   return (
-    <div className={`profile-avatar-shell profile-effect-${effect.variant ?? "none"}`} style={{ width: size, height: size, "--frame-ring": frame.ring, "--frame-glow": frame.glow, "--effect-glow": effect.glow } as CSSProperties}>
-      <div className="profile-avatar-frame" />
+    <div className={`profile-avatar-shell ${hasFrame ? "profile-avatar-has-frame" : "profile-avatar-no-frame"}`} style={{ width: size, height: size, "--frame-ring": frame.ring, "--frame-glow": frame.glow } as CSSProperties}>
+      {hasFrame && <div className="profile-avatar-frame" />}
       <div className="profile-avatar-core">{children}</div>
-      <div className="profile-avatar-spark profile-avatar-spark-a" />
-      <div className="profile-avatar-spark profile-avatar-spark-b" />
+      {hasFrame && <><div className="profile-avatar-spark profile-avatar-spark-a" /><div className="profile-avatar-spark profile-avatar-spark-b" /></>}
     </div>
   );
 }
@@ -154,7 +153,8 @@ export default function ProfileEditorModal() {
     return () => { mounted = false; };
   }, []);
 
-  const frameMeta = useMemo(() => PROFILE_FRAMES.find((item) => item.id === selectedFrame) ?? PROFILE_FRAMES[0], [selectedFrame]);
+  const frameMeta = useMemo(() => PROFILE_FRAMES.find((item) => item.id === selectedFrame) ?? PROFILE_FRAMES.find((item) => item.id === "none")!, [selectedFrame]);
+  const effectMeta = useMemo(() => PROFILE_EFFECTS.find((item) => item.id === selectedEffect) ?? PROFILE_EFFECTS[0], [selectedEffect]);
   const badgeMeta = useMemo(() => PROFILE_BADGES.find((item) => item.id === selectedBadge) ?? PROFILE_BADGES[PROFILE_BADGES.length - 1], [selectedBadge]);
   const cardMeta = useMemo(() => PROFILE_CARD_STYLES.find((item) => item.id === selectedCardStyle) ?? PROFILE_CARD_STYLES[0], [selectedCardStyle]);
 
@@ -272,7 +272,7 @@ export default function ProfileEditorModal() {
           ) : (
             <div className="grid gap-4 lg:grid-cols-[330px_minmax(0,1fr)]">
               <aside className="space-y-3 lg:sticky lg:top-0 lg:self-start">
-                <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#0c0f16] shadow-[0_18px_48px_rgba(0,0,0,.35)]">
+                <div className={`profile-expanded-card overflow-hidden rounded-2xl border border-white/10 bg-[#0c0f16] shadow-[0_18px_48px_rgba(0,0,0,.35)] ${effectMeta.id !== "none" ? "profile-card-aura" : ""}`} style={{ "--card-aura": effectMeta.glow } as CSSProperties}>
                   <div className="relative h-40 overflow-hidden" style={customBannerStyle}>
                     {!form.bannerUrl && <CosmeticBanner id={selectedBanner === "custom" ? DEFAULT_PROFILE_BANNER : selectedBanner} />}
                     <div className="absolute inset-0 bg-gradient-to-t from-[#0c0f16] via-transparent to-transparent" />

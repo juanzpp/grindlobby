@@ -76,6 +76,7 @@ export const PROFILE_BANNERS: ProfileBannerOption[] = [
 ];
 
 export const PROFILE_FRAMES: ProfileFrameOption[] = [
+  { id: 'none', label: 'Sem moldura', accent: 'transparent', glow: 'transparent', ring: 'transparent' },
   { id: 'prism', label: 'Prismático', accent: '#b99cff', glow: 'rgba(167,139,250,.64)', ring: 'conic-gradient(from 0deg,#7c3aed,#b794f4,#62d9ff,#d8b4fe,#7c3aed)' },
   { id: 'carmesim', label: 'Carmesim', accent: '#ff6b85', glow: 'rgba(248,113,113,.62)', ring: 'conic-gradient(from 20deg,#4b0711,#ff365c,#ff9cad,#7a0d20,#ff365c)' },
   { id: 'gold', label: 'Áureo', accent: '#ffd66b', glow: 'rgba(251,191,36,.62)', ring: 'conic-gradient(from 0deg,#5b3904,#f59e0b,#fff0a4,#b96c00,#fbbf24,#5b3904)' },
@@ -119,7 +120,7 @@ export const PROFILE_CARD_STYLES: ProfileCardStyle[] = [
 ];
 
 export const DEFAULT_PROFILE_BANNER = 'void-rift';
-export const DEFAULT_PROFILE_FRAME = 'prism';
+export const DEFAULT_PROFILE_FRAME = 'none';
 export const DEFAULT_PROFILE_EFFECT = 'none';
 export const DEFAULT_PROFILE_BADGE = 'none';
 export const DEFAULT_PROFILE_CARD_STYLE = 'violet';

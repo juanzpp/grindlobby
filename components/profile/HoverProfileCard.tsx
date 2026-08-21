@@ -53,26 +53,28 @@ function initials(value:string){return value.trim().split(/\s+/).map(part=>part[
 function memberYear(value:string|null){if(!value)return "—";const date=new Date(value);return Number.isFinite(date.getTime())?String(date.getFullYear()):"—"}
 
 function Avatar({player}:{player:HoverPlayerData}){
-  const frame=PROFILE_FRAMES.find(item=>item.id===(player.frame||"prism"))??PROFILE_FRAMES[0];
-  const effect=PROFILE_EFFECTS.find(item=>item.id===(player.effect||"none"))??PROFILE_EFFECTS[0];
+  const frame=PROFILE_FRAMES.find(item=>item.id===(player.frame||"none"))??PROFILE_FRAMES.find(item=>item.id==="none")!;
+  const hasFrame=frame.id!=="none";
   return <span
-    className={`grind-hover-avatar profile-avatar-shell profile-effect-${effect.variant??"none"}`}
+    className={`grind-hover-avatar profile-avatar-shell ${hasFrame?"profile-avatar-has-frame":"profile-avatar-no-frame"}`}
     aria-hidden="true"
-    style={{"--frame-ring":frame.ring,"--frame-glow":frame.glow,"--effect-glow":effect.glow} as CSSProperties}
+    style={{"--frame-ring":frame.ring,"--frame-glow":frame.glow} as CSSProperties}
   >
-    <span className="profile-avatar-frame"/>
+    {hasFrame?<span className="profile-avatar-frame"/>:null}
     <span className="profile-avatar-core">
       {player.avatar?<img src={player.avatar} alt="" className="grind-hover-avatar-image" referrerPolicy="no-referrer"/>:<span>{initials(player.name).slice(0,1)}</span>}
     </span>
-    <span className="profile-avatar-spark profile-avatar-spark-a"/><span className="profile-avatar-spark profile-avatar-spark-b"/>
+    {hasFrame?<><span className="profile-avatar-spark profile-avatar-spark-a"/><span className="profile-avatar-spark profile-avatar-spark-b"/></>:null}
   </span>;
 }
 
 function HoverCard({player,onAdd,onCall,position,onEnter,onLeave}:{player:HoverPlayerData;onAdd?:()=>void;onCall?:()=>void;position:Position;onEnter:()=>void;onLeave:()=>void}){
   const palette=useMemo(()=>tierColors.find(item=>player.level>=item.from)??tierColors[tierColors.length-1],[player.level]);
+  const effect=PROFILE_EFFECTS.find(item=>item.id===(player.effect||"none"))??PROFILE_EFFECTS[0];
+  const hasAura=effect.id!=="none";
   return <div
-    className={`grind-hover-card grind-hover-card-${position.side}`}
-    style={{left:position.left,top:position.top,"--hover-accent":palette.accent,"--hover-accent-2":palette.accent2} as CSSProperties}
+    className={`grind-hover-card grind-hover-card-${position.side} ${hasAura?`grind-hover-aura grind-hover-aura-${effect.variant}`:""}`}
+    style={{left:position.left,top:position.top,"--hover-accent":palette.accent,"--hover-accent-2":palette.accent2,"--card-aura":effect.glow} as CSSProperties}
     onMouseEnter={onEnter}
     onMouseLeave={onLeave}
     role="dialog"

@@ -31,16 +31,16 @@ function tierFor(level:number){return TIERS.find(t=>level>=t.from&&level<=t.to)?
 function gradient(tier:Tier){return `linear-gradient(90deg,${tier.color},${tier.glow})`}
 function initials(value:string){return value.trim().split(/\s+/).map(part=>part[0]).join("").slice(0,2).toUpperCase()||"GL"}
 
-export function ProfileAvatar({name,size=36,className="",avatarUrl,frameId="prism",effectId="none"}:{name:string;size?:number;className?:string;avatarUrl?:string|null;frameId?:string|null;effectId?:string|null}){
-  const frame=PROFILE_FRAMES.find(item=>item.id===(frameId||"prism"))??PROFILE_FRAMES[0];
-  const effect=PROFILE_EFFECTS.find(item=>item.id===(effectId||"none"))??PROFILE_EFFECTS[0];
+export function ProfileAvatar({name,size=36,className="",avatarUrl,frameId="none"}:{name:string;size?:number;className?:string;avatarUrl?:string|null;frameId?:string|null;effectId?:string|null}){
+  const frame=PROFILE_FRAMES.find(item=>item.id===(frameId||"none"))??PROFILE_FRAMES.find(item=>item.id==="none")!;
+  const hasFrame=frame.id!=="none";
   return <span
-    className={`lovable-profile-avatar profile-avatar-shell profile-effect-${effect.variant} ${className}`}
-    style={{width:size,height:size,"--frame-ring":frame.ring,"--frame-glow":frame.glow,"--effect-glow":effect.glow} as CSSProperties}
+    className={`lovable-profile-avatar profile-avatar-shell ${hasFrame?"profile-avatar-has-frame":"profile-avatar-no-frame"} ${className}`}
+    style={{width:size,height:size,"--frame-ring":frame.ring,"--frame-glow":frame.glow} as CSSProperties}
   >
-    <span className="profile-avatar-frame"/>
+    {hasFrame?<span className="profile-avatar-frame"/>:null}
     <span className="profile-avatar-core">{avatarUrl?<img src={avatarUrl} alt={name} className="h-full w-full object-cover" referrerPolicy="no-referrer"/>:<span style={{fontSize:Math.max(10,size*.36)}}>{initials(name).slice(0,1)}</span>}</span>
-    <span className="profile-avatar-spark profile-avatar-spark-a"/><span className="profile-avatar-spark profile-avatar-spark-b"/>
+    {hasFrame?<><span className="profile-avatar-spark profile-avatar-spark-a"/><span className="profile-avatar-spark profile-avatar-spark-b"/></>:null}
   </span>;
 }
 
