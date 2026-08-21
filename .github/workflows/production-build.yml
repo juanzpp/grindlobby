@@ -34,5 +34,30 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Validate startup guard
+        run: node --check scripts/verify-schema.mjs
+
       - name: Build production app
         run: npm run build
+
+      - name: Start production server for smoke test
+        run: |
+          npx next start -p 3100 > /tmp/grindlobby-next.log 2>&1 &
+          echo $! > /tmp/grindlobby-next.pid
+
+      - name: HTTP smoke test
+        run: |
+          for i in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:3100/api/health > /tmp/health.json; then break; fi
+            sleep 1
+          done
+          cat /tmp/health.json
+          grep -q '"ok":true' /tmp/health.json
+          curl --fail --silent http://127.0.0.1:3100/login > /tmp/login.html
+          test -s /tmp/login.html
+
+      - name: Stop production server
+        if: always()
+        run: |
+          if [ -f /tmp/grindlobby-next.pid ]; then kill $(cat /tmp/grindlobby-next.pid) || true; fi
+          cat /tmp/grindlobby-next.log || true
