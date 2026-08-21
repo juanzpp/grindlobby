@@ -25,14 +25,16 @@ jobs:
         with:
           workspaces: desktop/src-tauri
 
-      - name: Install Tauri CLI
-        run: cargo install tauri-cli --version "^2" --locked
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
 
       - name: Cargo check
         run: cargo check
 
       - name: Build Windows installer
-        run: cargo tauri build --bundles nsis
+        run: npx --yes @tauri-apps/cli@2 build --bundles nsis
 
       - name: Upload EXE installer
         uses: actions/upload-artifact@v4
