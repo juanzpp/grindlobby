@@ -31,8 +31,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
       - name: Run tests
         run: npm test
+
+      - name: Validate migration contract
+        run: node scripts/check-migration-contract.mjs
 
       - name: Validate startup guard
         run: node --check scripts/verify-schema.mjs

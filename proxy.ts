@@ -1,7 +1,11 @@
 import {NextResponse,type NextRequest} from 'next/server'
 import {corsHeaders,isAllowedFrontendOrigin} from '@/lib/api/cors'
 
-export function middleware(request:NextRequest){
+/**
+ * Next.js 16 request proxy. This replaces the deprecated middleware.ts
+ * convention while preserving the same API CORS boundary.
+ */
+export function proxy(request:NextRequest){
   const origin=request.headers.get('origin')
   if(!origin)return NextResponse.next()
 

@@ -15,7 +15,7 @@ describe('cosmetic state', () => {
     const state = equipBundle(
       {
         owned: ['void-rift', 'prism'],
-        equipped: { banner: 'void-rift', frame: 'prism', effect: 'none', badge: 'none', cardStyle: 'violet' },
+        equipped: { banner: 'void-rift', frame: 'prism', effect: 'none', badge: 'none', cardStyle: 'violet', bundle: '' },
       },
       'cyber'
     );
@@ -30,7 +30,7 @@ describe('cosmetic state', () => {
     const state = equipCosmetic(
       {
         owned: ['void-rift'],
-        equipped: { banner: 'void-rift', frame: 'prism', effect: 'none', badge: 'none', cardStyle: 'violet' },
+        equipped: { banner: 'void-rift', frame: 'prism', effect: 'none', badge: 'none', cardStyle: 'violet', bundle: '' },
       },
       'banner',
       'nebula-pulse'
