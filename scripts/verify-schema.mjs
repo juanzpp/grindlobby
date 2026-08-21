@@ -1,6 +1,6 @@
 const url=process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/,"");
 const key=process.env.SUPABASE_SERVICE_ROLE_KEY;
-const expectedVersion="20260821_final_structural_hardening";
+const expectedVersion="20260821_queue_presence_hardening";
 if(!url||!key){console.error("[schema-check] missing Supabase server environment variables");process.exit(1)}
 const headers={apikey:key,Authorization:`Bearer ${key}`,Accept:"application/json"};
 const required=["lobby_invites","voice_quality_samples","app_schema_state"];
