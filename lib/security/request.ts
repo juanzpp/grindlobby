@@ -19,13 +19,7 @@ export function assertTrustedMutation(request:Request){
     let originUrl:URL;
     try{originUrl=new URL(origin)}catch{throw new InvalidRequestError()}
     if(originUrl.origin===requestUrl.origin)return;
-    // Reverse proxies can expose an internal request URL to Next.js. Fetch
-    // Metadata remains browser-controlled and confirms the public request was
-    // initiated from the same origin without trusting forwarded host headers.
     if(fetchSite==="same-origin")return;
-    // Decoupled frontend requests are allowed only from an explicit frontend
-    // allowlist and only when they carry bearer authentication. Route handlers
-    // still verify that token server-side before applying the mutation.
     if(isAllowedFrontendOrigin(origin)&&hasBearerAuthorization(request))return;
     throw new InvalidRequestError();
   }
@@ -51,6 +45,7 @@ export function noStoreJson(data:unknown,init:ResponseInit={}){
   const headers=new Headers(init.headers);
   headers.set("Cache-Control","private, no-store, max-age=0");
   headers.set("Pragma","no-cache");
-  headers.set("Vary","Cookie");
+  headers.set("Vary","Cookie, Authorization, Origin");
+  if(!headers.has("X-Request-Id"))headers.set("X-Request-Id",globalThis.crypto?.randomUUID?.()??`${Date.now()}-${Math.random().toString(36).slice(2)}`);
   return Response.json(data,{...init,headers});
 }
