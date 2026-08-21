@@ -214,7 +214,8 @@ h1,h2,h3,h4,.font-display{font-family:"Chakra Petch","Inter",ui-sans-serif,syste
 .auth-primary{background-image:var(--gl-gradient-primary);box-shadow:var(--gl-shadow-glow);}
 
 /* Dashboard */
-.lovable-dashboard-sidebar{position:sticky;top:0;height:100svh;overflow-y:auto;}
+.lovable-dashboard-sidebar{position:sticky;top:0;height:100svh;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none;}
+.lovable-dashboard-sidebar::-webkit-scrollbar{display:none;width:0;height:0;}
 .lovable-sidebar-nav button,.lovable-mobile-nav button{transition:background-color .2s ease,color .2s ease,border-color .2s ease,box-shadow .2s ease;}
 .lovable-dashboard-main{min-width:0;}
 .lovable-rank-emblem{filter:drop-shadow(0 0 45px oklch(var(--gl-primary)/.55));}
@@ -447,4 +448,104 @@ h1,h2,h3,h4,.font-display{font-family:"Chakra Petch","Inter",ui-sans-serif,syste
 
 @media (prefers-reduced-motion: reduce) {
   .profile-banner-fx::before,.profile-banner-fx::after,.profile-banner-depth,.profile-banner-orb,.profile-banner-beam,.profile-banner-particles,.profile-banner-grain,.profile-avatar-frame,.profile-avatar-spark,.profile-effect-swatch::before,.profile-effect-nebula::before,.profile-effect-smoke::before,.profile-effect-void::before,.profile-effect-halo::before,.profile-effect-eclipse::before,.profile-effect-electric::before { animation: none !important; }
+}
+
+/* Keep dashboard scrolling functional without exposing the intrusive native scrollbar. */
+.lovable-surface{scrollbar-width:none;-ms-overflow-style:none;}
+.lovable-surface::-webkit-scrollbar{display:none;width:0;height:0;}
+.profile-avatar-core>span{display:grid;width:100%;height:100%;place-items:center;border-radius:inherit;background:linear-gradient(135deg,oklch(var(--gl-primary)/.78),oklch(var(--gl-primary-glow)/.78));font-family:"Chakra Petch",sans-serif;font-weight:700;color:#fff;}
+
+
+/* Dashboard palette locked to the approved GrindLobby reference. */
+.lovable-dashboard-theme{
+  --gl-background:.035 .010 285;
+  --gl-foreground:.965 .010 285;
+  --gl-card:.050 .014 286;
+  --gl-panel:.065 .020 288;
+  --gl-primary:.565 .230 300;
+  --gl-primary-glow:.705 .205 305;
+  --gl-secondary:.085 .025 289;
+  --gl-muted:.105 .022 289;
+  --gl-muted-foreground:.655 .026 291;
+  --gl-accent:.135 .070 297;
+  --gl-border:.145 .030 291;
+  --gl-input:.135 .030 291;
+  --gl-gradient-primary:linear-gradient(120deg,oklch(.565 .230 300),oklch(.705 .205 305));
+  --gl-gradient-hero:radial-gradient(90% 125% at 6% 8%,oklch(.22 .11 300/.72),transparent 56%),linear-gradient(110deg,oklch(.085 .028 291),oklch(.035 .010 285) 72%);
+  --gl-shadow-glow:0 0 26px oklch(.565 .23 300/.36);
+  --gl-shadow-panel:0 14px 42px rgba(0,0,0,.56);
+  background:
+    radial-gradient(circle at 74% -26%,oklch(.31 .14 300/.10),transparent 28%),
+    #050509;
+}
+.lovable-dashboard-theme .lovable-dashboard-sidebar{
+  background:linear-gradient(180deg,rgba(7,6,14,.98),rgba(7,6,14,.96));
+  border-color:rgba(138,92,246,.13);
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  scrollbar-width:none!important;
+  -ms-overflow-style:none!important;
+}
+.lovable-dashboard-theme .lovable-dashboard-sidebar::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}
+.lovable-dashboard-theme .lovable-dashboard-main{background:#050509}
+.lovable-dashboard-theme .lovable-panel{
+  background:#07070c;
+  border-color:#1b1928;
+  box-shadow:0 14px 42px rgba(0,0,0,.44);
+}
+.lovable-dashboard-theme .lovable-level-hero{
+  background:
+    radial-gradient(70% 130% at 0% 50%,rgba(88,28,135,.34),transparent 62%),
+    linear-gradient(100deg,#10091d 0%,#08070e 44%,#050509 100%);
+}
+.lovable-dashboard-theme .lovable-sidebar-nav button{
+  color:#a7a1b6;
+}
+.lovable-dashboard-theme .lovable-sidebar-nav button:hover{
+  background:rgba(139,92,246,.065);
+  color:#f3f0f9;
+}
+.lovable-dashboard-theme .lovable-sidebar-nav button[class*="border-primary"]{
+  border-color:rgba(139,92,246,.42)!important;
+  background:linear-gradient(90deg,rgba(101,38,171,.22),rgba(80,28,135,.12))!important;
+  box-shadow:0 0 24px rgba(113,45,190,.18)!important;
+}
+.lovable-dashboard-theme .lovable-btn-primary{
+  background:linear-gradient(105deg,#7431c7 0%,#9b4ee9 100%);
+  box-shadow:0 8px 26px rgba(126,55,205,.22);
+}
+.lovable-dashboard-theme .lovable-btn-ghost{
+  background:#0b0912;
+  border-color:#211d31;
+}
+.lovable-dashboard-theme .lovable-elo-card{
+  background:#09080f;
+  border-color:#1b1928;
+}
+.lovable-dashboard-theme .lovable-member-list>li,
+.lovable-dashboard-theme .lovable-member-list>li>div{
+  border-color:#1c1928;
+}
+.lovable-dashboard-theme .lovable-wave span{opacity:.8}
+.lovable-dashboard-theme .lovable-label{color:#898398}
+.lovable-dashboard-theme .text-muted-foreground{color:#8c8798}
+.lovable-dashboard-theme .border-border{border-color:#1b1928}
+.lovable-dashboard-theme .bg-panel{background-color:#0b0912}
+.lovable-dashboard-theme .bg-card\/60{background-color:rgba(7,6,14,.92)}
+.lovable-dashboard-theme .bg-panel\/50{background-color:rgba(11,9,18,.58)}
+.lovable-dashboard-theme .bg-panel\/30{background-color:rgba(11,9,18,.34)}
+.lovable-dashboard-theme .bg-secondary{background-color:#0d0a15}
+.lovable-dashboard-theme .profile-avatar-frame{filter:saturate(1.08)}
+.lovable-dashboard-theme .grind-hover-card{background:linear-gradient(145deg,#0d0918,#08070d 72%);border-color:rgba(139,92,246,.34)}
+
+/* Native scrollbars stay invisible while mouse wheel/touch scrolling keeps working. */
+.lovable-dashboard-theme,
+.lovable-dashboard-theme *{
+  scrollbar-color:transparent transparent;
+}
+.lovable-dashboard-theme::-webkit-scrollbar,
+.lovable-dashboard-theme *::-webkit-scrollbar{
+  width:0!important;
+  height:0!important;
+  display:none!important;
 }

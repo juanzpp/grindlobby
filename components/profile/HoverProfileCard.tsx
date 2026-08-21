@@ -3,6 +3,7 @@
 import {createPortal} from "react-dom";
 import {CalendarDays,Gamepad2,MessageSquare,UserPlus} from "lucide-react";
 import {useEffect,useMemo,useRef,useState,type CSSProperties,type ReactNode} from "react";
+import {PROFILE_EFFECTS,PROFILE_FRAMES} from "@/lib/profile-cosmetics";
 
 export type HoverPlayerData={
   id:string;
@@ -19,6 +20,11 @@ export type HoverPlayerData={
   streak:number|null;
   favoriteGame:string;
   memberSince:string|null;
+  banner?:string|null;
+  frame?:string|null;
+  effect?:string|null;
+  badge?:string|null;
+  cardStyle?:string|null;
 };
 
 type Props={
@@ -47,8 +53,18 @@ function initials(value:string){return value.trim().split(/\s+/).map(part=>part[
 function memberYear(value:string|null){if(!value)return "—";const date=new Date(value);return Number.isFinite(date.getTime())?String(date.getFullYear()):"—"}
 
 function Avatar({player}:{player:HoverPlayerData}){
-  return <span className="grind-hover-avatar" aria-hidden="true">
-    {player.avatar?<img src={player.avatar} alt="" className="grind-hover-avatar-image" referrerPolicy="no-referrer"/>:<span>{initials(player.name).slice(0,1)}</span>}
+  const frame=PROFILE_FRAMES.find(item=>item.id===(player.frame||"prism"))??PROFILE_FRAMES[0];
+  const effect=PROFILE_EFFECTS.find(item=>item.id===(player.effect||"none"))??PROFILE_EFFECTS[0];
+  return <span
+    className={`grind-hover-avatar profile-avatar-shell profile-effect-${effect.variant??"none"}`}
+    aria-hidden="true"
+    style={{"--frame-ring":frame.ring,"--frame-glow":frame.glow,"--effect-glow":effect.glow} as CSSProperties}
+  >
+    <span className="profile-avatar-frame"/>
+    <span className="profile-avatar-core">
+      {player.avatar?<img src={player.avatar} alt="" className="grind-hover-avatar-image" referrerPolicy="no-referrer"/>:<span>{initials(player.name).slice(0,1)}</span>}
+    </span>
+    <span className="profile-avatar-spark profile-avatar-spark-a"/><span className="profile-avatar-spark profile-avatar-spark-b"/>
   </span>;
 }
 
@@ -67,7 +83,7 @@ function HoverCard({player,onAdd,onCall,position,onEnter,onLeave}:{player:HoverP
     <div className="grind-hover-head">
       <Avatar player={player}/>
       <div className="min-w-0 flex-1">
-        <p className="truncate font-display text-[17px] font-bold text-white">{player.name}</p>
+        <p className="truncate font-display text-[17px] font-bold text-white">{player.name}{player.badge&&player.badge!=="none"?<span className="ml-1.5 align-middle text-[9px] font-bold uppercase text-amber-300">{player.badge}</span>:null}</p>
         <p className="truncate text-[11px] text-zinc-400">@{player.username}</p>
         <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-zinc-300"><span className={`h-2 w-2 rounded-full ${player.status==="online"?"bg-emerald-400":"bg-zinc-500"}`} style={player.status==="online"?{boxShadow:"0 0 12px #34d399"}:undefined}/>{player.statusLabel|| (player.status==="online"?"Online":"Offline")}</p>
       </div>
