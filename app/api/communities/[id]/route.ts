@@ -3,9 +3,9 @@ import {createAdminClient} from '@/lib/supabase/admin';
 import {getCommunityMembership} from '@/lib/community';
 import {noStoreJson} from '@/lib/security/request';
 
-export async function GET(_:Request,{params}:{params:Promise<{id:string}>}){
+export async function GET(request:Request,{params}:{params:Promise<{id:string}>}){
   try{
-    const user=await getCurrentUser();if(!user)return noStoreJson({error:'Não autorizado.'},{status:401});
+    const user=await getCurrentUser(request);if(!user)return noStoreJson({error:'Não autorizado.'},{status:401});
     const {id}=await params;const membership=await getCommunityMembership(id,user.id);if(!membership)return noStoreJson({error:'Community não encontrada.'},{status:404});
     const admin=createAdminClient();
     const [{data:community,error},{data:members},{data:environments},{data:posts},{data:events}]=await Promise.all([
@@ -21,13 +21,6 @@ export async function GET(_:Request,{params}:{params:Promise<{id:string}>}){
     type CommunityProfile={id:string;username:string;display_name:string;avatar:string|null;status:string|null;favorite_game:string|null;avatar_frame:string|null;profile_effect:string|null;profile_badge:string|null};
     const profileMap=new Map<string,CommunityProfile>(((profiles??[]) as CommunityProfile[]).map(profile=>[profile.id,profile]));
     const online=(members??[]).filter(m=>profileMap.get(m.user_id)?.status==='online').length;
-    return noStoreJson({
-      community:{...community,role:membership.role},
-      members:(members??[]).map(m=>({...m,profile:profileMap.get(m.user_id)??null})),
-      environments:environments??[],
-      posts:(posts??[]).map(p=>({...p,author:profileMap.get(p.author_id)??null})),
-      events:events??[],
-      stats:{members:(members??[]).length,online,activeRooms:(environments??[]).filter(e=>Boolean(e.lobby_id)).length},
-    });
+    return noStoreJson({community:{...community,role:membership.role},members:(members??[]).map(m=>({...m,profile:profileMap.get(m.user_id)??null})),environments:environments??[],posts:(posts??[]).map(p=>({...p,author:profileMap.get(p.author_id)??null})),events:events??[],stats:{members:(members??[]).length,online,activeRooms:(environments??[]).filter(e=>Boolean(e.lobby_id)).length}});
   }catch{return noStoreJson({error:'Não foi possível carregar a Community.'},{status:500});}
 }
