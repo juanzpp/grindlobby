@@ -34,6 +34,9 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Validate migration contract
+        run: node scripts/check-migration-contract.mjs
+
       - name: Validate startup guard
         run: node --check scripts/verify-schema.mjs
 
