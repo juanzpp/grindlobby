@@ -1,5 +1,5 @@
 import {z} from "zod";
-import {createClient} from "@/lib/supabase/server";
+import {getCurrentUser} from "@/lib/auth";
 import {createAdminClient} from "@/lib/supabase/admin";
 import {assertTrustedMutation,InvalidRequestError,noStoreJson,readJsonBody} from "@/lib/security/request";
 import {enforceRateLimit,RateLimitExceededError,RateLimitUnavailableError,rateLimitResponse} from "@/lib/security/rate-limit";
@@ -34,9 +34,9 @@ export async function POST(request:Request){
   try{
     assertTrustedMutation(request);
     stage="authentication";
-    const supabase=await createClient(),{data:{user},error:authError}=await supabase.auth.getUser();
-    if(authError||!user){
-      logLobbyCreate({authenticated:false,userId:null,stage,outcome:"blocked",code:safeErrorCode(authError,"unauthenticated")});
+    const user=await getCurrentUser(request);
+    if(!user){
+      logLobbyCreate({authenticated:false,userId:null,stage,outcome:"blocked",code:"unauthenticated"});
       return noStoreJson({error:"Não autorizado."},{status:401});
     }
     userId=user.id;
