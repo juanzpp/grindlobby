@@ -30,6 +30,9 @@ jobs:
         with:
           node-version: 22
 
+      - name: Generate Windows icons from GrindLobby logo
+        run: npx --yes @tauri-apps/cli@2 icon ../../public/brand/grindlobby-official.png
+
       - name: Cargo check
         run: cargo check
 
