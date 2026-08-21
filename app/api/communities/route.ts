@@ -14,7 +14,7 @@ const createSchema=z.object({
 
 export async function GET(request:Request){
   try{
-    const user=await getCurrentUser();if(!user)return noStoreJson({error:'Não autorizado.'},{status:401});
+    const user=await getCurrentUser(request);if(!user)return noStoreJson({error:'Não autorizado.'},{status:401});
     await enforceRateLimit(request,{scope:'communities-read',limit:120,windowSeconds:600,subject:user.id});
     const admin=createAdminClient();
     const {data:memberships,error}=await admin.from('community_members').select('community_id,role,joined_at').eq('user_id',user.id).order('joined_at',{ascending:false});
@@ -35,7 +35,7 @@ export async function GET(request:Request){
 export async function POST(request:Request){
   try{
     assertTrustedMutation(request);
-    const user=await getCurrentUser();if(!user)return noStoreJson({error:'Não autorizado.'},{status:401});
+    const user=await getCurrentUser(request);if(!user)return noStoreJson({error:'Não autorizado.'},{status:401});
     await enforceRateLimit(request,{scope:'communities-create',limit:10,windowSeconds:3600,subject:user.id});
     const body=createSchema.parse(await readJsonBody(request,20_000));
     const admin=createAdminClient();
@@ -48,8 +48,10 @@ export async function POST(request:Request){
       {name:'Táticas & Estratégias',type:'strategy',description:'Planos, mapas e preparação',capacity:10,sort_order:30},
       {name:'Clips & Highlights',type:'clips',description:'Melhores momentos da Community',capacity:50,sort_order:40},
     ];
-    await admin.from('community_environments').insert(defaults.map(item=>({...item,community_id:community.id,created_by:user.id})));
-    await admin.from('community_posts').insert({community_id:community.id,author_id:user.id,type:'activity',title:'Community criada',body:`${user.display_name||user.username} criou a Community.`});
+    const {error:environmentError}=await admin.from('community_environments').insert(defaults.map(item=>({...item,community_id:community.id,created_by:user.id})));
+    if(environmentError)throw environmentError;
+    const {error:postError}=await admin.from('community_posts').insert({community_id:community.id,author_id:user.id,type:'activity',title:'Community criada',body:`${user.display_name||user.username} criou a Community.`});
+    if(postError)throw postError;
     return noStoreJson({community},{status:201});
   }catch(error){
     if(error instanceof InvalidRequestError)return noStoreJson({error:error.message},{status:400});
