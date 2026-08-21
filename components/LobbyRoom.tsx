@@ -1,6 +1,6 @@
 "use client";
 
-import {useCallback,useEffect,useRef,useState} from "react";
+import {useCallback,useEffect,useRef,useState,type CSSProperties} from "react";
 import {useRouter} from "next/navigation";
 import {
   ArrowLeft,Check,Copy,Crown,Gamepad2,Globe,Loader2,LogOut,MessageSquare,Mic,MicOff,
@@ -8,12 +8,12 @@ import {
 } from "lucide-react";
 import AudioHost from "@/components/AudioHost";
 import RemoteVoiceAudio from "@/components/RemoteVoiceAudio";
-import LovableBrand from "@/components/brand/LovableBrand";
 import GrindLoading from "@/components/feedback/GrindLoading";
 import ScreenShare from "@/components/stream/ScreenShare";
 import LobbyChat from "@/components/lobby/LobbyChat";
 import {setLiveKitMicrophoneGain,setLiveKitMicrophoneMuted,useLobbyVoice} from "@/lib/webrtc/useLobbyVoice";
 import {loadAudioPreferences,playAudioEvent} from "@/lib/audio";
+import {getGameLobbyTheme} from "@/lib/lobby-game-theme";
 
 type Member={
   user_id:string;
@@ -117,26 +117,44 @@ export default function LobbyRoom({id,user}:{id:string;user:LobbyUser}){
 
   const owner=lobby.members.find(member=>member.user_id===lobby.owner_id);
   const isPro=user.account_tier==="pro"||user.app_role==="admin";
+  const gameTheme=getGameLobbyTheme(lobby.game?.slug,lobby.game?.name);
 
   return <main className="room-shell lovable-surface lovable-room">
     <header className="room-top">
       <button onClick={()=>router.push("/")}><ArrowLeft size={17}/>Dashboard</button>
-      <LovableBrand compact emblemSize={40}/>
+      <div className="room-official-brand" aria-label="GrindLobby"><img src="/brand/grindlobby-official.png" alt="GrindLobby"/></div>
       <button onClick={copy}>{copied?<Check size={16}/>:<Copy size={16}/>} {copied?"Copiado":"Convidar"}</button>
     </header>
 
     <div className="room-wrap">
-      <section className="room-hero lovable-panel lovable-hero">
-        <div className="gridfx"/><div className="glow"/>
-        <div className="relative z-10 flex flex-wrap items-end justify-between gap-6">
-          <div><div className="eyebrow"><Radio size={13}/>LIVE LOBBY · {lobby.status.toUpperCase()}</div><h1>{lobby.name}</h1><p>{lobby.game?.name??"Jogo livre"} · Host: {owner?.profile?.display_name??owner?.profile?.username??"Player"}</p><div className="room-badges"><span><Users size={14}/>{lobby.members.length}/{lobby.max_members} players</span><span><Mic size={14}/>LiveKit voice</span><span><MonitorUp size={14}/>Screen share</span><span><Shield size={14}/>{lobby.visibility}</span></div></div>
-          <div className="flex gap-3"><button onClick={copy} className="lovable-btn-ghost flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm"><UserPlus size={16}/>Convidar</button>{lobby.isMember?<button onClick={leave} disabled={busy} className="lovable-btn-ghost flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm"><LogOut size={16}/>Sair</button>:<button onClick={join} disabled={busy} className="lovable-btn-primary flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm">{busy?<Loader2 size={16} className="animate-spin"/>:<Gamepad2 size={16}/>}Entrar</button>}</div>
+      <section className="room-hero room-game-hero lovable-panel" style={{"--room-accent":gameTheme.accent,"--room-accent-2":gameTheme.accent2,"--room-banner":`url(${gameTheme.banner})`} as CSSProperties}>
+        <div className="room-game-banner"/>
+        <div className="room-game-vignette"/>
+        <div className="gridfx"/>
+        <img className="room-hero-logo" src="/brand/grindlobby-official.png" alt="" aria-hidden="true"/>
+        <div className="relative z-10 flex h-full flex-wrap items-end justify-between gap-6">
+          <div>
+            <div className="eyebrow"><Radio size={13}/>LIVE LOBBY · {lobby.status.toUpperCase()}</div>
+            <h1>{lobby.name}</h1>
+            <p>{gameTheme.label} · Host: {owner?.profile?.display_name??owner?.profile?.username??"Player"}</p>
+            <div className="room-badges">
+              <span><Users size={14}/>{lobby.members.length}/{lobby.max_members} jogadores</span>
+              <span><Mic size={14}/>Voz LiveKit</span>
+              <span><MonitorUp size={14}/>Tela disponível</span>
+              <span><Shield size={14}/>{lobby.visibility}</span>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <button onClick={copy} className="lovable-btn-ghost flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm"><UserPlus size={16}/>Convidar</button>
+            {lobby.isMember?<button onClick={leave} disabled={busy} className="lovable-btn-ghost flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm"><LogOut size={16}/>Sair</button>:<button onClick={join} disabled={busy} className="lovable-btn-primary flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm">{busy?<Loader2 size={16} className="animate-spin"/>:<Gamepad2 size={16}/>}Entrar</button>}
+          </div>
         </div>
       </section>
 
       {error?<div className="lovable-feedback lovable-feedback-error mt-4" role="alert">{error}</div>:null}
-      <div className="room-grid">
-        <section className="room-panel lovable-panel">
+      <div className="room-experience-grid">
+        <div className="room-members-column">
+          <section className="room-panel lovable-panel">
           <div className="section-head"><div><small>SALA</small><h2>{roomTab==="members"?`Squad (${lobby.members.length}/${lobby.max_members})`:"Chat da sala"}</h2></div><div className="room-tabs"><button className={roomTab==="members"?"active":""} onClick={()=>setRoomTab("members")}><Users size={13}/>Membros</button><button className={roomTab==="chat"?"active":""} onClick={()=>setRoomTab("chat")}><MessageSquare size={13}/>Chat</button></div></div>
           {roomTab==="members"?<ul className="lovable-member-list mt-3 rounded-xl border border-border bg-panel/40 px-3">
             {lobby.members.map(member=>{
@@ -164,7 +182,7 @@ export default function LobbyRoom({id,user}:{id:string;user:LobbyUser}){
               };
               const copyHandle=()=>navigator.clipboard?.writeText(`@${member.profile?.username??"player"}`).catch(()=>{});
               return <li className={`member-voice-row flex flex-wrap items-center gap-3 py-3 ${speaking?"member-speaking":""}`} key={member.user_id}>
-                <span className="relative"><span className="lovable-avatar grid h-9 w-9 place-items-center rounded-full font-display text-xs font-bold">{initials(memberName)}</span><span className={`lovable-presence-dot absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ${voiceActive?"bg-success":"bg-muted"}`}/></span>
+                <span className="relative"><span className="lovable-avatar grid h-9 w-9 place-items-center overflow-hidden rounded-full font-display text-xs font-bold">{member.profile?.avatar?<img src={member.profile.avatar} alt="" className="h-full w-full object-cover"/>:initials(memberName)}</span><span className={`lovable-presence-dot absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ${voiceActive?"bg-success":"bg-muted"}`}/></span>
                 <div className="min-w-0 flex-1"><p className="flex items-center gap-1.5 text-sm font-semibold">{memberName}{member.role==="owner"?<Crown size={14} className="text-warning"/>:null}</p><p className="text-xs text-muted-foreground">@{member.profile?.username??"player"}{voiceActive?` · ${voice?.status||"Connected"}`:" · OFF"}</p></div>
                 <div className="member-voice-actions ml-auto flex items-center gap-2">
                   {peer?<RemoteVoiceAudio stream={peer.stream} volume={peer.volume} muted={peer.muted}/>:null}
@@ -188,12 +206,17 @@ export default function LobbyRoom({id,user}:{id:string;user:LobbyUser}){
               </li>;
             })}
           </ul>:<LobbyChat lobbyId={id} members={voiceLobbyMembers.map(member=>({userId:member.userId,name:member.name}))}/>}
-        </section>
+          </section>
 
-        <aside className="room-side">
+        </div>
+
+        <div className="room-stream-column">
+          {lobby.isMember?<ScreenShare isPro={isPro} gameName={gameTheme.label} gameBanner={gameTheme.banner}/>:<section className="room-panel lovable-panel room-stream-locked"><MonitorUp size={28}/><h2>Entre na sala para assistir</h2><p>A transmissão aparece aqui sem bloquear o restante do lobby.</p></section>}
+        </div>
+
+        <aside className="room-side room-control-column">
           <AudioHost enabled={lobby.isMember} onStreamChange={setLocalStream}/>
-          {lobby.isMember?<ScreenShare isPro={isPro}/>:null}
-          <section className="room-panel lovable-panel"><small>SESSÃO</small><h2>Pronto para jogar</h2><p>A membership do lobby vem do Supabase; presença, mute, fala e áudio da call vêm exclusivamente do LiveKit.</p><div className="mt-4 grid gap-2 text-sm"><span className="flex items-center justify-between rounded-lg border border-border bg-panel px-3 py-2"><span className="flex items-center gap-2 text-muted-foreground"><Globe size={15}/>Visibilidade</span><b>{lobby.visibility}</b></span><span className="flex items-center justify-between rounded-lg border border-border bg-panel px-3 py-2"><span className="flex items-center gap-2 text-muted-foreground"><MonitorUp size={15}/>Qualidade</span><b>{isPro?"1080p60":"720p30"}</b></span></div>{lobby.owner_id===user.id?<button className="lovable-btn-ghost mt-4 flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm"><Settings size={15}/>Você é o host</button>:null}</section>
+          <section className="room-panel lovable-panel room-session-card"><small>SESSÃO</small><h2>Pronto para jogar</h2><p>Voz e tela usam LiveKit SFU com stream adaptativo e reconexão automática.</p><div className="mt-4 grid gap-2 text-sm"><span className="flex items-center justify-between rounded-lg border border-border bg-panel px-3 py-2"><span className="flex items-center gap-2 text-muted-foreground"><Globe size={15}/>Visibilidade</span><b>{lobby.visibility}</b></span><span className="flex items-center justify-between rounded-lg border border-border bg-panel px-3 py-2"><span className="flex items-center gap-2 text-muted-foreground"><MonitorUp size={15}/>Máximo</span><b>{isPro?"1080p60":"720p30"}</b></span></div>{lobby.owner_id===user.id?<button className="lovable-btn-ghost mt-4 flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm"><Settings size={15}/>Você é o host</button>:null}</section>
         </aside>
       </div>
     </div>
