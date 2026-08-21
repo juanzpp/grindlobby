@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
@@ -177,7 +176,8 @@ export default function ProfileEditorModal() {
       if (!response.ok) throw new Error(payload.error || "Falha no upload.");
       setForm((current) => ({ ...current, [type === "avatar" ? "avatarUrl" : "bannerUrl"]: payload.url }));
       if (type === "banner") setSelectedBanner("custom");
-      setNotice(type === "avatar" ? "Foto enviada. Salve para aplicar." : "Banner enviado. Salve para aplicar.");
+      setNotice(type === "avatar" ? "Foto aplicada ao perfil. Salve para manter também os demais ajustes." : "Banner aplicado ao perfil. Salve para manter também os demais ajustes.");
+      window.dispatchEvent(new CustomEvent("grindlobby:profile-updated"));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Falha no upload.");
     } finally {
@@ -226,6 +226,8 @@ export default function ProfileEditorModal() {
       if (!response.ok) throw new Error(payload.error || "Não foi possível salvar.");
       setCosmetics(nextCosmetics);
       setNotice("Perfil atualizado.");
+      window.dispatchEvent(new CustomEvent("grindlobby:profile-updated"));
+      router.refresh();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Não foi possível salvar.");
     } finally {
@@ -276,7 +278,7 @@ export default function ProfileEditorModal() {
                     <div className="absolute inset-0 bg-gradient-to-t from-[#0c0f16] via-transparent to-transparent" />
                     <div className="absolute bottom-3 left-4 flex items-end gap-3">
                       <AvatarFrame frameId={selectedFrame} effectId={selectedEffect} size={84}>
-                        {form.avatarUrl ? <Image src={form.avatarUrl} alt="Avatar" fill sizes="84px" className="object-cover" /> : <span className="grid h-full w-full place-items-center bg-gradient-to-br from-violet-500 to-purple-700 text-xl font-black text-white">{initials(form.displayName || form.username)}</span>}
+                        {form.avatarUrl ? <img src={form.avatarUrl} alt="Avatar" className="h-full w-full object-cover" referrerPolicy="no-referrer" /> : <span className="grid h-full w-full place-items-center bg-gradient-to-br from-violet-500 to-purple-700 text-xl font-black text-white">{initials(form.displayName || form.username)}</span>}
                       </AvatarFrame>
                       <div className="pb-1">
                         <div className="flex items-center gap-1.5"><span className="max-w-[150px] truncate text-lg font-bold text-white">{form.displayName || form.username}</span>{isAdmin && <Crown size={14} className="text-amber-300" />}</div>
