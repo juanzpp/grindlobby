@@ -56,6 +56,21 @@ jobs:
           curl --fail --silent http://127.0.0.1:3100/login > /tmp/login.html
           test -s /tmp/login.html
 
+          curl --silent --dump-header /tmp/cors.headers --output /dev/null \
+            -X OPTIONS \
+            -H 'Origin: https://pixel-perfect-clone-87933.lovable.app' \
+            -H 'Access-Control-Request-Method: GET' \
+            http://127.0.0.1:3100/api/v1/session
+          grep -qi '^HTTP/.* 204' /tmp/cors.headers
+          grep -qi '^access-control-allow-origin: https://pixel-perfect-clone-87933.lovable.app' /tmp/cors.headers
+
+          curl --silent --dump-header /tmp/cors-denied.headers --output /dev/null \
+            -X OPTIONS \
+            -H 'Origin: https://evil.example' \
+            -H 'Access-Control-Request-Method: GET' \
+            http://127.0.0.1:3100/api/v1/session
+          grep -qi '^HTTP/.* 403' /tmp/cors-denied.headers
+
       - name: Stop production server
         if: always()
         run: |
