@@ -31,14 +31,16 @@ export async function POST(request: Request) {
 
     const bucketName = "profile-assets";
     const admin = createAdminClient();
-    try {
-      await admin.storage.getBucket(bucketName);
-    } catch {
-      await admin.storage.createBucket(bucketName, {
+    const { error: bucketError } = await admin.storage.getBucket(bucketName);
+    if (bucketError) {
+      const { error: createBucketError } = await admin.storage.createBucket(bucketName, {
         public: true,
-        fileSizeLimit: maxSize,
+        fileSizeLimit: 10 * 1024 * 1024,
         allowedMimeTypes: ["image/png", "image/jpeg", "image/webp"],
       });
+      if (createBucketError && !/already exists/i.test(createBucketError.message)) {
+        return noStoreJson({ error: "Não foi possível preparar o armazenamento de perfil." }, { status: 500 });
+      }
     }
 
     const extension = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
