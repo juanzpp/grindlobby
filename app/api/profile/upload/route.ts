@@ -9,6 +9,21 @@ const uploadSchema = z.object({
   type: z.enum(["avatar", "banner"]),
 }).strict();
 
+function hasValidImageSignature(bytes: Uint8Array, mime: string) {
+  if (mime === "image/png") {
+    return bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47 && bytes[4] === 0x0d && bytes[5] === 0x0a && bytes[6] === 0x1a && bytes[7] === 0x0a;
+  }
+  if (mime === "image/jpeg") {
+    return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  }
+  if (mime === "image/webp") {
+    return bytes.length >= 12
+      && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46
+      && bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50;
+  }
+  return false;
+}
+
 export async function POST(request: Request) {
   try {
     assertTrustedMutation(request);
@@ -24,10 +39,15 @@ export async function POST(request: Request) {
     if (!(file instanceof File)) return noStoreJson({ error: "Imagem não enviada." }, { status: 400 });
 
     const maxSize = body.type === "avatar" ? 5 * 1024 * 1024 : 10 * 1024 * 1024;
-    if (file.size > maxSize) return noStoreJson({ error: body.type === "avatar" ? "A imagem do avatar deve ter até 5MB." : "O banner deve ter até 10MB." }, { status: 400 });
+    if (file.size <= 0 || file.size > maxSize) return noStoreJson({ error: body.type === "avatar" ? "A imagem do avatar deve ter até 5MB." : "O banner deve ter até 10MB." }, { status: 400 });
 
     const allowedMimeTypes = new Set(["image/png", "image/jpeg", "image/webp"]);
     if (!allowedMimeTypes.has(file.type)) return noStoreJson({ error: "Formato inválido. Use PNG, JPG ou WEBP." }, { status: 400 });
+
+    const content = new Uint8Array(await file.arrayBuffer());
+    if (!hasValidImageSignature(content, file.type)) {
+      return noStoreJson({ error: "O arquivo enviado não corresponde a uma imagem válida." }, { status: 400 });
+    }
 
     const bucketName = "profile-assets";
     const admin = createAdminClient();
@@ -52,7 +72,6 @@ export async function POST(request: Request) {
 
     const extension = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
     const objectPath = `${user.id}/${body.type}/${randomUUID()}.${extension}`;
-    const content = new Uint8Array(await file.arrayBuffer());
     const { error: uploadError } = await admin.storage.from(bucketName).upload(objectPath, content, {
       contentType: file.type,
       cacheControl: "3600",
@@ -63,10 +82,6 @@ export async function POST(request: Request) {
 
     const { data } = admin.storage.from(bucketName).getPublicUrl(objectPath);
     const publicUrl = data.publicUrl;
-
-    // Persist the uploaded asset immediately. The explicit Save button still
-    // persists the rest of the profile, but avatar/banner must never disappear
-    // after a refresh just because the editor state was closed.
     const column = body.type === "avatar" ? "avatar" : "profile_banner";
     const { data: previousProfile } = await admin
       .from("profiles")
