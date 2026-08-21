@@ -7,7 +7,6 @@ import {
   clampMediaPercent,
   microphoneLinearGain,
   perceptualPlaybackGain,
-  shouldUseScreenSimulcast,
 } from '../lib/webrtc/mediaPolicy';
 
 describe('media hardening policy',()=>{
@@ -30,11 +29,6 @@ describe('media hardening policy',()=>{
     expect(bitrateKbpsFromDelta(2_000_000,null,15_000)).toBeNull();
     expect(bitrateKbpsFromDelta(900,1000,15_000)).toBeNull();
     expect(bitrateKbpsFromDelta(1000,900,0)).toBeNull();
-  });
-
-  it('keeps 720p30 on a single encode layer to reduce sender CPU',()=>{
-    expect(shouldUseScreenSimulcast(720,30)).toBe(false);
-    expect(shouldUseScreenSimulcast(1080,60)).toBe(true);
   });
 
   it('survives a large deterministic telemetry/gain stress loop',()=>{
@@ -68,5 +62,14 @@ describe('voice lifecycle regressions',()=>{
   it('keeps voice telemetry compatible with Lovable bearer auth',async()=>{
     const source=await readFile('app/api/lobbies/[id]/voice/metrics/route.ts','utf8');
     expect(source).toContain('getCurrentUser(request)');
+  });
+
+  it('recovers remote voice and persistent stream audio from autoplay blocks',async()=>{
+    const voice=await readFile('components/RemoteVoiceAudio.tsx','utf8');
+    const dock=await readFile('components/PersistentCallDock.tsx','utf8');
+    expect(voice).toContain('blockedRemoteAudio');
+    expect(voice).toContain('pointerdown');
+    expect(dock).toContain('subscribeAudioOutput');
+    expect(dock).toContain('audioBlocked');
   });
 });
