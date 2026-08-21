@@ -10,11 +10,17 @@ export default function LobbyInvitePage(){
   useEffect(()=>{
     let cancelled=false;
     void (async()=>{
+      const invitePath=`/lobby/invite/${params.token}`;
       const response=await fetch(`/api/lobbies/invite/${encodeURIComponent(params.token)}`,{method:"POST"});
       const body=await response.json().catch(()=>({}));
       if(cancelled)return;
-      if(response.status===401){router.replace(`/login?next=${encodeURIComponent(`/lobby/invite/${params.token}`)}`);return}
+      if(response.status===401){
+        document.cookie=`grindlobby_next=${encodeURIComponent(invitePath)}; Path=/; Max-Age=900; SameSite=Lax`;
+        router.replace("/login");
+        return;
+      }
       if(!response.ok||!body.lobbyId){setError(body.error||"Convite indisponível.");return}
+      document.cookie="grindlobby_next=; Path=/; Max-Age=0; SameSite=Lax";
       router.replace(`/lobby/${body.lobbyId}`);
     })();
     return()=>{cancelled=true};
