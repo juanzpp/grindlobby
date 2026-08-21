@@ -4,6 +4,7 @@ import {createAdminClient} from "@/lib/supabase/admin";
 import {assertTrustedMutation,InvalidRequestError,noStoreJson} from "@/lib/security/request";
 import {enforceRateLimit,RateLimitExceededError,RateLimitUnavailableError,rateLimitResponse} from "@/lib/security/rate-limit";
 import {logSecurityEvent} from "@/lib/security/logging";
+import {isExplicitLobbyLeave} from "@/lib/lobby-leave";
 
 const idSchema=z.string().uuid();
 
@@ -13,6 +14,15 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
     const id=idSchema.parse((await params).id);
     const user=await getCurrentUser(request);
     if(!user)return noStoreJson({error:"Não autorizado."},{status:401});
+
+    // `pagehide`/sendBeacon is not an explicit leave. A refresh, navigation or
+    // browser close must only stop heartbeats; the server's presence timeout and
+    // reconnect window decide when the membership becomes inactive. This keeps a
+    // host from destroying the lobby on a simple refresh. Future decoupled clients
+    // can force an explicit JSON leave with `?intent=explicit`.
+    if(!isExplicitLobbyLeave(request)){
+      return noStoreJson({ok:true,closed:false,deferred:true});
+    }
 
     await enforceRateLimit(request,{scope:"leave-lobby",limit:30,windowSeconds:300,subject:user.id});
     const admin=createAdminClient();
