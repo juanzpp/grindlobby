@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import {useCallback,useEffect,useMemo,useState} from "react";
 import {useRouter} from "next/navigation";
 import {
@@ -164,7 +165,7 @@ export default function Dashboard({user,initialView="dashboard"}:{user:Dashboard
           <div className="mt-6 space-y-2"><button onClick={()=>setCreate(true)} className="lovable-btn-primary flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold"><Plus size={16}/>Criar lobby</button><button onClick={inviteCurrentLobby} className="lovable-btn-ghost flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium"><UserPlus size={16}/>Convidar amigos</button></div>
           <div className="mt-8"><p className="lovable-label">Atividade recente</p><ul className="mt-3 space-y-3">{data?.online.slice(0,4).map(person=><li key={person.id} className="flex items-start gap-2.5"><Avatar name={person.display_name||person.username} size={28}/><div className="text-xs leading-tight"><p><span className="font-semibold">{person.display_name||person.username}</span> <span className="text-muted-foreground">está online</span></p><p className="mt-0.5 text-muted-foreground">agora</p></div></li>)}{!data?.online.length?<li className="text-xs text-muted-foreground">Sua rede aparecerá aqui.</li>:null}</ul></div>
         </div>
-        <div className="mt-8 rounded-xl border border-border bg-panel p-3"><div className="flex items-center gap-3"><ProfileAvatar name={display} size={40}/><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{display}</p><p className="truncate text-[11px] text-muted-foreground">Level {account.level} • @{user.username}</p><p className="mt-0.5 flex items-center gap-1 text-[11px] text-success"><span className="h-1.5 w-1.5 rounded-full bg-success"/>Online</p></div><button onClick={logout} aria-label="Sair" className="text-muted-foreground hover:text-foreground"><LogOut size={17}/></button></div></div>
+        <div className="mt-8 rounded-xl border border-border bg-panel p-3"><div className="flex items-center gap-3"><ProfileAvatar name={display} size={40}/><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{display}</p><p className="truncate text-[11px] text-muted-foreground">Level {account.level} • @{user.username}</p><p className="mt-0.5 flex items-center gap-1 text-[11px] text-success"><span className="h-1.5 w-1.5 rounded-full bg-success"/>Online</p></div><button onClick={logout} aria-label="Sair" className="text-muted-foreground hover:text-foreground"><LogOut size={17}/></button></div><Link href="/perfil/editar" className="mt-3 inline-flex w-full items-center justify-center rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary-glow hover:bg-primary/15">Editar perfil</Link></div>
       </aside>
 
       <main className="lovable-dashboard-main flex-1 space-y-4 p-4 md:p-6">

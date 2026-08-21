@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { Check, ChevronRight, Crown, Frame, Gift, Image as ImageIcon, MessageSquare, Package, Palette, SignalHigh, Sparkles, Star, Wand2, Shield } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { ProfileAvatar } from "@/components/dashboard/LovableWidgets";
 import SmokeFX from "@/components/SmokeFX";
+import { DEFAULT_PROFILE_COSMETICS, equipBundle, equipCosmetic, normalizeCosmeticState } from "@/lib/cosmetic-state";
 import { BUNDLES, SHELVES, STORE_CATEGORIES, type Bundle, type CosmeticKind, type ShelfItem, type StoreCategory } from "@/lib/store-catalog";
 
 type StoreShowcaseProps = { display: string; isAdmin?: boolean };
@@ -38,18 +39,39 @@ function Shelf({ title, items, onEquip }: { title: string; items: ShelfItem[]; o
 export default function StoreShowcase({ display, isAdmin = false }: StoreShowcaseProps) {
   const [category, setCategory] = useState<StoreCategory>("Bundles");
   const [selected, setSelected] = useState("competitive");
-  const [equipped, setEquipped] = useState<string | null>(null);
+  const [cosmeticState, setCosmeticState] = useState(DEFAULT_PROFILE_COSMETICS);
   const bundle = useMemo(() => BUNDLES.find((item) => item.id === selected) ?? BUNDLES[0], [selected]);
   const filteredShelves = useMemo(() => SHELVES.map((shelf) => ({ ...shelf, items: shelf.items.filter((item) => category === "Bundles" ? true : category === "Molduras" ? item.kind === "Moldura" : category === "Banners" ? item.kind === "Banner" : category === "Papéis de parede" ? item.kind === "Papel de parede" : item.kind === "Efeito de lobby" || item.kind === "Badge de perfil") })), [category]);
+
+  useEffect(() => {
+    const syncState = normalizeCosmeticState({
+      owned: DEFAULT_PROFILE_COSMETICS.owned,
+      equipped: DEFAULT_PROFILE_COSMETICS.equipped,
+    }, isAdmin);
+    setCosmeticState(syncState);
+  }, [isAdmin]);
+
+  const updateCosmetic = (kind: "banner" | "frame" | "effect" | "badge" | "cardStyle", id: string) => {
+    const state = equipCosmetic(cosmeticState, kind, id, isAdmin);
+    setCosmeticState(state);
+  };
+
+  const equipBundleSelection = (bundleId: string) => {
+    const state = equipBundle(cosmeticState, bundleId, isAdmin);
+    setSelected(bundleId);
+    setCosmeticState(state);
+  };
+
+  const equipped = cosmeticState.equipped.bundle || null;
 
   return <section className="gl-store-showcase">
     <aside className="gl-store-sidebar"><div className="gl-store-brand"><span>GL</span><strong>GRIND<span>LOBBY</span></strong></div><nav>{["Dashboard", "Lobbies", "Rank", "Loja", "Pro", "Configurações"].map((item) => <button key={item} className={item === "Loja" ? "is-active" : ""}>{item}</button>)}</nav><div className="gl-store-sidebar-actions"><button><Sparkles size={14} />Criar lobby</button><button><Gift size={14} />Convidar amigos</button></div><div className="gl-store-activity"><span className="gl-store-label">Atividade recente</span><p><MiniAvatar name="Maya" /> Maya está online</p><p><MiniAvatar name="Ravi" /> Ravi entrou no lobby</p></div></aside>
     <main className="gl-store-main"><header className="gl-store-header"><div><Crown size={16} /><strong>{isAdmin ? "Admin ativo" : "Plano Free"}</strong><i /> <span>{isAdmin ? "PRO liberado gratuitamente" : "Personalize seu perfil"}</span></div><div><Gift size={18} /><span className="gl-store-notification"><SignalHigh size={18} /></span></div></header>
       <div className="gl-store-content"><div className="gl-store-column"><h1>Loja de Cosméticos</h1><p className="gl-store-subtitle">Personalize seu perfil e destaque-se no GrindLobby.</p><div className="gl-store-tabs">{STORE_CATEGORIES.map((item) => { const Icon = item === "Bundles" ? Package : item === "Molduras" ? Frame : item === "Banners" ? MessageSquare : item === "Papéis de parede" ? ImageIcon : item === "Efeitos" ? Wand2 : Star; return <button key={item} onClick={() => setCategory(item)} className={category === item ? "is-active" : ""}><Icon size={14} />{item}</button>; })}</div>
         <section className="gl-store-hero"><Image src="/lovable/store-bundles.jpg" alt="Caixa de cosméticos GrindLobby envolta em névoa violeta" fill priority /><div className="gl-store-hero-shade" /><SmokeFX originX={72} /><div className="gl-store-hero-copy"><h2>Coleções exclusivas para<br />representar seu estilo.</h2><p>Todos os itens disponíveis para admins.</p></div></section>
-        {category === "Bundles" ? <><div className="gl-store-section-heading"><span><Crown size={14} />Bundles em destaque</span><small>5 coleções</small></div><div className="gl-store-bundles">{BUNDLES.map((item) => <article key={item.id} onClick={() => setSelected(item.id)} className={selected === item.id ? "is-selected" : ""} style={selected === item.id ? { boxShadow: `0 0 26px ${rgba(item.glow, .35)}` } : undefined}><span className="gl-store-check">{selected === item.id && <Check size={12} />}</span><BundleArt bundle={item} /><h3>{item.name}</h3><p>6 itens inclusos</p><ul>{item.items.map((included) => { const Icon = kindIcon[included.kind]; return <li key={included.kind}><Icon size={12} />{included.kind}</li>; })}</ul><em>Liberado</em><button onClick={(event) => { event.stopPropagation(); setSelected(item.id); setEquipped(item.id); }} className={equipped === item.id ? "is-equipped" : ""}>{equipped === item.id ? "Equipado" : "Equipar"}</button></article>)}</div></> : null}
-        <div className="gl-store-shelves">{filteredShelves.map((shelf) => <Shelf key={shelf.title} title={shelf.title} items={shelf.items} onEquip={setEquipped} />)}</div>
-      </div><aside className="gl-store-preview gl-store-panel"><span className="gl-store-label">Pré-visualização</span><BundleArt bundle={bundle} big /><div className="gl-store-frame" style={{ borderColor: bundle.glow, boxShadow: `inset 0 0 18px ${rgba(bundle.glow, .5)}, 0 0 20px ${rgba(bundle.glow, .35)}` }}><MiniAvatar name={display} /><div><strong>{display}</strong><small>@{display.toLowerCase().replace(/\s+/g, "_")} · ADMIN</small></div></div><div className="gl-store-preview-icons">{bundle.items.map((item) => { const Icon = kindIcon[item.kind]; return <span key={item.kind} title={item.kind}><Icon size={15} /></span>; })}</div><h2>Itens inclusos</h2><ul className="gl-store-included">{bundle.items.map((item) => <li key={item.kind}><span><Check size={12} /></span><div><strong>{item.name}</strong><small>{item.kind}</small></div><em>Liberado</em></li>)}</ul><button className="gl-store-equip" onClick={() => setEquipped(bundle.id)}>{equipped === bundle.id ? "Bundle equipado" : "Equipar bundle"}</button></aside></div>
+        {category === "Bundles" ? <><div className="gl-store-section-heading"><span><Crown size={14} />Bundles em destaque</span><small>5 coleções</small></div><div className="gl-store-bundles">{BUNDLES.map((item) => <article key={item.id} onClick={() => setSelected(item.id)} className={selected === item.id ? "is-selected" : ""} style={selected === item.id ? { boxShadow: `0 0 26px ${rgba(item.glow, .35)}` } : undefined}><span className="gl-store-check">{selected === item.id && <Check size={12} />}</span><BundleArt bundle={item} /><h3>{item.name}</h3><p>6 itens inclusos</p><ul>{item.items.map((included) => { const Icon = kindIcon[included.kind]; return <li key={included.kind}><Icon size={12} />{included.kind}</li>; })}</ul><em>Liberado</em><button onClick={(event) => { event.stopPropagation(); equipBundleSelection(item.id); }} className={equipped === item.id ? "is-equipped" : ""}>{equipped === item.id ? "Equipado" : "Equipar"}</button></article>)}</div></> : null}
+        <div className="gl-store-shelves">{filteredShelves.map((shelf) => <Shelf key={shelf.title} title={shelf.title} items={shelf.items} onEquip={(id) => updateCosmetic("banner", id)} />)}</div>
+      </div><aside className="gl-store-preview gl-store-panel"><span className="gl-store-label">Pré-visualização</span><BundleArt bundle={bundle} big /><div className="gl-store-frame" style={{ borderColor: bundle.glow, boxShadow: `inset 0 0 18px ${rgba(bundle.glow, .5)}, 0 0 20px ${rgba(bundle.glow, .35)}` }}><MiniAvatar name={display} /><div><strong>{display}</strong><small>@{display.toLowerCase().replace(/\s+/g, "_")} · ADMIN</small></div></div><div className="gl-store-preview-icons">{bundle.items.map((item) => { const Icon = kindIcon[item.kind]; return <span key={item.kind} title={item.kind}><Icon size={15} /></span>; })}</div><h2>Itens inclusos</h2><ul className="gl-store-included">{bundle.items.map((item) => <li key={item.kind}><span><Check size={12} /></span><div><strong>{item.name}</strong><small>{item.kind}</small></div><em>Liberado</em></li>)}</ul><button className="gl-store-equip" onClick={() => equipBundleSelection(bundle.id)}>{equipped === bundle.id ? "Bundle equipado" : "Equipar bundle"}</button></aside></div>
     </main>
   </section>;
 }

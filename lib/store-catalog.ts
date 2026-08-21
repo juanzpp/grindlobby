@@ -44,25 +44,25 @@ export const SHELVES: { title: string; items: ShelfItem[] }[] = [
   {
     title: "Itens em destaque",
     items: [
-      { id: "s1", name: "Moldura Nebula", kind: "Moldura", accent: "oklch(0.62 0.2 302)" },
-      { id: "s2", name: "Efeito Aurora", kind: "Efeito de lobby", accent: "oklch(0.7 0.16 160)" },
-      { id: "s3", name: "Banner Vortex", kind: "Banner", accent: "oklch(0.6 0.18 280)" },
+      { id: "prism", name: "Moldura Prismática", kind: "Moldura", accent: "oklch(0.62 0.2 302)" },
+      { id: "electric-halo", name: "Efeito Electric Halo", kind: "Efeito de lobby", accent: "oklch(0.7 0.16 160)" },
+      { id: "void-rift", name: "Banner Void Rift", kind: "Banner", accent: "oklch(0.6 0.18 280)" },
     ],
   },
   {
     title: "Adicionados recentemente",
     items: [
-      { id: "s4", name: "Papel de parede Eclipse", kind: "Papel de parede", accent: "oklch(0.58 0.14 268)" },
-      { id: "s5", name: "Badge Lendário", kind: "Badge de perfil", accent: "oklch(0.72 0.16 88)" },
-      { id: "s6", name: "Cor de chat Neon", kind: "Cor do chat", accent: "oklch(0.62 0.15 220)" },
+      { id: "gold", name: "Moldura Áurea", kind: "Moldura", accent: "oklch(0.72 0.16 88)" },
+      { id: "founder", name: "Badge Founder", kind: "Badge de perfil", accent: "oklch(0.72 0.16 88)" },
+      { id: "aurora", name: "Banner Aurora", kind: "Banner", accent: "oklch(0.62 0.15 220)" },
     ],
   },
   {
     title: "Mais populares",
     items: [
-      { id: "s7", name: "Moldura Elite Gold", kind: "Moldura", accent: "oklch(0.72 0.16 88)" },
-      { id: "s8", name: "Efeito Comet", kind: "Efeito de lobby", accent: "oklch(0.68 0.2 35)" },
-      { id: "s9", name: "Banner Ascension", kind: "Banner", accent: "oklch(0.6 0.22 302)" },
+      { id: "amethyst", name: "Moldura Ametista", kind: "Moldura", accent: "oklch(0.72 0.16 88)" },
+      { id: "void-pulse", name: "Efeito Void Pulse", kind: "Efeito de lobby", accent: "oklch(0.68 0.2 35)" },
+      { id: "nebula-pulse", name: "Banner Nebula Pulse", kind: "Banner", accent: "oklch(0.6 0.22 302)" },
     ],
   },
 ];
