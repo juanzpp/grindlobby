@@ -39,4 +39,14 @@ describe('Community API boundary',()=>{
       expect(source).toContain('assertTrustedMutation(request)');
     }
   });
+
+  it('keeps Community creation and invite acceptance transactional',async()=>{
+    const createSource=await readFile('app/api/communities/route.ts','utf8');
+    const inviteSource=await readFile('app/api/community/invite/[token]/route.ts','utf8');
+    const migration=await readFile('supabase/migrations/20260821221500_community_atomic_hardening.sql','utf8');
+    expect(createSource).toContain("rpc('create_community_atomic'");
+    expect(inviteSource).toContain("rpc('accept_community_invite_atomic'");
+    expect(migration).toContain('for update');
+    expect(migration).toContain("'20260821_community_atomic_hardening'");
+  });
 });
