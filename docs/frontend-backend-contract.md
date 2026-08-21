@@ -55,6 +55,15 @@ Returns the authenticated account plus server-derived capabilities. It supports 
 
 The frontend must use returned capability flags instead of re-implementing entitlement rules.
 
+## Lobby presence and explicit leave
+
+Lobby presence is heartbeat-based so refreshes, temporary network loss and normal browser lifecycle events can reconnect without destroying the room.
+
+- `pagehide`/`sendBeacon` is treated as temporary disconnect and must not close a lobby.
+- A normal same-origin explicit leave may POST to `/api/lobbies/:id/leave` without a JSON body.
+- A decoupled/JSON client such as the Lovable frontend must use `POST /api/lobbies/:id/leave?intent=explicit` when the user actually clicks **Sair**.
+- Closing or refreshing the page must not call the explicit-leave contract; stop heartbeats and allow the server presence timeout to handle the disconnect.
+
 ## Frontend implementation rules
 
 - Network access belongs in one typed API client layer, not inside visual components.
