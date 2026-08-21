@@ -1,3 +1,4 @@
+import {headers} from 'next/headers'
 import {createClient} from '@/lib/supabase/server'
 import {createAdminClient} from '@/lib/supabase/admin'
 import {requireEmailConfirmation} from '@/lib/auth-config'
@@ -10,15 +11,19 @@ type AuthUser={
   user_metadata?:Record<string,unknown>
 }
 
-function bearerToken(request?:Request){
-  if(!request)return null
-  const value=request.headers.get('authorization')?.trim()??''
+async function authorizationValue(request?:Request){
+  if(request)return request.headers.get('authorization')
+  try{return (await headers()).get('authorization')}catch{return null}
+}
+
+async function bearerToken(request?:Request){
+  const value=(await authorizationValue(request))?.trim()??''
   const match=/^Bearer\s+(.+)$/i.exec(value)
   return match?.[1]?.trim()||null
 }
 
 async function resolveAuthUser(request?:Request):Promise<{user:AuthUser|null;client:ReturnType<typeof createAdminClient>|Awaited<ReturnType<typeof createClient>>}> {
-  const token=bearerToken(request)
+  const token=await bearerToken(request)
   if(token){
     const admin=createAdminClient()
     const {data:{user},error}=await admin.auth.getUser(token)
@@ -34,8 +39,9 @@ async function resolveAuthUser(request?:Request):Promise<{user:AuthUser|null;cli
  *
  * - Server-rendered/current app calls may omit `request` and continue using the
  *   existing Supabase cookie session.
- * - Decoupled frontends (for example the Lovable UI) may pass a Request with a
- *   Supabase access token in `Authorization: Bearer <token>`.
+ * - API handlers automatically inherit a Supabase access token from the current
+ *   request's `Authorization: Bearer <token>` header, or may pass Request
+ *   explicitly. This lets the Lovable frontend use the same backend contracts.
  *
  * The browser never receives the service-role key: token verification and
  * privileged profile reads stay server-side.
