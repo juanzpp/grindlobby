@@ -32,7 +32,7 @@ export async function GET(_:Request,{params}:{params:Promise<{token:string}>}){
 export async function POST(request:Request,{params}:{params:Promise<{token:string}>}){
   try{
     assertTrustedMutation(request);
-    const user=await getCurrentUser();
+    const user=await getCurrentUser(request);
     if(!user)return noStoreJson({error:'Faça login para aceitar o convite.'},{status:401});
     const {token}=await params;
     const invite=await inviteByToken(token);
