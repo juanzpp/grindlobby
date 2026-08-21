@@ -7,12 +7,29 @@ import {logSecurityEvent} from "@/lib/security/logging";
 
 const idSchema=z.string().uuid();
 
+function looksLikePageExitBeacon(request:Request){
+  const url=new URL(request.url);
+  if(url.searchParams.get("intent")==="explicit")return false;
+  const fetchMode=request.headers.get("sec-fetch-mode")?.toLowerCase();
+  const contentType=request.headers.get("content-type")?.toLowerCase()??"";
+  return fetchMode==="no-cors"||contentType.startsWith("application/json");
+}
+
 export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){
   try{
     assertTrustedMutation(request);
     const id=idSchema.parse((await params).id);
     const user=await getCurrentUser(request);
     if(!user)return noStoreJson({error:"Não autorizado."},{status:401});
+
+    // `pagehide`/sendBeacon is not an explicit leave. A refresh, navigation or
+    // browser close must only stop heartbeats; the server's presence timeout and
+    // reconnect window decide when the membership becomes inactive. This keeps a
+    // host from destroying the lobby on a simple refresh. Future decoupled clients
+    // can force an explicit JSON leave with `?intent=explicit`.
+    if(looksLikePageExitBeacon(request)){
+      return noStoreJson({ok:true,closed:false,deferred:true});
+    }
 
     await enforceRateLimit(request,{scope:"leave-lobby",limit:30,windowSeconds:300,subject:user.id});
     const admin=createAdminClient();
