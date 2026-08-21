@@ -1,7 +1,7 @@
 use tauri::{WebviewUrl, WebviewWindowBuilder};
 use url::Url;
 
-const PRODUCTION_URL: &str = "https://grindlobby.onrender.com";
+const PRODUCTION_URL: &str = "https://grindlobby.onrender.com/?desktop=1";
 
 fn main() {
     tauri::Builder::default()
