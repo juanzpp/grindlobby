@@ -18,7 +18,7 @@ const payloadSchema=z.object({
 export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){
   try{
     assertTrustedMutation(request);
-    const user=await getCurrentUser();if(!user)return noStoreJson({error:"Não autorizado."},{status:401});
+    const user=await getCurrentUser(request);if(!user)return noStoreJson({error:"Não autorizado."},{status:401});
     await enforceRateLimit(request,{scope:"voice-metrics",limit:120,windowSeconds:600,subject:user.id});
     const lobbyId=idSchema.parse((await params).id),body=payloadSchema.parse(await readJsonBody(request,4096)),admin=createAdminClient();
     const cutoff=new Date(Date.now()-60000).toISOString();

@@ -3,10 +3,12 @@
 import {useEffect} from "react";
 import {ConnectionState,LocalAudioTrack,RemoteAudioTrack,Track,type Room} from "livekit-client";
 import {subscribeActiveLiveKitRoom} from "@/lib/webrtc/useLobbyVoice";
+import {bitrateKbpsFromDelta} from "@/lib/webrtc/mediaPolicy";
 
 type Sample={connectionState:"connected"|"reconnecting"|"disconnected";rttMs:number|null;jitterMs:number|null;packetsLost:number|null;packetsReceived:number|null;bitrateKbps:number|null;participantCount:number};
+type RawStats=Omit<Sample,"bitrateKbps">&{bytes:number};
 
-async function readStats(room:Room):Promise<Sample>{
+async function readStats(room:Room):Promise<RawStats>{
   const tracks:(LocalAudioTrack|RemoteAudioTrack)[]=[];
   const local=room.localParticipant.getTrackPublication(Track.Source.Microphone)?.track;
   if(local instanceof LocalAudioTrack)tracks.push(local);
@@ -30,22 +32,25 @@ async function readStats(room:Room):Promise<Sample>{
       });
     }catch{}
   }
-  return {connectionState:room.state===ConnectionState.Reconnecting?"reconnecting":room.state===ConnectionState.Connected?"connected":"disconnected",rttMs:rtt===null?null:Math.round(rtt),jitterMs:jitter===null?null:Math.round(jitter*1000)/1000,packetsLost:lost||null,packetsReceived:received||null,bitrateKbps:bytes?Math.round((bytes*8/1000)/15):null,participantCount:room.numParticipants};
+  return {connectionState:room.state===ConnectionState.Reconnecting?"reconnecting":room.state===ConnectionState.Connected?"connected":"disconnected",rttMs:rtt===null?null:Math.round(rtt),jitterMs:jitter===null?null:Math.round(jitter*1000)/1000,packetsLost:lost||null,packetsReceived:received||null,participantCount:room.numParticipants,bytes};
 }
 
 export function useVoiceTelemetry(lobbyId:string,enabled:boolean){
   useEffect(()=>{
     if(!enabled)return;
-    let room:Room|null=null,disposed=false;
-    const unsubscribe=subscribeActiveLiveKitRoom(next=>{room=next});
+    let room:Room|null=null,disposed=false,lastBytes:number|null=null,lastAt:number|null=null;
+    const unsubscribe=subscribeActiveLiveKitRoom(next=>{room=next;if(!next){lastBytes=null;lastAt=null}});
     const send=async()=>{
       if(disposed||!room)return;
-      const sample=await readStats(room);
-      if(disposed)return;
+      const raw=await readStats(room);if(disposed)return;
+      const now=performance.now();
+      const bitrateKbps=lastAt==null?null:bitrateKbpsFromDelta(raw.bytes,lastBytes,now-lastAt);
+      lastBytes=raw.bytes;lastAt=now;
+      const {bytes:_,...sampleBase}=raw;
+      const sample:Sample={...sampleBase,bitrateKbps};
       void fetch(`/api/lobbies/${lobbyId}/voice/metrics`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(sample),keepalive:true}).catch(()=>{});
     };
-    const timer=window.setInterval(()=>void send(),15_000);
-    void send();
+    const timer=window.setInterval(()=>void send(),15_000);void send();
     return()=>{disposed=true;window.clearInterval(timer);unsubscribe()};
   },[lobbyId,enabled]);
 }

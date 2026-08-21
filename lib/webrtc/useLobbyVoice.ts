@@ -1,9 +1,7 @@
 "use client";
 import {useEffect,useState} from "react";
-import {
- AudioPresets,ConnectionState,LocalAudioTrack,RemoteAudioTrack,Room,RoomEvent,Track,
- type RemoteParticipant,type RemoteTrack,type RemoteTrackPublication
-} from "livekit-client";
+import {AudioPresets,ConnectionState,LocalAudioTrack,RemoteAudioTrack,Room,RoomEvent,Track} from "livekit-client";
+import {MAX_MICROPHONE_GAIN_PERCENT,clampMediaPercent,microphoneLinearGain} from "@/lib/webrtc/mediaPolicy";
 
 export type VoiceMemberState={userId:string;connected:boolean;stream:RemoteAudioTrack|null;status:"Offline"|"Connecting"|"Connected"|"Reconnecting";speaking:boolean;audioLevel:number;microphoneMuted:boolean;volume:number;muted:boolean};
 export type VoiceLobbyMember={userId:string;name:string;profileId:string|null;membershipId:string|null};
@@ -21,12 +19,12 @@ let activePresence=new Map<string,VoiceMemberState>();
 let activeStream:MediaStream|null=null;
 let micAudioContext:AudioContext|null=null;
 let micGainNode:GainNode|null=null;
+let micLimiterNode:DynamicsCompressorNode|null=null;
 let micSourceTrackId:string|null=null;
 let micProcessedStream:MediaStream|null=null;
-let microphoneGain=125;
+let microphoneGain=100;
 let connectGeneration=0;
 let heartbeatTimer:number|undefined;
-let pagehideBound=false;
 const volumes=new Map<string,{volume:number;muted:boolean}>();
 const roomListeners=new Set<(room:Room|null)=>void>();
 const sessionListeners=new Set<(session:ActiveVoiceSession)=>void>();
@@ -67,7 +65,6 @@ function startHeartbeat(){
  if(!activeLobbyId||typeof window==="undefined")return;
  const ping=()=>{if(activeLobbyId)fetch(`/api/lobbies/${activeLobbyId}/heartbeat`,{method:"POST",keepalive:true}).catch(()=>{})};
  void ping();heartbeatTimer=window.setInterval(ping,10_000);
- if(!pagehideBound){pagehideBound=true;window.addEventListener("pagehide",()=>{if(!activeLobbyId)return;const url=`/api/lobbies/${activeLobbyId}/leave`;navigator.sendBeacon?.(url,new Blob([],{type:"application/json"}))},{capture:true})}
 }
 function bindRoom(room:Room){
  const sync=()=>syncPresence(room);
@@ -83,7 +80,7 @@ function bindRoom(room:Room){
 }
 function cleanupMicProcessing(){
  micProcessedStream?.getTracks().forEach(track=>track.stop());
- micProcessedStream=null;micGainNode=null;micSourceTrackId=null;
+ micProcessedStream=null;micGainNode=null;micLimiterNode=null;micSourceTrackId=null;
  micAudioContext?.close().catch(()=>{});micAudioContext=null;
 }
 async function processedMicrophoneStream(stream:MediaStream){
@@ -91,16 +88,17 @@ async function processedMicrophoneStream(stream:MediaStream){
  if(micProcessedStream&&micSourceTrackId===sourceTrack.id&&micProcessedStream.getAudioTracks()[0]?.readyState==="live")return micProcessedStream;
  cleanupMicProcessing();
  if(typeof AudioContext==="undefined")return stream;
- const context=new AudioContext(),source=context.createMediaStreamSource(stream),gain=context.createGain(),destination=context.createMediaStreamDestination();
- gain.gain.value=Math.max(0,Math.min(2,microphoneGain/100));
- source.connect(gain);gain.connect(destination);
+ const context=new AudioContext(),source=context.createMediaStreamSource(stream),gain=context.createGain(),limiter=context.createDynamicsCompressor(),destination=context.createMediaStreamDestination();
+ gain.gain.value=microphoneLinearGain(microphoneGain);
+ limiter.threshold.value=-3;limiter.knee.value=2;limiter.ratio.value=12;limiter.attack.value=.003;limiter.release.value=.12;
+ source.connect(gain);gain.connect(limiter);limiter.connect(destination);
  await context.resume().catch(()=>{});
- micAudioContext=context;micGainNode=gain;micSourceTrackId=sourceTrack.id;micProcessedStream=destination.stream;
+ micAudioContext=context;micGainNode=gain;micLimiterNode=limiter;micSourceTrackId=sourceTrack.id;micProcessedStream=destination.stream;
  return destination.stream;
 }
 async function publishOrReplaceMicrophone(room:Room,stream:MediaStream|null){
  if(!stream)return;
- const raw=stream.getAudioTracks()[0];if(!raw)return;
+ const raw=stream.getAudioTracks()[0];if(!raw||raw.readyState!=="live")return;
  activeStream=stream;
  const processed=await processedMicrophoneStream(stream),next=processed?.getAudioTracks()[0];if(!next)return;
  const publication=room.localParticipant.getTrackPublication(Track.Source.Microphone),current=publication?.track;
@@ -112,15 +110,19 @@ async function ensureSession(lobbyId:string,userId:string,members:VoiceLobbyMemb
  activeMembers=members;
  if(activeRoom&&activeLobbyId===lobbyId&&activeRoom.state!==ConnectionState.Disconnected){await publishOrReplaceMicrophone(activeRoom,stream);syncPresence(activeRoom);return}
  await disconnectActiveLiveKitVoice(false);
- const generation=++connectGeneration,room=new Room({adaptiveStream:true,dynacast:true,disconnectOnPageLeave:true});
+ const generation=++connectGeneration,room=new Room({adaptiveStream:true,dynacast:true,disconnectOnPageLeave:false});
  activeLobbyId=lobbyId;activeUserId=userId;activeMembers=members;setActiveRoom(room);bindRoom(room);
  try{
   const response=await fetch(`/api/lobbies/${lobbyId}/voice/token`,{method:"POST",cache:"no-store"}),data=await response.json() as {token?:string;url?:string;error?:string};
   if(!response.ok||!data.token||!data.url)throw new Error(data.error||"Token LiveKit indisponível");
-  if(generation!==connectGeneration)return;
-  await room.connect(data.url,data.token,{autoSubscribe:true});if(generation!==connectGeneration)return;
-  if(stream)await publishOrReplaceMicrophone(room,stream);syncPresence(room);log("room-connected",{room:room.name,participantCount:room.numParticipants,microphone: Boolean(stream)});
- }catch(error){logError("room-connect-failed",{error:String(error)});syncPresence(room)}
+  if(generation!==connectGeneration){room.removeAllListeners();await room.disconnect();return}
+  await room.connect(data.url,data.token,{autoSubscribe:true});
+  if(generation!==connectGeneration){room.removeAllListeners();await room.disconnect();return}
+  if(stream)await publishOrReplaceMicrophone(room,stream);syncPresence(room);log("room-connected",{room:room.name,participantCount:room.numParticipants,microphone:Boolean(stream)});
+ }catch(error){
+  logError("room-connect-failed",{error:String(error)});
+  if(generation===connectGeneration){stopHeartbeat();room.removeAllListeners();await room.disconnect().catch(()=>{});setActiveRoom(null);activeLobbyId=null;activeUserId=null;activeMembers=[];activePresence=new Map();emitPresence()}
+ }
 }
 export async function disconnectActiveLiveKitVoice(stopTracks=true){
  connectGeneration+=1;stopHeartbeat();
@@ -130,47 +132,31 @@ export async function disconnectActiveLiveKitVoice(stopTracks=true){
 }
 export async function setLiveKitMicrophoneMuted(muted:boolean){const publication=activeRoom?.localParticipant.getTrackPublication(Track.Source.Microphone);if(!publication)return;if(muted)await publication.mute();else await publication.unmute();syncPresence()}
 export function setLiveKitMicrophoneGain(value:number){
- microphoneGain=Math.max(0,Math.min(200,value));
- if(micGainNode&&micAudioContext){const now=micAudioContext.currentTime;micGainNode.gain.cancelScheduledValues(now);micGainNode.gain.setTargetAtTime(microphoneGain/100,now,.035)}
+ microphoneGain=clampMediaPercent(value,MAX_MICROPHONE_GAIN_PERCENT);
+ if(micGainNode&&micAudioContext){const now=micAudioContext.currentTime;micGainNode.gain.cancelScheduledValues(now);micGainNode.gain.setTargetAtTime(microphoneLinearGain(microphoneGain),now,.035)}
 }
-export async function switchLiveKitMicrophoneDevice(deviceId:string){const publication=activeRoom?.localParticipant.getTrackPublication(Track.Source.Microphone),track=publication?.track;if(!(track instanceof LocalAudioTrack))return null;await track.setDeviceId(deviceId||"default");activeStream=new MediaStream([track.mediaStreamTrack]);return track.mediaStreamTrack}
+export async function switchLiveKitMicrophoneDevice(deviceId:string){const publication=activeRoom?.localParticipant.getTrackPublication(Track.Source.Microphone),track=publication?.track;if(!(track instanceof LocalAudioTrack))return null;await track.setDeviceId(deviceId||"default");activeStream=new MediaStream([track.mediaStreamTrack]);cleanupMicProcessing();return track.mediaStreamTrack}
 export async function setLiveKitScreenShareEnabled(enabled:boolean){await activeRoom?.localParticipant.setScreenShareEnabled(enabled)}
 export function getRemoteVoicePeerId(track:RemoteAudioTrack|null){return track?.sid}
 
 export async function getLiveKitMediaRttMs(){
- const room=activeRoom;
- if(!room||room.state!==ConnectionState.Connected)return null;
+ const room=activeRoom;if(!room||room.state!==ConnectionState.Connected)return null;
  const tracks:(LocalAudioTrack|RemoteAudioTrack)[]=[];
- const localTrack=room.localParticipant.getTrackPublication(Track.Source.Microphone)?.track;
- if(localTrack instanceof LocalAudioTrack)tracks.push(localTrack);
- for(const participant of room.remoteParticipants.values()){
-  const remoteTrack=participant.getTrackPublication(Track.Source.Microphone)?.track;
-  if(remoteTrack instanceof RemoteAudioTrack)tracks.push(remoteTrack);
- }
+ const localTrack=room.localParticipant.getTrackPublication(Track.Source.Microphone)?.track;if(localTrack instanceof LocalAudioTrack)tracks.push(localTrack);
+ for(const participant of room.remoteParticipants.values()){const remoteTrack=participant.getTrackPublication(Track.Source.Microphone)?.track;if(remoteTrack instanceof RemoteAudioTrack)tracks.push(remoteTrack)}
  const candidates:number[]=[];
- for(const track of tracks){
-  try{
-   const report=await track.getRTCStatsReport();
-   report?.forEach(stat=>{
-    const row=stat as RTCStats & {currentRoundTripTime?:number;roundTripTime?:number;state?:string;nominated?:boolean};
-    if(row.type==="candidate-pair"&&row.state==="succeeded"&&typeof row.currentRoundTripTime==="number"&&row.currentRoundTripTime>=0)candidates.push(row.currentRoundTripTime*1000);
-    if(row.type==="remote-inbound-rtp"&&typeof row.roundTripTime==="number"&&row.roundTripTime>=0)candidates.push(row.roundTripTime*1000);
-   });
-  }catch{}
- }
- if(!candidates.length)return null;
- return Math.max(1,Math.round(Math.min(...candidates)));
+ for(const track of tracks){try{const report=await track.getRTCStatsReport();report?.forEach(stat=>{const row=stat as RTCStats&{currentRoundTripTime?:number;roundTripTime?:number;state?:string};if(row.type==="candidate-pair"&&row.state==="succeeded"&&typeof row.currentRoundTripTime==="number"&&row.currentRoundTripTime>=0)candidates.push(row.currentRoundTripTime*1000);if(row.type==="remote-inbound-rtp"&&typeof row.roundTripTime==="number"&&row.roundTripTime>=0)candidates.push(row.roundTripTime*1000)})}catch{}}
+ if(!candidates.length)return null;return Math.max(1,Math.round(Math.min(...candidates)));
 }
 
 export function useLobbyVoice(lobbyId:string,localUserId:string,lobbyMembers:VoiceLobbyMember[],localStream:MediaStream|null){
- const [voicePresence,setVoicePresence]=useState<Map<string,VoiceMemberState>>(()=>new Map(activePresence));
- activeMembers=lobbyMembers;
+ const [voicePresence,setVoicePresence]=useState<Map<string,VoiceMemberState>>(()=>new Map(activePresence));activeMembers=lobbyMembers;
  useEffect(()=>{if(process.env.NEXT_PUBLIC_VOICE_DEBUG!=="true"||window.__GRINDLOBBY_VOICE_DEBUG__)return;window.__GRINDLOBBY_VOICE_DEBUG__=true;console.debug("[GrindLobby Voice] debug-enabled")},[]);
  useEffect(()=>{const listener=(value:Map<string,VoiceMemberState>)=>setVoicePresence(new Map(value));presenceListeners.add(listener);listener(activePresence);return()=>{presenceListeners.delete(listener)}},[]);
  useEffect(()=>{activeMembers=lobbyMembers;if(activeRoom&&activeLobbyId===lobbyId)syncPresence(activeRoom)},[lobbyMembers.map(member=>member.userId).join(","),lobbyId]);
  useEffect(()=>{if(!lobbyId||!localUserId||!lobbyMembers.length)return;void ensureSession(lobbyId,localUserId,lobbyMembers,localStream)},[localStream,lobbyId,localUserId,lobbyMembers.map(member=>member.userId).join(",")]);
  const voiceMembers=[...voicePresence.values()],remotePeers=voiceMembers.filter(member=>member.userId!==localUserId&&member.connected);
- function setPeerVolume(userId:string,volume:number){const current=volumes.get(userId)??{volume:100,muted:false};volumes.set(userId,{...current,volume});syncPresence()}
+ function setPeerVolume(userId:string,volume:number){const current=volumes.get(userId)??{volume:100,muted:false};volumes.set(userId,{...current,volume:clampMediaPercent(volume,100)});syncPresence()}
  function togglePeerMuted(userId:string){const current=volumes.get(userId)??{volume:100,muted:false};volumes.set(userId,{...current,muted:!current.muted});syncPresence()}
  function notifyVoiceLeave(){void disconnectActiveLiveKitVoice(true)}
  return{remotePeers,voiceMembers,setPeerVolume,togglePeerMuted,notifyVoiceLeave};
