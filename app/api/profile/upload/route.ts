@@ -31,7 +31,7 @@ export async function POST(request: Request) {
 
     const bucketName = "profile-assets";
     const admin = createAdminClient();
-    const { error: bucketError } = await admin.storage.getBucket(bucketName);
+    const { data: bucketData, error: bucketError } = await admin.storage.getBucket(bucketName);
     if (bucketError) {
       const { error: createBucketError } = await admin.storage.createBucket(bucketName, {
         public: true,
@@ -41,6 +41,13 @@ export async function POST(request: Request) {
       if (createBucketError && !/already exists/i.test(createBucketError.message)) {
         return noStoreJson({ error: "Não foi possível preparar o armazenamento de perfil." }, { status: 500 });
       }
+    } else if (bucketData && !bucketData.public) {
+      const { error: updateBucketError } = await admin.storage.updateBucket(bucketName, {
+        public: true,
+        fileSizeLimit: 10 * 1024 * 1024,
+        allowedMimeTypes: ["image/png", "image/jpeg", "image/webp"],
+      });
+      if (updateBucketError) return noStoreJson({ error: "Não foi possível liberar a visualização da imagem de perfil." }, { status: 500 });
     }
 
     const extension = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
@@ -55,7 +62,40 @@ export async function POST(request: Request) {
     if (uploadError) return noStoreJson({ error: "Não foi possível salvar a imagem." }, { status: 400 });
 
     const { data } = admin.storage.from(bucketName).getPublicUrl(objectPath);
-    return noStoreJson({ url: data.publicUrl });
+    const publicUrl = data.publicUrl;
+
+    // Persist the uploaded asset immediately. The explicit Save button still
+    // persists the rest of the profile, but avatar/banner must never disappear
+    // after a refresh just because the editor state was closed.
+    const column = body.type === "avatar" ? "avatar" : "profile_banner";
+    const { data: previousProfile } = await admin
+      .from("profiles")
+      .select("avatar,profile_banner")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    const previousUrl = body.type === "avatar" ? previousProfile?.avatar : previousProfile?.profile_banner;
+    const { error: persistError } = await admin
+      .from("profiles")
+      .update({ [column]: publicUrl, updated_at: new Date().toISOString() })
+      .eq("id", user.id);
+    if (persistError) {
+      await admin.storage.from(bucketName).remove([objectPath]);
+      return noStoreJson({ error: "A imagem foi enviada, mas não foi possível aplicá-la ao perfil." }, { status: 500 });
+    }
+
+    if (typeof previousUrl === "string" && previousUrl.includes(`/storage/v1/object/public/${bucketName}/`)) {
+      try {
+        const previousPath = decodeURIComponent(previousUrl.split(`/storage/v1/object/public/${bucketName}/`)[1]?.split("?")[0] ?? "");
+        if (previousPath && previousPath !== objectPath && previousPath.startsWith(`${user.id}/`)) {
+          await admin.storage.from(bucketName).remove([previousPath]);
+        }
+      } catch {
+        // Cleanup is best-effort and must not break a successful upload.
+      }
+    }
+
+    return noStoreJson({ url: publicUrl, applied: true });
   } catch (error) {
     if (error instanceof RateLimitExceededError || error instanceof RateLimitUnavailableError) return rateLimitResponse(error);
     if (error instanceof z.ZodError) return noStoreJson({ error: "Tipo ou payload inválidos." }, { status: 400 });

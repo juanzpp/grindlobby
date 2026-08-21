@@ -33,7 +33,7 @@ export async function GET(request:Request){
       admin.from("lobbies").select("id,owner_id,game_id,name,description,visibility,max_members,status,created_at").eq("status","open").order("created_at",{ascending:false}).limit(40),
       admin.from("profiles").select("id,username,display_name,avatar,status,created_at,account_level,favorite_game").eq("status","online").neq("id",user.id).limit(20),
       admin.from("lobby_members").select("lobby_id,role,joined_at,last_seen_at").eq("user_id",user.id).order("joined_at",{ascending:false}),
-      admin.from("profiles").select("account_level,account_xp,created_at,favorite_game").eq("id",user.id).maybeSingle(),
+      admin.from("profiles").select("account_level,account_xp,created_at,favorite_game,avatar,profile_banner,avatar_frame,profile_effect,profile_badge,profile_card_style").eq("id",user.id).maybeSingle(),
     ]);
 
     const allRanks=(allCompetitiveRanks??[]) as RankRow[];
@@ -148,7 +148,7 @@ export async function GET(request:Request){
       currentLobby:currentLobby?{...currentLobby,members:currentMembers}:null,
       online,
       topPlayers,
-      account:{level:profile?.account_level??0,xp:profile?.account_xp??0},
+      account:{level:profile?.account_level??0,xp:profile?.account_xp??0,avatar:profile?.avatar??null,banner:profile?.profile_banner??null,frame:profile?.avatar_frame??null,effect:profile?.profile_effect??null,badge:profile?.profile_badge??null,cardStyle:profile?.profile_card_style??null},
       entitlements:{tier:user.account_tier==="pro"||user.app_role==="admin"?"pro":"free",isAdmin:user.app_role==="admin"},
       stats:{online:online.length+1,activeLobbies:lobbies.length,myLobbies:activeMine.size,rank:ranks?.length?Math.max(...ranks.map(rank=>rank.points)):0},
     });
