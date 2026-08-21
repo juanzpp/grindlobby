@@ -30,8 +30,26 @@ jobs:
         with:
           node-version: 22
 
+      - name: Prepare square desktop icon
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.Drawing
+          $src = (Resolve-Path '../../public/brand/grindlobby-official.png').Path
+          $img = [System.Drawing.Image]::FromFile($src)
+          $size = [Math]::Max($img.Width, $img.Height)
+          $bmp = New-Object System.Drawing.Bitmap $size, $size
+          $graphics = [System.Drawing.Graphics]::FromImage($bmp)
+          $graphics.Clear([System.Drawing.Color]::Transparent)
+          $x = [int](($size - $img.Width) / 2)
+          $y = [int](($size - $img.Height) / 2)
+          $graphics.DrawImage($img, $x, $y, $img.Width, $img.Height)
+          $bmp.Save((Join-Path $PWD 'app-icon.png'), [System.Drawing.Imaging.ImageFormat]::Png)
+          $graphics.Dispose()
+          $bmp.Dispose()
+          $img.Dispose()
+
       - name: Generate Windows icons from GrindLobby logo
-        run: npx --yes @tauri-apps/cli@2 icon ../../public/brand/grindlobby-official.png
+        run: npx --yes @tauri-apps/cli@2 icon app-icon.png
 
       - name: Cargo check
         run: cargo check
