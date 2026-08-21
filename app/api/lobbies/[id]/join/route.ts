@@ -15,9 +15,11 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
     if(!user)return noStoreJson({error:"Não autorizado."},{status:401});
     actorId=user.id;
     await enforceRateLimit(request,{scope:"join-lobby",limit:20,windowSeconds:300,subject:user.id});
-    const admin=createAdminClient(),[{data:lobby},{data:existing}]=await Promise.all([
+    const admin=createAdminClient();
+    const cutoff=new Date(Date.now()-30000).toISOString();
+    const [{data:lobby},{data:existing}]=await Promise.all([
       admin.from("lobbies").select("id,owner_id,max_members,status,visibility").eq("id",id).maybeSingle(),
-      admin.from("lobby_members").select("role,last_seen_at").eq("lobby_id",id).eq("user_id",user.id).maybeSingle(),
+      admin.from("lobby_members").select("role,last_seen_at").eq("lobby_id",id).eq("user_id",user.id).gt("last_seen_at",cutoff).maybeSingle(),
     ]);
     if(!lobby||lobby.status!=="open")return noStoreJson({error:"Lobby indisponível."},{status:404});
     if(lobby.visibility!=="public"&&lobby.owner_id!==user.id&&!existing)return noStoreJson({error:"Convite necessário para entrar neste lobby."},{status:403});
