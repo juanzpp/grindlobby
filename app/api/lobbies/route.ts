@@ -3,6 +3,7 @@ import {createClient} from "@/lib/supabase/server";
 import {createAdminClient} from "@/lib/supabase/admin";
 import {assertTrustedMutation,InvalidRequestError,noStoreJson,readJsonBody} from "@/lib/security/request";
 import {enforceRateLimit,RateLimitExceededError,RateLimitUnavailableError,rateLimitResponse} from "@/lib/security/rate-limit";
+import {lobbyInviteHash} from "@/lib/lobby-invites";
 
 const createSchema=z.object({
   name:z.string().trim().min(2).max(80),
@@ -12,15 +13,11 @@ const createSchema=z.object({
   maxMembers:z.coerce.number().int().min(2).max(100),
 }).strict();
 
-type LobbyCreateStage="request"|"authentication"|"rate_limit"|"payload_validation"|"game_lookup"|"lobby_insert"|"host_insert"|"rollback"|"complete";
+type LobbyCreateStage="request"|"authentication"|"rate_limit"|"payload_validation"|"game_lookup"|"lobby_insert"|"host_insert"|"invite_insert"|"rollback"|"complete";
 
 class LobbyCreateError extends Error{
   code:string;
-  constructor(code:string){
-    super("Lobby creation failed");
-    this.name="LobbyCreateError";
-    this.code=code;
-  }
+  constructor(code:string){super("Lobby creation failed");this.name="LobbyCreateError";this.code=code;}
 }
 
 function safeErrorCode(value:unknown,fallback:string){
@@ -51,22 +48,24 @@ export async function POST(request:Request){
     stage="game_lookup";
     const {data:game,error:gameError}=await admin.from("games").select("id").eq("id",body.gameId).maybeSingle();
     if(gameError)throw new LobbyCreateError(safeErrorCode(gameError,"game_lookup_failed"));
-    if(!game){
-      logLobbyCreate({authenticated:true,userId,stage,outcome:"blocked",code:"invalid_game"});
-      return noStoreJson({error:"Jogo inválido."},{status:400});
-    }
+    if(!game){logLobbyCreate({authenticated:true,userId,stage,outcome:"blocked",code:"invalid_game"});return noStoreJson({error:"Jogo inválido."},{status:400});}
     stage="lobby_insert";
     const {data:lobby,error}=await admin.from("lobbies").insert({owner_id:user.id,game_id:body.gameId,name:body.name,description:body.description,visibility:body.visibility,max_members:body.maxMembers,status:"open"}).select("id").single();
     if(error||!lobby)throw new LobbyCreateError(safeErrorCode(error,"lobby_create_failed"));
     stage="host_insert";
     const {error:memberError}=await admin.from("lobby_members").insert({lobby_id:lobby.id,user_id:user.id,role:"owner"});
     if(memberError){
-      const memberCode=safeErrorCode(memberError,"membership_create_failed");
-      stage="rollback";
-      const {error:rollbackError}=await admin.from("lobbies").delete().eq("id",lobby.id);
-      if(rollbackError)logLobbyCreate({authenticated:true,userId,stage,outcome:"failed",code:safeErrorCode(rollbackError,"rollback_failed")});
-      stage="host_insert";
-      throw new LobbyCreateError(memberCode);
+      const memberCode=safeErrorCode(memberError,"membership_create_failed");stage="rollback";
+      await admin.from("lobbies").delete().eq("id",lobby.id);stage="host_insert";throw new LobbyCreateError(memberCode);
+    }
+    if(body.visibility!=="public"){
+      stage="invite_insert";
+      const {error:inviteError}=await admin.from("lobby_invites").insert({lobby_id:lobby.id,token_hash:lobbyInviteHash(lobby.id),created_by:user.id,max_uses:100,expires_at:new Date(Date.now()+7*24*3600000).toISOString()});
+      if(inviteError){
+        stage="rollback";
+        await admin.from("lobbies").delete().eq("id",lobby.id);
+        throw new LobbyCreateError(safeErrorCode(inviteError,"invite_create_failed"));
+      }
     }
     stage="complete";
     logLobbyCreate({authenticated:true,userId,stage,outcome:"allowed",code:"created"});
