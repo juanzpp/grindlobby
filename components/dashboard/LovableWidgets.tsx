@@ -1,8 +1,9 @@
 "use client";
 
-import {useCallback,useEffect,useMemo,useRef,useState,type FormEvent} from "react";
+import {useCallback,useEffect,useMemo,useRef,useState,type CSSProperties,type FormEvent} from "react";
 import Image from "next/image";
 import {ProfileHoverTrigger,type HoverPlayerData} from "@/components/profile/HoverProfileCard";
+import {PROFILE_EFFECTS,PROFILE_FRAMES} from "@/lib/profile-cosmetics";
 import {getLiveKitMediaRttMs,subscribeActiveLiveKitRoom} from "@/lib/webrtc/useLobbyVoice";
 import {RoomEvent,type Room,type Participant} from "livekit-client";
 import {
@@ -30,8 +31,17 @@ function tierFor(level:number){return TIERS.find(t=>level>=t.from&&level<=t.to)?
 function gradient(tier:Tier){return `linear-gradient(90deg,${tier.color},${tier.glow})`}
 function initials(value:string){return value.trim().split(/\s+/).map(part=>part[0]).join("").slice(0,2).toUpperCase()||"GL"}
 
-export function ProfileAvatar({name,size=36,className="",avatarUrl}:{name:string;size?:number;className?:string;avatarUrl?:string|null}){
-  return <span className={`lovable-profile-avatar ${className}`} style={{width:size,height:size,padding:size>=60?4:3}}>{avatarUrl?<img src={avatarUrl} alt={name} className="h-full w-full rounded-full object-cover" referrerPolicy="no-referrer"/>:<span style={{fontSize:Math.max(10,size*.36)}}>{initials(name).slice(0,1)}</span>}</span>;
+export function ProfileAvatar({name,size=36,className="",avatarUrl,frameId="prism",effectId="none"}:{name:string;size?:number;className?:string;avatarUrl?:string|null;frameId?:string|null;effectId?:string|null}){
+  const frame=PROFILE_FRAMES.find(item=>item.id===(frameId||"prism"))??PROFILE_FRAMES[0];
+  const effect=PROFILE_EFFECTS.find(item=>item.id===(effectId||"none"))??PROFILE_EFFECTS[0];
+  return <span
+    className={`lovable-profile-avatar profile-avatar-shell profile-effect-${effect.variant} ${className}`}
+    style={{width:size,height:size,"--frame-ring":frame.ring,"--frame-glow":frame.glow,"--effect-glow":effect.glow} as CSSProperties}
+  >
+    <span className="profile-avatar-frame"/>
+    <span className="profile-avatar-core">{avatarUrl?<img src={avatarUrl} alt={name} className="h-full w-full object-cover" referrerPolicy="no-referrer"/>:<span style={{fontSize:Math.max(10,size*.36)}}>{initials(name).slice(0,1)}</span>}</span>
+    <span className="profile-avatar-spark profile-avatar-spark-a"/><span className="profile-avatar-spark profile-avatar-spark-b"/>
+  </span>;
 }
 
 type TickerItem={id:string;tone:"admin"|"event"|"drop"|"live";icon:typeof Crown;title:string;detail:string};
@@ -59,11 +69,11 @@ export function EventTicker({display,isAdmin,isPro,activeLobbies}:{display:strin
 export function TopElos({players,onAdd,onCall}:{players:HoverPlayerData[];onAdd?:(player:HoverPlayerData)=>void;onCall?:(player:HoverPlayerData)=>void}){
   if(!players.length)return <section className="lovable-panel px-5 py-4"><div className="flex items-center justify-between gap-3"><p className="lovable-label flex items-center gap-2"><Crown size={16} className="text-warning"/>Top players do servidor</p><span className="flex items-center gap-1.5 text-xs text-muted-foreground"><TrendingUp size={14} className="text-success"/>ranking atual</span></div><div className="mt-4 rounded-xl border border-dashed border-border bg-panel/40 px-4 py-5 text-center text-sm text-muted-foreground">Ainda não há jogadores com histórico competitivo suficiente para entrar no Top Players.</div></section>;
   return <section className="lovable-panel px-5 py-4"><div className="flex items-center justify-between gap-3"><p className="lovable-label flex items-center gap-2"><Crown size={16} className="text-warning"/>Top players do servidor</p><span className="flex items-center gap-1.5 text-xs text-muted-foreground"><TrendingUp size={14} className="text-success"/>ranking atual</span></div>
-    <ol className="lovable-elo-list mt-3 flex gap-3 overflow-x-auto pb-1 pt-1">{players.map((person,index)=>{const tier=tierFor(person.level);return <li key={person.id} className="shrink-0"><ProfileHoverTrigger player={person} onAdd={onAdd?()=>onAdd(person):undefined} onCall={onCall?()=>onCall(person):undefined}><div className="lovable-elo-card" style={{boxShadow:`0 9px 24px color-mix(in oklch, ${tier.glow} 15%, transparent)`}}><span className="font-display text-sm font-bold text-muted-foreground">#{index+1}</span><ProfileAvatar name={person.name} avatarUrl={person.avatar} size={34}/><div className="min-w-0"><p className="truncate text-sm font-semibold">{person.name}</p><p className="mt-0.5 flex items-center gap-1.5 text-[11px]"><span className="h-2 w-2 rounded-full" style={{background:tier.color,boxShadow:`0 0 8px ${tier.glow}`}}/><span className="max-w-[82px] truncate text-muted-foreground">{person.rankName}</span><span className="rounded px-1.5 font-display font-bold text-background" style={{backgroundImage:gradient(tier)}}>{person.level}</span></p></div></div></ProfileHoverTrigger></li>})}</ol>
+    <ol className="lovable-elo-list mt-3 flex gap-3 overflow-x-auto pb-1 pt-1">{players.map((person,index)=>{const tier=tierFor(person.level);return <li key={person.id} className="shrink-0"><ProfileHoverTrigger player={person} onAdd={onAdd?()=>onAdd(person):undefined} onCall={onCall?()=>onCall(person):undefined}><div className="lovable-elo-card" style={{boxShadow:`0 9px 24px color-mix(in oklch, ${tier.glow} 15%, transparent)`}}><span className="font-display text-sm font-bold text-muted-foreground">#{index+1}</span><ProfileAvatar name={person.name} avatarUrl={person.avatar} frameId={person.frame} effectId={person.effect} size={34}/><div className="min-w-0"><p className="truncate text-sm font-semibold">{person.name}</p><p className="mt-0.5 flex items-center gap-1.5 text-[11px]"><span className="h-2 w-2 rounded-full" style={{background:tier.color,boxShadow:`0 0 8px ${tier.glow}`}}/><span className="max-w-[82px] truncate text-muted-foreground">{person.rankName}</span><span className="rounded px-1.5 font-display font-bold text-background" style={{backgroundImage:gradient(tier)}}>{person.level}</span></p></div></div></ProfileHoverTrigger></li>})}</ol>
   </section>;
 }
 
-export function LevelHero({display,username,level,xp,game,onSelectGame,games,onOpenProfile,avatarUrl}:{display:string;username:string;level:number;xp:number;game:HomeGame;games:HomeGame[];onSelectGame:(id:number)=>void;onOpenProfile:()=>void;avatarUrl?:string|null}){
+export function LevelHero({display,username,level,xp,game,onSelectGame,games,onOpenProfile,avatarUrl,frameId,effectId,badgeLabel}:{display:string;username:string;level:number;xp:number;game:HomeGame;games:HomeGame[];onSelectGame:(id:number)=>void;onOpenProfile:()=>void;avatarUrl?:string|null;frameId?:string|null;effectId?:string|null;badgeLabel?:string|null}){
   const tier=tierFor(level);const need=400+level*220;const within=xp%need;const pct=Math.min(100,Math.round(within/need*100));const nextTier=TIERS.find(item=>item.from>level);
   return <section className="lovable-panel lovable-level-hero relative overflow-hidden px-5 py-6"><div className="grid items-center gap-6 lg:grid-cols-[auto_1fr_auto]">
     <div className="relative mx-auto"><span className="absolute inset-0 rounded-full blur-2xl" style={{background:tier.color,opacity:.35}}/><Image src="/brand/ascent-portal.png" alt="Emblema GrindLobby" width={512} height={512} priority className="relative h-40 w-40 object-contain" style={{filter:`drop-shadow(0 0 34px ${tier.glow})`}}/></div>
@@ -72,7 +82,7 @@ export function LevelHero({display,username,level,xp,game,onSelectGame,games,onO
       <div className="mt-4 flex flex-wrap gap-2"><button onClick={onOpenProfile} className="lovable-btn-primary flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold"><Trophy size={14}/>Ver meu rank</button><button onClick={onOpenProfile} className="lovable-btn-ghost rounded-lg px-3 py-2 text-xs font-medium">Configurar perfil</button></div>
       <div className="mt-4 flex flex-wrap gap-1.5">{TIERS.map(item=><span key={item.name} title={`${item.name} — level ${item.from}-${item.to}`} className="h-1.5 w-10 rounded-full" style={{backgroundImage:gradient(item),opacity:level>=item.from?1:.25}}/>)}</div>
     </div>
-    <div className="flex flex-col items-center gap-3 lg:border-l lg:border-border lg:pl-6"><ProfileAvatar name={display} avatarUrl={avatarUrl} size={78}/><div className="text-center"><p className="font-display text-lg font-bold">{display}</p><p className="text-xs text-muted-foreground">@{username}</p><p className="mt-2 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">{game.rank} <Info size={14}/></p></div></div>
+    <div className="flex flex-col items-center gap-3 lg:border-l lg:border-border lg:pl-6"><ProfileAvatar name={display} avatarUrl={avatarUrl} frameId={frameId} effectId={effectId} size={78}/><div className="text-center"><p className="font-display text-lg font-bold">{display}{badgeLabel&&badgeLabel!=="none"?<span className="ml-2 rounded-md border border-warning/30 bg-warning/10 px-1.5 py-0.5 align-middle text-[9px] font-bold uppercase text-warning">{badgeLabel}</span>:null}</p><p className="text-xs text-muted-foreground">@{username}</p><p className="mt-2 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">{game.rank} <Info size={14}/></p></div></div>
   </div></section>;
 }
 
