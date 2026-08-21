@@ -1,5 +1,5 @@
 import {describe,expect,it} from "vitest";
-import {createLobbyInviteToken,lobbyInviteHash} from "@/lib/lobby-invites";
+import {createLobbyInviteToken,lobbyInviteHash} from "../lib/lobby-invites";
 
 describe("lobby invite tokens",()=>{
   it("generates URL-safe high-entropy tokens",()=>{
