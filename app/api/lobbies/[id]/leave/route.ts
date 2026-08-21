@@ -4,16 +4,9 @@ import {createAdminClient} from "@/lib/supabase/admin";
 import {assertTrustedMutation,InvalidRequestError,noStoreJson} from "@/lib/security/request";
 import {enforceRateLimit,RateLimitExceededError,RateLimitUnavailableError,rateLimitResponse} from "@/lib/security/rate-limit";
 import {logSecurityEvent} from "@/lib/security/logging";
+import {isExplicitLobbyLeave} from "@/lib/lobby-leave";
 
 const idSchema=z.string().uuid();
-
-function looksLikePageExitBeacon(request:Request){
-  const url=new URL(request.url);
-  if(url.searchParams.get("intent")==="explicit")return false;
-  const fetchMode=request.headers.get("sec-fetch-mode")?.toLowerCase();
-  const contentType=request.headers.get("content-type")?.toLowerCase()??"";
-  return fetchMode==="no-cors"||contentType.startsWith("application/json");
-}
 
 export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){
   try{
@@ -27,7 +20,7 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
     // reconnect window decide when the membership becomes inactive. This keeps a
     // host from destroying the lobby on a simple refresh. Future decoupled clients
     // can force an explicit JSON leave with `?intent=explicit`.
-    if(looksLikePageExitBeacon(request)){
+    if(!isExplicitLobbyLeave(request)){
       return noStoreJson({ok:true,closed:false,deferred:true});
     }
 
