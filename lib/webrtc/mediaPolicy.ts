@@ -19,7 +19,3 @@ export function bitrateKbpsFromDelta(currentBytes:number,previousBytes:number|nu
   if(previousBytes==null||!Number.isFinite(currentBytes)||!Number.isFinite(previousBytes)||!Number.isFinite(elapsedMs)||elapsedMs<=0||currentBytes<previousBytes)return null;
   return Math.round(((currentBytes-previousBytes)*8)/elapsedMs);
 }
-
-export function shouldUseScreenSimulcast(height:number,fps:number){
-  return height>=1080||fps>30;
-}
