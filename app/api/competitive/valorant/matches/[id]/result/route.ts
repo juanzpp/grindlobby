@@ -1,3 +1,28 @@
-import {z} from 'zod';import {getCurrentUser} from '@/lib/auth';import {createAdminClient} from '@/lib/supabase/admin';import {assertTrustedMutation,noStoreJson,readJsonBody} from '@/lib/security/request';
-const schema=z.object({scoreA:z.number().int().min(0).max(99),scoreB:z.number().int().min(0).max(99)}).refine(v=>v.scoreA!==v.scoreB,{message:'Empate não é permitido.'});
-export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){try{assertTrustedMutation(request);const user=await getCurrentUser();if(!user)return noStoreJson({error:'Não autorizado.'},{status:401});const {id}=await params,body=schema.parse(await readJsonBody(request));const admin=createAdminClient();const {data:match}=await admin.from('valorant_matches').select('id,state,squad_a_id,squad_b_id').eq('id',id).maybeSingle();if(!match||!['LOBBY_READY','PLAYING','RESULT_PENDING','DISPUTED'].includes(match.state))return noStoreJson({error:'Resultado não pode ser enviado neste estado.'},{status:409});const {data:squads}=await admin.from('valorant_squads').select('id,captain_id').in('id',[match.squad_a_id,match.squad_b_id]);const mySquad=(squads??[]).find(s=>s.captain_id===user.id);if(!mySquad)return noStoreJson({error:'Somente capitães podem enviar resultado.'},{status:403});await admin.from('valorant_result_submissions').upsert({match_id:id,captain_id:user.id,squad_id:mySquad.id,score_a:body.scoreA,score_b:body.scoreB,submitted_at:new Date().toISOString()},{onConflict:'match_id,captain_id'});const {data:submissions}=await admin.from('valorant_result_submissions').select('captain_id,score_a,score_b').eq('match_id',id).order('submitted_at');if((submissions??[]).length<2){await admin.from('valorant_matches').update({state:'RESULT_PENDING',updated_at:new Date().toISOString()}).eq('id',id);return noStoreJson({state:'RESULT_PENDING',waitingForOpponent:true});}const same=submissions?.[0]?.score_a===submissions?.[1]?.score_a&&submissions?.[0]?.score_b===submissions?.[1]?.score_b;if(!same){await admin.from('valorant_matches').update({state:'DISPUTED',updated_at:new Date().toISOString()}).eq('id',id);return noStoreJson({state:'DISPUTED'});}const {data:finalized,error}=await admin.rpc('finalize_valorant_match',{p_match_id:id});if(error)throw error;return noStoreJson({state:finalized?'FINISHED':'RESULT_PENDING'});}catch(error){if(error instanceof z.ZodError)return noStoreJson({error:error.issues[0]?.message||'Resultado inválido.'},{status:400});return noStoreJson({error:'Não foi possível registrar o resultado.'},{status:500});}}
+import {z} from 'zod';
+import {getCurrentUser} from '@/lib/auth';
+import {createAdminClient} from '@/lib/supabase/admin';
+import {assertTrustedMutation,InvalidRequestError,noStoreJson,readJsonBody} from '@/lib/security/request';
+import {enforceRateLimit,RateLimitExceededError,RateLimitUnavailableError,rateLimitResponse} from '@/lib/security/rate-limit';
+
+const schema=z.object({scoreA:z.number().int().min(0).max(99),scoreB:z.number().int().min(0).max(99)}).strict().refine(v=>v.scoreA!==v.scoreB,{message:'Empate não é permitido.'});
+export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){
+  try{
+    assertTrustedMutation(request);
+    const user=await getCurrentUser();if(!user)return noStoreJson({error:'Não autorizado.'},{status:401});
+    await enforceRateLimit(request,{scope:'valorant-result',limit:20,windowSeconds:300,subject:user.id});
+    const {id}=await params,body=schema.parse(await readJsonBody(request)),admin=createAdminClient();
+    const {data,error}=await admin.rpc('submit_valorant_result_atomic',{p_match_id:id,p_captain_id:user.id,p_score_a:body.scoreA,p_score_b:body.scoreB});
+    if(error)throw error;
+    const result=data as {result?:string;state?:string;waitingForOpponent?:boolean}|null;
+    if(result?.result==='not_found')return noStoreJson({error:'Partida não encontrada.'},{status:404});
+    if(result?.result==='forbidden')return noStoreJson({error:'Somente capitães podem enviar resultado.'},{status:403});
+    if(result?.result==='invalid_score')return noStoreJson({error:'Resultado inválido.'},{status:400});
+    if(result?.result==='invalid_state')return noStoreJson({error:'Resultado não pode ser enviado neste estado.',state:result.state},{status:409});
+    if(result?.result!=='ok')throw new Error('unexpected_result_submission');
+    return noStoreJson({state:result.state,waitingForOpponent:Boolean(result.waitingForOpponent)});
+  }catch(error){
+    if(error instanceof RateLimitExceededError||error instanceof RateLimitUnavailableError)return rateLimitResponse(error);
+    if(error instanceof z.ZodError||error instanceof InvalidRequestError)return noStoreJson({error:error instanceof z.ZodError?(error.issues[0]?.message||'Resultado inválido.'):error.message},{status:400});
+    return noStoreJson({error:'Não foi possível registrar o resultado.'},{status:500});
+  }
+}

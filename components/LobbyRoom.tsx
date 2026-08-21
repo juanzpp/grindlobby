@@ -12,6 +12,7 @@ import GrindLoading from "@/components/feedback/GrindLoading";
 import ScreenShare from "@/components/stream/ScreenShare";
 import LobbyChat from "@/components/lobby/LobbyChat";
 import {setLiveKitMicrophoneGain,setLiveKitMicrophoneMuted,useLobbyVoice} from "@/lib/webrtc/useLobbyVoice";
+import {useVoiceTelemetry} from "@/lib/webrtc/useVoiceTelemetry";
 import {loadAudioPreferences,playAudioEvent} from "@/lib/audio";
 import {getGameLobbyTheme} from "@/lib/lobby-game-theme";
 
@@ -50,6 +51,7 @@ export default function LobbyRoom({id,user}:{id:string;user:LobbyUser}){
     membershipId:null,
   }))??[];
   const {remotePeers,voiceMembers,setPeerVolume,togglePeerMuted,notifyVoiceLeave}=useLobbyVoice(id,user.id,voiceLobbyMembers,localStream);
+  useVoiceTelemetry(id,Boolean(lobby?.isMember));
   const roomConnected=useRef(false);
   const roomExitAnnounced=useRef(false);
 
@@ -108,8 +110,18 @@ export default function LobbyRoom({id,user}:{id:string;user:LobbyUser}){
     else setError("Não foi possível sair.");
   }
   async function copy(){
-    try{await navigator.clipboard.writeText(location.href);setCopied(true);window.setTimeout(()=>setCopied(false),1500)}
-    catch{setError("Não foi possível copiar o convite.")}
+    if(!lobby)return;
+    try{
+      let inviteUrl=location.href;
+      if(lobby.visibility!=="public"){
+        if(lobby.owner_id!==user.id){setError("Apenas o host pode criar convites para este lobby privado.");return}
+        const response=await fetch(`/api/lobbies/${id}/invites`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({maxUses:25,hours:24})});
+        const body=await response.json();
+        if(!response.ok||!body.path)throw new Error(body.error||"Não foi possível criar o convite.");
+        inviteUrl=`${location.origin}${body.path}`;
+      }
+      await navigator.clipboard.writeText(inviteUrl);setCopied(true);setError("");window.setTimeout(()=>setCopied(false),1500);
+    }catch(cause){setError(cause instanceof Error?cause.message:"Não foi possível copiar o convite.")}
   }
 
   if(loading)return <main className="room-shell lovable-surface lovable-room"><GrindLoading variant="fullscreen" label="Entrando no lobby…"/></main>;
