@@ -7,7 +7,7 @@
     "build": "next build",
     "lint": "next lint",
     "test": "vitest run",
-    "start": "next start"
+    "start": "node scripts/verify-schema.mjs && next start"
   },
   "dependencies": {
     "@supabase/ssr": "^0.7.0",
