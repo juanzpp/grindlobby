@@ -1,14 +1,25 @@
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
 import { isConfiguredAdmin } from "@/lib/admin-config";
-import { DEFAULT_PROFILE_BADGE, DEFAULT_PROFILE_BANNER, DEFAULT_PROFILE_CARD_STYLE, DEFAULT_PROFILE_EFFECT, DEFAULT_PROFILE_FRAME } from "@/lib/profile-cosmetics";
-import { normalizeCosmeticState } from "@/lib/cosmetic-state";
+import {
+  DEFAULT_PROFILE_BADGE,
+  DEFAULT_PROFILE_BANNER,
+  DEFAULT_PROFILE_CARD_STYLE,
+  DEFAULT_PROFILE_EFFECT,
+  DEFAULT_PROFILE_FRAME,
+  PROFILE_BADGES,
+  PROFILE_BANNERS,
+  PROFILE_CARD_STYLES,
+  PROFILE_EFFECTS,
+  PROFILE_FRAMES,
+} from "@/lib/profile-cosmetics";
+import { normalizeCosmeticState, type CosmeticState } from "@/lib/cosmetic-state";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { assertTrustedMutation, noStoreJson, readJsonBody } from "@/lib/security/request";
 import { enforceRateLimit, RateLimitExceededError, RateLimitUnavailableError, rateLimitResponse } from "@/lib/security/rate-limit";
 
 const cosmeticEquippedSchema = z.object({
-  banner: z.string().trim().max(80).default(DEFAULT_PROFILE_BANNER),
+  banner: z.string().trim().max(800).default(DEFAULT_PROFILE_BANNER),
   frame: z.string().trim().max(80).default(DEFAULT_PROFILE_FRAME),
   effect: z.string().trim().max(80).default(DEFAULT_PROFILE_EFFECT),
   badge: z.string().trim().max(80).default(DEFAULT_PROFILE_BADGE),
@@ -48,6 +59,49 @@ const profileSchema = z.object({
   equippedCosmetics: cosmeticEquippedSchema.optional(),
 }).strict();
 
+const validIds = {
+  banner: new Set(PROFILE_BANNERS.map((item) => item.id)),
+  frame: new Set(PROFILE_FRAMES.map((item) => item.id)),
+  effect: new Set(PROFILE_EFFECTS.map((item) => item.id)),
+  badge: new Set(PROFILE_BADGES.map((item) => item.id)),
+  cardStyle: new Set(PROFILE_CARD_STYLES.map((item) => item.id)),
+};
+
+function enforceOwnedSelections(state: CosmeticState, isAdmin: boolean): CosmeticState {
+  if (isAdmin) return state;
+  const owned = new Set(state.owned);
+  const canUse = (kind: keyof typeof validIds, id: string, fallback: string) =>
+    id === fallback || (validIds[kind].has(id) && owned.has(id)) ? id : fallback;
+
+  return {
+    owned: state.owned,
+    equipped: {
+      ...state.equipped,
+      banner: canUse("banner", state.equipped.banner, DEFAULT_PROFILE_BANNER),
+      frame: canUse("frame", state.equipped.frame, DEFAULT_PROFILE_FRAME),
+      effect: canUse("effect", state.equipped.effect, DEFAULT_PROFILE_EFFECT),
+      badge: canUse("badge", state.equipped.badge, DEFAULT_PROFILE_BADGE),
+      cardStyle: canUse("cardStyle", state.equipped.cardStyle, DEFAULT_PROFILE_CARD_STYLE),
+      bundle: state.equipped.bundle && owned.has(state.equipped.bundle) ? state.equipped.bundle : "",
+    },
+  };
+}
+
+function buildCosmeticState(profile: any, isAdmin: boolean) {
+  const equippedInput = {
+    banner: typeof profile?.cosmetic_equipped?.banner === "string" ? profile.cosmetic_equipped.banner : DEFAULT_PROFILE_BANNER,
+    frame: typeof profile?.cosmetic_equipped?.frame === "string" ? profile.cosmetic_equipped.frame : DEFAULT_PROFILE_FRAME,
+    effect: typeof profile?.cosmetic_equipped?.effect === "string" ? profile.cosmetic_equipped.effect : DEFAULT_PROFILE_EFFECT,
+    badge: typeof profile?.cosmetic_equipped?.badge === "string" ? profile.cosmetic_equipped.badge : DEFAULT_PROFILE_BADGE,
+    cardStyle: typeof profile?.cosmetic_equipped?.cardStyle === "string" ? profile.cosmetic_equipped.cardStyle : DEFAULT_PROFILE_CARD_STYLE,
+    bundle: typeof profile?.cosmetic_equipped?.bundle === "string" ? profile.cosmetic_equipped.bundle : "",
+  };
+  return enforceOwnedSelections(normalizeCosmeticState({
+    owned: Array.isArray(profile?.cosmetic_owned) ? profile.cosmetic_owned as string[] : [],
+    equipped: equippedInput,
+  }, isAdmin), isAdmin);
+}
+
 export async function GET(request: Request) {
   try {
     const user = await getCurrentUser();
@@ -62,21 +116,8 @@ export async function GET(request: Request) {
       .eq("id", user.id)
       .maybeSingle();
 
-    if (error) { return noStoreJson({ error: "Não foi possível carregar o perfil." }, { status: 500 }); }
-
-    const equippedInput = {
-      banner: typeof profile?.cosmetic_equipped?.banner === "string" ? profile.cosmetic_equipped.banner : DEFAULT_PROFILE_BANNER,
-      frame: typeof profile?.cosmetic_equipped?.frame === "string" ? profile.cosmetic_equipped.frame : DEFAULT_PROFILE_FRAME,
-      effect: typeof profile?.cosmetic_equipped?.effect === "string" ? profile.cosmetic_equipped.effect : DEFAULT_PROFILE_EFFECT,
-      badge: typeof profile?.cosmetic_equipped?.badge === "string" ? profile.cosmetic_equipped.badge : DEFAULT_PROFILE_BADGE,
-      cardStyle: typeof profile?.cosmetic_equipped?.cardStyle === "string" ? profile.cosmetic_equipped.cardStyle : DEFAULT_PROFILE_CARD_STYLE,
-      bundle: typeof profile?.cosmetic_equipped?.bundle === "string" ? profile.cosmetic_equipped.bundle : "",
-    };
-
-    const cosmeticState = normalizeCosmeticState({
-      owned: Array.isArray(profile?.cosmetic_owned) ? profile.cosmetic_owned as string[] : [],
-      equipped: equippedInput,
-    }, isAdmin);
+    if (error) return noStoreJson({ error: "Não foi possível carregar o perfil." }, { status: 500 });
+    const cosmeticState = buildCosmeticState(profile, isAdmin);
 
     return noStoreJson({
       profile: {
@@ -92,10 +133,10 @@ export async function GET(request: Request) {
         social_instagram: profile?.social_instagram ?? "",
         social_twitch: profile?.social_twitch ?? "",
         profile_banner: profile?.profile_banner ?? "",
-        avatar_frame: profile?.avatar_frame ?? DEFAULT_PROFILE_FRAME,
-        profile_effect: profile?.profile_effect ?? DEFAULT_PROFILE_EFFECT,
-        profile_badge: profile?.profile_badge ?? DEFAULT_PROFILE_BADGE,
-        profile_card_style: profile?.profile_card_style ?? DEFAULT_PROFILE_CARD_STYLE,
+        avatar_frame: cosmeticState.equipped.frame,
+        profile_effect: cosmeticState.equipped.effect,
+        profile_badge: cosmeticState.equipped.badge,
+        profile_card_style: cosmeticState.equipped.cardStyle,
         cosmetic_owned: cosmeticState.owned,
         cosmetic_equipped: cosmeticState.equipped,
         cosmetic_state: cosmeticState,
@@ -119,18 +160,31 @@ export async function PATCH(request: Request) {
     const body = profileSchema.parse(await readJsonBody(request, 16384));
     const admin = createAdminClient();
     const isAdmin = isConfiguredAdmin(user.id);
+
+    const { data: persistedProfile, error: persistedError } = await admin
+      .from("profiles")
+      .select("cosmetic_owned,cosmetic_equipped")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (persistedError) return noStoreJson({ error: "Não foi possível validar seus cosméticos." }, { status: 500 });
+
+    const persistedOwned = Array.isArray(persistedProfile?.cosmetic_owned) ? persistedProfile.cosmetic_owned as string[] : [];
+    const requestedEquipped = body.cosmetics?.equipped ?? body.equippedCosmetics ?? {};
     const equippedInput = {
-      banner: typeof body.cosmetics?.equipped?.banner === "string" ? body.cosmetics.equipped.banner : (typeof body.equippedCosmetics?.banner === "string" ? body.equippedCosmetics.banner : DEFAULT_PROFILE_BANNER),
-      frame: typeof body.cosmetics?.equipped?.frame === "string" ? body.cosmetics.equipped.frame : (typeof body.equippedCosmetics?.frame === "string" ? body.equippedCosmetics.frame : DEFAULT_PROFILE_FRAME),
-      effect: typeof body.cosmetics?.equipped?.effect === "string" ? body.cosmetics.equipped.effect : (typeof body.equippedCosmetics?.effect === "string" ? body.equippedCosmetics.effect : DEFAULT_PROFILE_EFFECT),
-      badge: typeof body.cosmetics?.equipped?.badge === "string" ? body.cosmetics.equipped.badge : (typeof body.equippedCosmetics?.badge === "string" ? body.equippedCosmetics.badge : DEFAULT_PROFILE_BADGE),
-      cardStyle: typeof body.cosmetics?.equipped?.cardStyle === "string" ? body.cosmetics.equipped.cardStyle : (typeof body.equippedCosmetics?.cardStyle === "string" ? body.equippedCosmetics.cardStyle : DEFAULT_PROFILE_CARD_STYLE),
-      bundle: typeof body.cosmetics?.equipped?.bundle === "string" ? body.cosmetics.equipped.bundle : (typeof body.equippedCosmetics?.bundle === "string" ? body.equippedCosmetics.bundle : ""),
+      banner: requestedEquipped.banner ?? DEFAULT_PROFILE_BANNER,
+      frame: requestedEquipped.frame ?? body.avatarFrame ?? DEFAULT_PROFILE_FRAME,
+      effect: requestedEquipped.effect ?? body.profileEffect ?? DEFAULT_PROFILE_EFFECT,
+      badge: requestedEquipped.badge ?? body.profileBadge ?? DEFAULT_PROFILE_BADGE,
+      cardStyle: requestedEquipped.cardStyle ?? body.profileCardStyle ?? DEFAULT_PROFILE_CARD_STYLE,
+      bundle: requestedEquipped.bundle ?? "",
     };
-    const cosmeticState = normalizeCosmeticState({
-      owned: body.cosmetics?.owned ?? body.ownedCosmetics ?? [],
+
+    // Ownership is authoritative on the server. The client may choose among
+    // owned items, but it cannot grant itself cosmetics by PATCHing owned[].
+    const cosmeticState = enforceOwnedSelections(normalizeCosmeticState({
+      owned: persistedOwned,
       equipped: equippedInput,
-    }, isAdmin);
+    }, isAdmin), isAdmin);
 
     const payload = {
       username: body.username,
@@ -143,10 +197,10 @@ export async function PATCH(request: Request) {
       social_twitch: body.socialTwitch,
       avatar: body.avatarUrl || null,
       profile_banner: body.bannerUrl || null,
-      avatar_frame: body.avatarFrame || cosmeticState.equipped.frame,
-      profile_effect: body.profileEffect || cosmeticState.equipped.effect,
-      profile_badge: body.profileBadge || cosmeticState.equipped.badge,
-      profile_card_style: body.profileCardStyle || cosmeticState.equipped.cardStyle,
+      avatar_frame: cosmeticState.equipped.frame,
+      profile_effect: cosmeticState.equipped.effect,
+      profile_badge: cosmeticState.equipped.badge,
+      profile_card_style: cosmeticState.equipped.cardStyle,
       cosmetic_owned: cosmeticState.owned,
       cosmetic_equipped: cosmeticState.equipped,
       updated_at: new Date().toISOString(),
