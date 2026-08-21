@@ -1,2 +1,10 @@
-import {getCurrentUser} from "@/lib/auth";import {getScreenSharePolicy} from "@/lib/livekit-screen-policy";import {noStoreJson} from "@/lib/security/request";
-export async function GET(){const user=await getCurrentUser();if(!user)return noStoreJson({error:"Não autorizado."},{status:401});const pro=user.account_tier==="pro"||user.app_role==="admin",screenShare=getScreenSharePolicy(pro);return noStoreJson({screenShare:{...screenShare,allowed:true,reason:null},store:{premiumAccess:pro,allTestItems:user.app_role==="admin",purchasesAllowed:pro}})}
+import {getCurrentUser} from '@/lib/auth'
+import {getAccountCapabilities} from '@/lib/account-capabilities'
+import {noStoreJson} from '@/lib/security/request'
+
+export async function GET(){
+  const user=await getCurrentUser()
+  if(!user)return noStoreJson({error:'Não autorizado.'},{status:401})
+  const {screenShare,store}=getAccountCapabilities(user)
+  return noStoreJson({screenShare,store})
+}

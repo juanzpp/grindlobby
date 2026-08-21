@@ -1,6 +1,6 @@
 import {z} from "zod";
 import {AccessToken,TokenVerifier,TrackSource} from "livekit-server-sdk";
-import {createClient} from "@/lib/supabase/server";
+import {getCurrentUser} from "@/lib/auth";
 import {createAdminClient} from "@/lib/supabase/admin";
 import {assertTrustedMutation,InvalidRequestError,noStoreJson} from "@/lib/security/request";
 import {enforceRateLimit,RateLimitExceededError,RateLimitUnavailableError,rateLimitResponse} from "@/lib/security/rate-limit";
@@ -24,8 +24,7 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
   try{
     assertTrustedMutation(request);
     const id=idSchema.parse((await params).id);
-    const supabase=await createClient();
-    const {data:{user}}=await supabase.auth.getUser();
+    const user=await getCurrentUser(request);
     if(!user)return noStoreJson({error:"Não autorizado."},{status:401});
     actorId=user.id;
 
@@ -72,7 +71,6 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
     });
     const jwt=await accessToken.toJwt();
 
-    // Validate the exact token locally before it leaves the trusted server boundary.
     const verified=await new TokenVerifier(apiKey,apiSecret).verify(jwt);
     if(
       verified.sub!==user.id

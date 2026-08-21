@@ -1,5 +1,5 @@
 import {z} from "zod";
-import {createClient} from "@/lib/supabase/server";
+import {getCurrentUser} from "@/lib/auth";
 import {createAdminClient} from "@/lib/supabase/admin";
 import {assertTrustedMutation,InvalidRequestError,noStoreJson} from "@/lib/security/request";
 import {enforceRateLimit,RateLimitExceededError,RateLimitUnavailableError,rateLimitResponse} from "@/lib/security/rate-limit";
@@ -11,7 +11,7 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
   let actorId:string|null=null;
   try{
     assertTrustedMutation(request);
-    const id=idSchema.parse((await params).id),supabase=await createClient(),{data:{user}}=await supabase.auth.getUser();
+    const id=idSchema.parse((await params).id),user=await getCurrentUser(request);
     if(!user)return noStoreJson({error:"Não autorizado."},{status:401});
     actorId=user.id;
     await enforceRateLimit(request,{scope:"join-lobby",limit:20,windowSeconds:300,subject:user.id});

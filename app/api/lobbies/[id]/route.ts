@@ -1,5 +1,5 @@
 import {z} from "zod";
-import {createClient} from "@/lib/supabase/server";
+import {getCurrentUser} from "@/lib/auth";
 import {createAdminClient} from "@/lib/supabase/admin";
 import {noStoreJson} from "@/lib/security/request";
 import {enforceRateLimit,RateLimitExceededError,RateLimitUnavailableError,rateLimitResponse} from "@/lib/security/rate-limit";
@@ -8,7 +8,7 @@ const idSchema=z.string().uuid();
 
 export async function GET(request:Request,{params}:{params:Promise<{id:string}>}){
   try{
-    const id=idSchema.parse((await params).id),supabase=await createClient(),{data:{user}}=await supabase.auth.getUser();
+    const id=idSchema.parse((await params).id),user=await getCurrentUser(request);
     if(!user)return noStoreJson({error:"Não autorizado."},{status:401});
     await enforceRateLimit(request,{scope:"read-lobby",limit:180,windowSeconds:60,subject:user.id});
     const admin=createAdminClient();
