@@ -1,8 +1,14 @@
+import {isAllowedFrontendOrigin} from '@/lib/api/cors'
+
 export class InvalidRequestError extends Error {
   constructor(message="Requisição inválida."){
     super(message);
     this.name="InvalidRequestError";
   }
+}
+
+function hasBearerAuthorization(request:Request){
+  return /^Bearer\s+\S+$/i.test(request.headers.get('authorization')?.trim()??'')
 }
 
 export function assertTrustedMutation(request:Request){
@@ -17,6 +23,10 @@ export function assertTrustedMutation(request:Request){
     // Metadata remains browser-controlled and confirms the public request was
     // initiated from the same origin without trusting forwarded host headers.
     if(fetchSite==="same-origin")return;
+    // Decoupled frontend requests are allowed only from an explicit frontend
+    // allowlist and only when they carry bearer authentication. Route handlers
+    // still verify that token server-side before applying the mutation.
+    if(isAllowedFrontendOrigin(origin)&&hasBearerAuthorization(request))return;
     throw new InvalidRequestError();
   }
   if(fetchSite!=="same-origin")throw new InvalidRequestError();
