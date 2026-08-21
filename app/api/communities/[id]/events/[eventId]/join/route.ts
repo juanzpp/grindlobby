@@ -6,7 +6,7 @@ import {enforceRateLimit,RateLimitExceededError,RateLimitUnavailableError,rateLi
 export async function POST(request:Request,{params}:{params:Promise<{id:string;eventId:string}>}){
   try{
     assertTrustedMutation(request);
-    const user=await getCurrentUser();if(!user)return noStoreJson({error:'Não autorizado.'},{status:401});
+    const user=await getCurrentUser(request);if(!user)return noStoreJson({error:'Não autorizado.'},{status:401});
     await enforceRateLimit(request,{scope:'community-event-join',limit:30,windowSeconds:300,subject:user.id});
     const {id,eventId}=await params,admin=createAdminClient();
     const {data,error}=await admin.rpc('join_community_event_atomic',{p_event_id:eventId,p_community_id:id,p_user_id:user.id});
