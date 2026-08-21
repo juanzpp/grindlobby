@@ -169,7 +169,7 @@ export async function PATCH(request: Request) {
     if (persistedError) return noStoreJson({ error: "Não foi possível validar seus cosméticos." }, { status: 500 });
 
     const persistedOwned = Array.isArray(persistedProfile?.cosmetic_owned) ? persistedProfile.cosmetic_owned as string[] : [];
-    const requestedEquipped = body.cosmetics?.equipped ?? body.equippedCosmetics ?? {};
+    const requestedEquipped: Partial<CosmeticState["equipped"]> = body.cosmetics?.equipped ?? body.equippedCosmetics ?? {};
     const equippedInput = {
       banner: requestedEquipped.banner ?? DEFAULT_PROFILE_BANNER,
       frame: requestedEquipped.frame ?? body.avatarFrame ?? DEFAULT_PROFILE_FRAME,
