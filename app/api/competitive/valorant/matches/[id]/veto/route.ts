@@ -2,21 +2,41 @@ import {z} from 'zod';
 import {getCurrentUser} from '@/lib/auth';
 import {createAdminClient} from '@/lib/supabase/admin';
 import {ensureValorantTeamRooms} from '@/lib/competitive/rooms';
-import {assertTrustedMutation,noStoreJson,readJsonBody} from '@/lib/security/request';
+import {advanceExpiredValorantVeto} from '@/lib/competitive/veto';
+import {assertTrustedMutation,InvalidRequestError,noStoreJson,readJsonBody} from '@/lib/security/request';
+import {enforceRateLimit,RateLimitExceededError,RateLimitUnavailableError,rateLimitResponse} from '@/lib/security/rate-limit';
 
-const schema=z.object({mapSlug:z.string().trim().min(2).max(40)});
+const schema=z.object({mapSlug:z.string().trim().min(2).max(40)}).strict();
 export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){
   try{
-    assertTrustedMutation(request);const user=await getCurrentUser();if(!user)return noStoreJson({error:'Não autorizado.'},{status:401});
-    const {id}=await params,body=schema.parse(await readJsonBody(request));const admin=createAdminClient();
-    const {data:match}=await admin.from('valorant_matches').select('id,state,squad_a_id,squad_b_id,veto_deadline').eq('id',id).maybeSingle();if(!match||match.state!=='VETO')return noStoreJson({error:'O veto não está ativo.'},{status:409});
-    const {data:squads}=await admin.from('valorant_squads').select('id,captain_id').in('id',[match.squad_a_id,match.squad_b_id]);const squadA=(squads??[]).find(s=>s.id===match.squad_a_id),squadB=(squads??[]).find(s=>s.id===match.squad_b_id);
-    const {data:actions}=await admin.from('valorant_veto_actions').select('step,map_slug').eq('match_id',id).order('step');const nextStep=(actions?.length??0)+1;const expectedSquadId=nextStep%2===1?match.squad_a_id:match.squad_b_id;const expectedCaptain=nextStep%2===1?squadA?.captain_id:squadB?.captain_id;
-    if(expectedCaptain!==user.id)return noStoreJson({error:'Não é o seu turno de veto.'},{status:403});
-    const {data:map}=await admin.from('valorant_map_pool').select('slug,name').eq('slug',body.mapSlug).eq('active',true).maybeSingle();if(!map)return noStoreJson({error:'Mapa inválido.'},{status:400});if((actions??[]).some(action=>action.map_slug===body.mapSlug))return noStoreJson({error:'Este mapa já foi vetado.'},{status:409});
-    const {error:insertError}=await admin.from('valorant_veto_actions').insert({match_id:id,step:nextStep,squad_id:expectedSquadId,captain_id:user.id,map_slug:body.mapSlug,action:'ban'});if(insertError)throw insertError;
-    const {data:pool}=await admin.from('valorant_map_pool').select('slug,name').eq('active',true).order('sort_order');const banned=new Set([...(actions??[]).map(a=>a.map_slug),body.mapSlug]);const remaining=(pool??[]).filter(item=>!banned.has(item.slug));
-    if(remaining.length===1){const selected=remaining[0];await admin.from('valorant_matches').update({state:'MAP_SELECTED',selected_map_slug:selected.slug,veto_deadline:null,updated_at:new Date().toISOString()}).eq('id',id).eq('state','VETO');await ensureValorantTeamRooms(id,selected.slug);await admin.from('valorant_matches').update({state:'LOBBY_READY',updated_at:new Date().toISOString()}).eq('id',id).eq('state','MAP_SELECTED');return noStoreJson({state:'LOBBY_READY',selectedMap:selected});}
-    await admin.from('valorant_matches').update({veto_deadline:new Date(Date.now()+24000).toISOString(),updated_at:new Date().toISOString()}).eq('id',id).eq('state','VETO');return noStoreJson({state:'VETO',remaining:remaining.length});
-  }catch(error){if(error instanceof z.ZodError)return noStoreJson({error:'Mapa inválido.'},{status:400});return noStoreJson({error:'Não foi possível registrar o veto.'},{status:500});}
+    assertTrustedMutation(request);
+    const user=await getCurrentUser();if(!user)return noStoreJson({error:'Não autorizado.'},{status:401});
+    await enforceRateLimit(request,{scope:'valorant-veto',limit:30,windowSeconds:300,subject:user.id});
+    const {id}=await params,body=schema.parse(await readJsonBody(request)),admin=createAdminClient();
+    const {data,error}=await admin.rpc('valorant_veto_map_atomic',{p_match_id:id,p_user_id:user.id,p_map_slug:body.mapSlug});
+    if(error)throw error;
+    const result=data as {result?:string;state?:string;selectedMapSlug?:string;remaining?:number}|null;
+    if(result?.result==='not_found')return noStoreJson({error:'Partida não encontrada.'},{status:404});
+    if(result?.result==='not_turn')return noStoreJson({error:'Não é o seu turno de veto.'},{status:403});
+    if(result?.result==='invalid_map')return noStoreJson({error:'Mapa inválido.'},{status:400});
+    if(result?.result==='already_used')return noStoreJson({error:'Este mapa já foi vetado.'},{status:409});
+    if(result?.result==='invalid_state')return noStoreJson({error:'O veto não está ativo.',state:result.state},{status:409});
+    if(result?.result==='expired'){
+      await advanceExpiredValorantVeto(id);
+      const {data:refreshed}=await admin.from('valorant_matches').select('state,selected_map_slug').eq('id',id).maybeSingle();
+      return noStoreJson({error:'O tempo deste veto acabou; o sistema avançou automaticamente.',state:refreshed?.state,selectedMapSlug:refreshed?.selected_map_slug},{status:409});
+    }
+    if(result?.result!=='ok')throw new Error('unexpected_veto_result');
+    if(result.state==='MAP_SELECTED'&&result.selectedMapSlug){
+      await ensureValorantTeamRooms(id,result.selectedMapSlug);
+      await admin.from('valorant_matches').update({state:'LOBBY_READY',updated_at:new Date().toISOString()}).eq('id',id).eq('state','MAP_SELECTED');
+      const {data:selected}=await admin.from('valorant_map_pool').select('slug,name').eq('slug',result.selectedMapSlug).maybeSingle();
+      return noStoreJson({state:'LOBBY_READY',selectedMap:selected??{slug:result.selectedMapSlug,name:result.selectedMapSlug}});
+    }
+    return noStoreJson({state:'VETO',remaining:result.remaining??0});
+  }catch(error){
+    if(error instanceof RateLimitExceededError||error instanceof RateLimitUnavailableError)return rateLimitResponse(error);
+    if(error instanceof z.ZodError||error instanceof InvalidRequestError)return noStoreJson({error:'Mapa inválido.'},{status:400});
+    return noStoreJson({error:'Não foi possível registrar o veto.'},{status:500});
+  }
 }
