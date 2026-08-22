@@ -50,6 +50,9 @@ export default function PersistentCallDock(){
  const router=useRouter(),pathname=usePathname();
  const lite=typeof window!=="undefined"&&new URLSearchParams(window.location.search).get("desktop")==="lite";
  useEffect(()=>subscribeVoiceSession(next=>{setSession(next);const pub=next.room?.localParticipant.getTrackPublication(Track.Source.Microphone);setMuted(Boolean(pub?.isMuted))}),[]);
+ useEffect(()=>{
+  if(pathname==="/login"||pathname.startsWith("/login/")||pathname==="/register"||pathname.startsWith("/register/"))void disconnectActiveLiveKitVoice(true);
+ },[pathname]);
  const localIdentity=session.room?.localParticipant.identity;
  const localShare=session.screenSharers.find(item=>item.userId===localIdentity)??null;
  const remoteShares=useMemo(()=>session.screenSharers.filter(item=>item.userId!==localIdentity),[session.screenSharers,localIdentity]);
