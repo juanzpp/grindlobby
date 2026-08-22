@@ -114,6 +114,15 @@ describe('voice lifecycle regressions',()=>{
     expect(dock).toMatch(/element\.play\(\)\.then\(\(\)=>\{setAudioBlocked\(false\);window\.removeEventListener/);
   });
 
+  it('keeps a visible stop control when the local screen share outlives the lobby page',async()=>{
+    const dock=await readFile('components/PersistentCallDock.tsx','utf8');
+    expect(dock).toContain('setLiveKitScreenShareEnabled');
+    expect(dock).toContain('const localShare=session.screenSharers.find');
+    expect(dock).toContain('Sua tela está ao vivo');
+    expect(dock).toContain('Parar transmissão');
+    expect(dock).toContain('!lite&&!inLobby&&remoteShares.length');
+  });
+
   it('keeps desktop diagnostics opt-in and serializes expensive samples',async()=>{
     const diagnostics=await readFile('components/desktop/DesktopPerformanceDiagnostics.tsx','utf8');
     expect(diagnostics).toMatch(/useEffect\(\(\)=>\{\s*if\(!lite\)return;\s*return subscribeActiveLiveKitRoom/);
