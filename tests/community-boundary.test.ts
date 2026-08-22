@@ -52,4 +52,12 @@ describe('Community functional boundary',()=>{
     expect(room).toContain("const candidateLobbyId=lobby.id as string");
     expect(room).toContain("update({status:'closed'}).eq('id',candidateLobbyId)");
   });
+
+  it('cancels stale Community detail requests before they can replace the current selection',async()=>{
+    const hub=await readFile('components/community/CommunityHub.tsx','utf8');
+    expect(hub).toContain('detailController.current?.abort()');
+    expect(hub).toContain('signal:controller.signal');
+    expect(hub).toContain('generation!==detailGeneration.current');
+    expect(hub).toContain('controller.signal.aborted');
+  });
 });
