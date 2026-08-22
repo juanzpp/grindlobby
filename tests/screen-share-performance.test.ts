@@ -19,6 +19,25 @@ describe('screen share performance policy',()=>{
     expect(source).not.toContain('simulcast:true');
   });
 
+  it('clears reconnect state on disconnect and on room replacement',async()=>{
+    const source=await readFile('components/stream/ScreenShare.tsx','utf8');
+    expect(source).toContain('if(!room){setShares([]);setReconnecting(false);return}');
+    expect(source).toContain('onDisconnected=()=>{setReconnecting(false);sync()}');
+    expect(source).toContain('RoomEvent.Disconnected,onDisconnected');
+  });
+
+  it('resets the bitrate baseline whenever the viewed track changes',async()=>{
+    const source=await readFile('components/stream/ScreenShare.tsx','utf8');
+    expect(source).toMatch(/useEffect\(\(\)=>\{\s*bytesRef\.current=null;/);
+    expect(source).toContain('window.clearInterval(timer);bytesRef.current=null');
+  });
+
+  it('resets voice telemetry when the active LiveKit room changes',async()=>{
+    const source=await readFile('lib/webrtc/useVoiceTelemetry.ts','utf8');
+    expect(source).toContain('if(room!==next){lastBytes=null;lastAt=null}');
+    expect(source).toContain('if(disposed||room!==sampledRoom)return');
+  });
+
   it('remains stable under repeated quality decisions',()=>{
     let adaptive=0,single=0;
     for(let i=0;i<100_000;i++){
