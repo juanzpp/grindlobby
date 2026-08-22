@@ -12,7 +12,6 @@ type PlayerProfile={
   cosmetic_owned:string[]|null;cosmetic_equipped:Record<string,string>|null;app_role:string|null;
 };
 
-
 const PROFILE_SELECT="id,username,display_name,avatar,status,created_at,account_level,favorite_game,profile_banner,avatar_frame,profile_effect,profile_badge,profile_card_style,cosmetic_owned,cosmetic_equipped,app_role";
 
 function ownedCosmetic(person:PlayerProfile,kind:"frame"|"effect",legacy:string|null|undefined){
@@ -36,7 +35,7 @@ function betterRank(next:RankRow,current?:RankRow){
 
 export async function GET(request:Request){
   try{
-    const user=await getCurrentUser();
+    const user=await getCurrentUser(request);
     if(!user)return noStoreJson({error:"Não autorizado."},{status:401});
     await enforceRateLimit(request,{scope:"dashboard-read",limit:120,windowSeconds:600,subject:user.id});
 
