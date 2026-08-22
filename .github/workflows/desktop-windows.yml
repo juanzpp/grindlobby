@@ -38,6 +38,17 @@ jobs:
         with:
           node-version: 22
 
+      - name: Resolve Rust dependency lock
+        run: cargo generate-lockfile
+
+      - name: Upload Cargo lock
+        uses: actions/upload-artifact@v4
+        with:
+          name: GrindLobby-Cargo-Lock
+          path: desktop/src-tauri/Cargo.lock
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Prepare square desktop icon
         shell: pwsh
         run: |
@@ -60,13 +71,13 @@ jobs:
         run: npx --yes @tauri-apps/cli@2.11.4 icon app-icon.png
 
       - name: Cargo check standard
-        run: cargo check
+        run: cargo check --locked
 
       - name: Cargo check performance
-        run: cargo check --features lite
+        run: cargo check --locked --features lite
 
       - name: Build standard Windows installer
-        run: npx --yes @tauri-apps/cli@2.11.4 build --bundles nsis
+        run: npx --yes @tauri-apps/cli@2.11.4 build --bundles nsis -- --locked
 
       - name: Upload standard EXE installer
         uses: actions/upload-artifact@v4
@@ -81,7 +92,7 @@ jobs:
           if (Test-Path 'target/release/bundle/nsis') { Remove-Item 'target/release/bundle/nsis' -Recurse -Force }
 
       - name: Build Performance Windows installer
-        run: npx --yes @tauri-apps/cli@2.11.4 build --bundles nsis --features lite --config tauri.lite.conf.json
+        run: npx --yes @tauri-apps/cli@2.11.4 build --bundles nsis --features lite --config tauri.lite.conf.json -- --locked
 
       - name: Upload Performance EXE installer
         uses: actions/upload-artifact@v4
