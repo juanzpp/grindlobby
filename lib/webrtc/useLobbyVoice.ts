@@ -168,10 +168,11 @@ export function setLiveKitMicrophoneGain(value:number){
  microphoneGain=clampMediaPercent(value,MAX_MICROPHONE_GAIN_PERCENT);
  if(micGainNode&&micAudioContext){const now=micAudioContext.currentTime;micGainNode.gain.cancelScheduledValues(now);micGainNode.gain.setTargetAtTime(microphoneLinearGain(microphoneGain),now,.035)}
 }
-export async function switchLiveKitMicrophoneDevice(deviceId:string){
+export async function switchLiveKitMicrophoneDevice(deviceId:string,requestedConstraints?:MediaTrackConstraints){
  const room=activeRoom;if(!room||room.state!==ConnectionState.Connected)return null;
  const previous=activeStream;
- const next=await navigator.mediaDevices.getUserMedia({audio:{deviceId:deviceId?{exact:deviceId}:undefined},video:false});
+ const audioConstraints=requestedConstraints??{deviceId:deviceId?{exact:deviceId}:undefined};
+ const next=await navigator.mediaDevices.getUserMedia({audio:audioConstraints,video:false});
  try{
   await publishOrReplaceMicrophone(room,next);
   if(activeStream!==next)throw new Error("microphone_replace_failed");
