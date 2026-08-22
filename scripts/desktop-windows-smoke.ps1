@@ -32,7 +32,7 @@ function Get-CommandPath([string]$CommandLine) {
 
 function Get-CpuTotal([int[]]$Pids) {
   $total = 0.0
-  foreach ($id in $Pids) {
+  foreach ($id in @($Pids)) {
     $process = Get-Process -Id $id -ErrorAction SilentlyContinue
     if ($process) { $total += [double]$process.CPU }
   }
@@ -60,16 +60,18 @@ Assert-True (-not [string]::IsNullOrWhiteSpace($installDir)) 'Could not determin
 Assert-True (Test-Path $installDir) "GrindLobby install directory does not exist: $installDir"
 
 $appCandidates = @(
-  (Join-Path $installDir 'GrindLobby.exe'),
-  (Join-Path $installDir 'grindlobby-desktop.exe')
-) | Where-Object { Test-Path $_ }
-if ($appCandidates.Count -eq 0) {
+  @(
+    (Join-Path $installDir 'GrindLobby.exe'),
+    (Join-Path $installDir 'grindlobby-desktop.exe')
+  ) | Where-Object { Test-Path $_ }
+)
+if (@($appCandidates).Count -eq 0) {
   $appCandidates = @(Get-ChildItem -Path $installDir -Filter '*.exe' -File -ErrorAction SilentlyContinue |
     Where-Object { $_.FullName -ne $uninstaller -and $_.Name -notmatch 'unins|uninstall' } |
     Select-Object -ExpandProperty FullName)
 }
-Assert-True ($appCandidates.Count -gt 0) "No installed GrindLobby application executable was found in $installDir"
-$appExe = $appCandidates[0]
+Assert-True (@($appCandidates).Count -gt 0) "No installed GrindLobby application executable was found in $installDir"
+$appExe = @($appCandidates)[0]
 $processName = [IO.Path]::GetFileNameWithoutExtension($appExe)
 Write-Host "Installed executable: $appExe"
 
@@ -99,27 +101,31 @@ try {
   Assert-True ($LASTEXITCODE -eq 0) 'Desktop WebView2 runtime smoke test failed.'
 
   $running = @(Get-Process -Name $processName -ErrorAction SilentlyContinue)
-  Assert-True ($running.Count -eq 1) "Expected one $processName process, found $($running.Count)."
+  Assert-True (@($running).Count -eq 1) "Expected one $processName process, found $(@($running).Count)."
 
   $second = Start-Process -FilePath $appExe -PassThru
   Start-Sleep -Seconds 3
   $runningAfterSecondLaunch = @(Get-Process -Name $processName -ErrorAction SilentlyContinue)
-  Assert-True ($runningAfterSecondLaunch.Count -eq 1) "Single-instance guard failed; found $($runningAfterSecondLaunch.Count) $processName processes."
+  Assert-True (@($runningAfterSecondLaunch).Count -eq 1) "Single-instance guard failed; found $(@($runningAfterSecondLaunch).Count) $processName processes."
 
   $afterWebView = @(Get-Process -Name 'msedgewebview2' -ErrorAction SilentlyContinue)
   $newWebView = @($afterWebView | Where-Object { $beforeWebView -notcontains $_.Id })
-  Assert-True ($newWebView.Count -gt 0) 'No WebView2 child process appeared after launching GrindLobby.'
+  Assert-True (@($newWebView).Count -gt 0) 'No WebView2 child process appeared after launching GrindLobby.'
 
   $appProcesses = @(Get-Process -Name $processName -ErrorAction SilentlyContinue)
-  $workingSetBytes = ($appProcesses | Measure-Object -Property WorkingSet64 -Sum).Sum + ($newWebView | Measure-Object -Property WorkingSet64 -Sum).Sum
+  $appWorkingSet = ($appProcesses | Measure-Object -Property WorkingSet64 -Sum).Sum
+  $webViewWorkingSet = ($newWebView | Measure-Object -Property WorkingSet64 -Sum).Sum
+  if ($null -eq $appWorkingSet) { $appWorkingSet = 0 }
+  if ($null -eq $webViewWorkingSet) { $webViewWorkingSet = 0 }
+  $workingSetBytes = [double]$appWorkingSet + [double]$webViewWorkingSet
   $workingSetMb = [math]::Round($workingSetBytes / 1MB, 1)
   Write-Host "Desktop working set (app + new WebView2 processes): $workingSetMb MB"
   Assert-True ($workingSetMb -lt 900) "Desktop idle working set is unexpectedly high: $workingSetMb MB"
 
-  $runtimePids = @($appProcesses.Id) + @($newWebView.Id)
-  $cpuStart = Get-CpuTotal $runtimePids
+  $runtimePids = @($appProcesses | ForEach-Object { $_.Id }) + @($newWebView | ForEach-Object { $_.Id })
+  $cpuStart = Get-CpuTotal @($runtimePids)
   Start-Sleep -Seconds 10
-  $cpuEnd = Get-CpuTotal $runtimePids
+  $cpuEnd = Get-CpuTotal @($runtimePids)
   $cpuDelta = [math]::Round($cpuEnd - $cpuStart, 2)
   Write-Host "Desktop CPU time over 10s idle sample: $cpuDelta s"
   Assert-True ($cpuDelta -lt 15) "Desktop idle CPU use is unexpectedly high: $cpuDelta CPU-seconds over 10 seconds."
