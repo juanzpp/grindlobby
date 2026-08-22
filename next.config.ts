@@ -18,12 +18,13 @@ const connectSources=[
 ];
 const csp=[
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV==="development"?" 'unsafe-eval'":""}`,
+  `script-src 'self' 'unsafe-inline' https://www.youtube.com${process.env.NODE_ENV==="development"?" 'unsafe-eval'":""}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data:",
   "media-src 'self' blob:",
   "worker-src 'self' blob:",
+  "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com",
   `connect-src ${connectSources.join(" ")}`,
   "object-src 'none'",
   "base-uri 'self'",

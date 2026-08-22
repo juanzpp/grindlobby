@@ -23,4 +23,12 @@ describe('Grind Beats YouTube runtime',()=>{
     const source=await readFile('components/dashboard/LovableWidgets.tsx','utf8');
     expect(source).toContain('if(window.onYouTubeIframeAPIReady===handler)window.onYouTubeIframeAPIReady=previous');
   });
+
+  it('allows only the YouTube origins required by the embedded player CSP',async()=>{
+    const source=await readFile('next.config.ts','utf8');
+    expect(source).toContain("script-src 'self' 'unsafe-inline' https://www.youtube.com");
+    expect(source).toContain("frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com");
+    expect(source).not.toContain("frame-src *");
+    expect(source).not.toContain("script-src *");
+  });
 });
