@@ -16,16 +16,21 @@ export async function unlockRemoteAudioContexts(){
 
 export default function RemoteVoiceAudio({stream:track,volume,muted}:Props){
  const audio=useRef<HTMLAudioElement|null>(null),[output,setOutput]=useState<AudioOutputPreferences>(loadAudioOutputPreferences),peerId=getRemoteVoicePeerId(track)??"unknown";
- useEffect(()=>{const unsubscribe=subscribeAudioOutput(setOutput);return()=>{unsubscribe()}},[]);
+ useEffect(()=>subscribeAudioOutput(setOutput),[]);
  useEffect(()=>{
   const element=audio.current;if(!element||!track)return;
   let disposed=false;
   const retry=()=>{if(disposed||element.muted)return;void element.play().then(()=>{blockedRemoteAudio.delete(element);window.removeEventListener("pointerdown",retry,true);window.removeEventListener("touchend",retry,true)}).catch(()=>{})};
-  track.attach(element);element.autoplay=true;element.muted=muted;track.setVolume(Math.min(1,Math.max(0,(volume/100)*(output.volume/100))));
-  if(output.deviceId)track.setSinkId(output.deviceId).catch(error=>log("remote-audio-output-device-failed",{peerId,error:String(error)}));
+  track.attach(element);element.autoplay=true;element.muted=true;track.setVolume(0);
   element.play().then(()=>log("remote-audio-play",{peerId})).catch(error=>{log("remote-audio-play-failed",{peerId,error:String(error)});blockedRemoteAudio.add(element);window.addEventListener("pointerdown",retry,true);window.addEventListener("touchend",retry,true)});
   return()=>{disposed=true;blockedRemoteAudio.delete(element);window.removeEventListener("pointerdown",retry,true);window.removeEventListener("touchend",retry,true);track.detach(element)};
- },[track]);
- useEffect(()=>{if(!track)return;const element=audio.current;if(element){element.muted=muted;if(!muted&&blockedRemoteAudio.has(element))void unlockRemoteAudioContexts()}track.setVolume(Math.min(1,Math.max(0,(volume/100)*(output.volume/100))));if(output.deviceId)track.setSinkId(output.deviceId).catch(error=>log("remote-audio-output-device-failed",{peerId,error:String(error)}))},[track,volume,muted,output]);
+ },[track,peerId]);
+ useEffect(()=>{
+  if(!track)return;
+  const element=audio.current;
+  if(element){element.muted=muted;if(!muted&&blockedRemoteAudio.has(element))void unlockRemoteAudioContexts()}
+  track.setVolume(Math.min(1,Math.max(0,(volume/100)*(output.volume/100))));
+  if(output.deviceId)track.setSinkId(output.deviceId).catch(error=>log("remote-audio-output-device-failed",{peerId,error:String(error)}));
+ },[track,volume,muted,output.volume,output.deviceId,peerId]);
  return <audio ref={audio} autoPlay playsInline aria-hidden="true" data-grind-remote-voice="true"/>;
 }
