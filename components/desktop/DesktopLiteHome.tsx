@@ -3,6 +3,7 @@
 import {useCallback,useEffect,useMemo,useState} from "react";
 import {useRouter} from "next/navigation";
 import {Headphones,Link2,LogOut,Mic,MonitorUp,RefreshCw,Settings,Shield,Users,Wifi,Zap} from "lucide-react";
+import {disconnectActiveLiveKitVoice} from "@/lib/webrtc/useLobbyVoice";
 
 type DesktopUser={id:string;username:string;display_name:string;email?:string};
 type Lobby={id:string;name:string;visibility:string;max_members:number;memberCount:number;joined:boolean;game?:{name:string;slug:string}|null;owner?:{display_name:string;username:string}|null};
@@ -59,7 +60,17 @@ export default function DesktopLiteHome({user}:{user:DesktopUser}){
       router.push(`/lobby/invite/${match[1]}?desktop=lite`);
     }catch{setError("Cole um link de convite válido do GrindLobby.")}
   }
-  async function logout(){await fetch("/api/auth/logout",{method:"POST"});router.push("/login?desktop=lite");router.refresh()}
+  async function logout(){
+    if(busy)return;
+    setBusy("logout");setError("");
+    try{
+      await disconnectActiveLiveKitVoice(true);
+      const response=await fetch("/api/auth/logout",{method:"POST"});
+      if(!response.ok)throw new Error("logout_failed");
+      router.push("/login?desktop=lite");router.refresh();
+    }catch{setError("Não foi possível sair da conta.")}
+    finally{setBusy(null)}
+  }
 
   return <main className="lite-shell">
     <aside className="lite-rail">
@@ -75,7 +86,7 @@ export default function DesktopLiteHome({user}:{user:DesktopUser}){
     <section className="lite-app">
       <header className="lite-topbar">
         <div><span className="lite-brand">GrindLobby</span><small>Performance Client</small></div>
-        <div className="lite-top-status"><span><i/>Online</span><span className="lite-tier">{tier}</span><button onClick={()=>void load()} title="Atualizar"><RefreshCw className={loading?"spin":""}/></button><button onClick={logout} title="Sair"><LogOut/></button></div>
+        <div className="lite-top-status"><span><i/>Online</span><span className="lite-tier">{tier}</span><button onClick={()=>void load()} title="Atualizar"><RefreshCw className={loading?"spin":""}/></button><button onClick={()=>void logout()} disabled={busy==="logout"} title="Sair"><LogOut/></button></div>
       </header>
 
       <div className="lite-content">
