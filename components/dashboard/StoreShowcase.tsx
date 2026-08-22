@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Image from "next/image";
 import { Check, ChevronRight, Crown, Frame, Gift, Image as ImageIcon, MessageSquare, Package, Palette, SignalHigh, Sparkles, Star, Wand2, Shield } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -39,27 +39,20 @@ function Shelf({ title, items, onEquip }: { title: string; items: ShelfItem[]; o
 export default function StoreShowcase({ display, isAdmin = false }: StoreShowcaseProps) {
   const [category, setCategory] = useState<StoreCategory>("Bundles");
   const [selected, setSelected] = useState("competitive");
-  const [cosmeticState, setCosmeticState] = useState(DEFAULT_PROFILE_COSMETICS);
+  const [storedCosmeticState, setStoredCosmeticState] = useState(DEFAULT_PROFILE_COSMETICS);
+  const cosmeticState = useMemo(() => normalizeCosmeticState(storedCosmeticState, isAdmin), [storedCosmeticState, isAdmin]);
   const bundle = useMemo(() => BUNDLES.find((item) => item.id === selected) ?? BUNDLES[0], [selected]);
   const filteredShelves = useMemo(() => SHELVES.map((shelf) => ({ ...shelf, items: shelf.items.filter((item) => category === "Bundles" ? true : category === "Molduras" ? item.kind === "Moldura" : category === "Banners" ? item.kind === "Banner" : category === "Papéis de parede" ? item.kind === "Papel de parede" : item.kind === "Efeito de lobby" || item.kind === "Badge de perfil") })), [category]);
 
-  useEffect(() => {
-    const syncState = normalizeCosmeticState({
-      owned: DEFAULT_PROFILE_COSMETICS.owned,
-      equipped: DEFAULT_PROFILE_COSMETICS.equipped,
-    }, isAdmin);
-    setCosmeticState(syncState);
-  }, [isAdmin]);
-
   const updateCosmetic = (kind: "banner" | "frame" | "effect" | "badge" | "cardStyle", id: string) => {
     const state = equipCosmetic(cosmeticState, kind, id, isAdmin);
-    setCosmeticState(state);
+    setStoredCosmeticState(state);
   };
 
   const equipBundleSelection = (bundleId: string) => {
     const state = equipBundle(cosmeticState, bundleId, isAdmin);
     setSelected(bundleId);
-    setCosmeticState(state);
+    setStoredCosmeticState(state);
   };
 
   const equipped = cosmeticState.equipped.bundle || null;
