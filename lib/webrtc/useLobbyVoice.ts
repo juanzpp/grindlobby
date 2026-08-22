@@ -81,7 +81,11 @@ function startBackgroundActivityLock(){
  let release!:()=>void;
  const held=new Promise<void>(resolve=>{release=resolve});
  releaseBackgroundActivity=release;
- backgroundActivityPromise=navigator.locks.request("grindlobby-active-voice",{mode:"shared"},()=>held).catch(()=>{}).finally(()=>{backgroundActivityPromise=null;releaseBackgroundActivity=null});
+ backgroundActivityPromise=(async()=>{
+  try{await navigator.locks.request("grindlobby-active-voice",{mode:"shared"},async()=>{await held})}
+  catch{}
+  finally{backgroundActivityPromise=null;releaseBackgroundActivity=null}
+ })();
 }
 function bindRoom(room:Room){
  const sync=()=>syncPresence(room);
