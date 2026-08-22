@@ -34,4 +34,14 @@ describe('LiveKit screen share server policy',()=>{
     expect(webhook).toContain('mutePublishedTrack');
     expect(webhook).toContain('screen_share_policy');
   });
+
+  it('revalidates lobby membership on join and before any published track is accepted',async()=>{
+    const webhook=await readFile('app/api/livekit/webhook/route.ts','utf8');
+    expect(webhook).toContain('enforceLobbyMembership');
+    expect(webhook).toContain('event.event==="participant_joined"');
+    expect(webhook).toContain('if(event.event!=="track_published")return response()');
+    expect(webhook).toContain('removeParticipant(room,identity');
+    expect(webhook).toContain('revokeTokenTs:BigInt(Math.floor(Date.now()/1000))');
+    expect(webhook).toContain('lobby?.status==="open"');
+  });
 });
