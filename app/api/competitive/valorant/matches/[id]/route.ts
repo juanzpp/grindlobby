@@ -3,9 +3,9 @@ import {createAdminClient} from '@/lib/supabase/admin';
 import {noStoreJson} from '@/lib/security/request';
 import {advanceExpiredValorantVeto} from '@/lib/competitive/veto';
 
-export async function GET(_:Request,{params}:{params:Promise<{id:string}>}){
+export async function GET(request:Request,{params}:{params:Promise<{id:string}>}){
  try{
-  const user=await getCurrentUser();if(!user)return noStoreJson({error:'Não autorizado.'},{status:401});const {id}=await params;const admin=createAdminClient();
+  const user=await getCurrentUser(request);if(!user)return noStoreJson({error:'Não autorizado.'},{status:401});const {id}=await params;const admin=createAdminClient();
   const {data:myPlayer}=await admin.from('valorant_match_players').select('match_id,squad_id,accepted').eq('match_id',id).eq('user_id',user.id).maybeSingle();if(!myPlayer)return noStoreJson({error:'Partida não encontrada.'},{status:404});
   let {data:match,error}=await admin.from('valorant_matches').select('*').eq('id',id).single();if(error)throw error;
   if(match.state==='VETO'&&match.veto_deadline&&new Date(match.veto_deadline).getTime()<=Date.now()){await advanceExpiredValorantVeto(id);const refreshed=await admin.from('valorant_matches').select('*').eq('id',id).single();if(refreshed.error)throw refreshed.error;match=refreshed.data;}
