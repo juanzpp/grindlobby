@@ -82,6 +82,15 @@ describe('voice lifecycle regressions',()=>{
     expect(source).toContain('stopRawMicrophoneStream(next);');
   });
 
+  it('explicitly stops local screen capture before a full LiveKit teardown',async()=>{
+    const source=await readFile('lib/webrtc/useLobbyVoice.ts','utf8');
+    const screenStop=source.indexOf('setScreenShareEnabled(false)');
+    const roomDisconnect=source.indexOf('room.removeAllListeners();await room.disconnect()',screenStop);
+    expect(screenStop).toBeGreaterThanOrEqual(0);
+    expect(roomDisconnect).toBeGreaterThan(screenStop);
+    expect(source).toContain('if(stopTracks&&room&&room.state!==ConnectionState.Disconnected)');
+  });
+
   it('keeps voice telemetry compatible with Lovable bearer auth',async()=>{
     const source=await readFile('app/api/lobbies/[id]/voice/metrics/route.ts','utf8');
     expect(source).toContain('getCurrentUser(request)');
