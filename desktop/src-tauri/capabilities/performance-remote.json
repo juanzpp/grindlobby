@@ -1,0 +1,11 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "performance-remote",
+  "description": "Read-only diagnostics exposed only to the GrindLobby production origin.",
+  "windows": ["main"],
+  "remote": {
+    "urls": ["https://grindlobby.onrender.com/*"]
+  },
+  "platforms": ["windows"],
+  "permissions": ["allow-performance-snapshot"]
+}
