@@ -124,7 +124,73 @@ try {
     .catch(error => ({ok:false, name:error.name, message:error.message}))`, true);
   assert(devices.ok, `enumerateDevices failed: ${devices.name || "Error"} ${devices.message || ""}`);
 
-  console.log(JSON.stringify({ capabilities, health: { status: health.status }, devices }, null, 2));
+  const audioGraph = await evaluate(client, `(async () => {
+    const AudioCtor = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AudioCtor({ latencyHint: 'interactive' });
+    try {
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const destination = ctx.createMediaStreamDestination();
+      gain.gain.value = 0.01;
+      oscillator.connect(gain).connect(destination);
+      oscillator.start();
+      await ctx.resume().catch(() => {});
+      const tracks = destination.stream.getAudioTracks();
+      oscillator.stop();
+      return {
+        ok: tracks.length === 1 && tracks[0].kind === 'audio',
+        state: ctx.state,
+        sampleRate: ctx.sampleRate,
+        tracks: tracks.length
+      };
+    } finally {
+      await ctx.close().catch(() => {});
+    }
+  })()`, true);
+  assert(audioGraph.ok, `Web Audio graph failed: ${JSON.stringify(audioGraph)}`);
+
+  const rtcLoopback = await evaluate(client, `(async () => {
+    const a = new RTCPeerConnection({ iceServers: [] });
+    const b = new RTCPeerConnection({ iceServers: [] });
+    let incoming;
+    try {
+      a.onicecandidate = event => { if (event.candidate) b.addIceCandidate(event.candidate).catch(() => {}); };
+      b.onicecandidate = event => { if (event.candidate) a.addIceCandidate(event.candidate).catch(() => {}); };
+      const incomingPromise = new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('datachannel timeout')), 12000);
+        b.ondatachannel = event => {
+          incoming = event.channel;
+          incoming.onmessage = msg => { clearTimeout(timer); resolve(msg.data); };
+        };
+      });
+      const channel = a.createDataChannel('grind-smoke');
+      const opened = new Promise((resolve, reject) => {
+        if (channel.readyState === 'open') return resolve();
+        const timer = setTimeout(() => reject(new Error('open timeout')), 12000);
+        channel.onopen = () => { clearTimeout(timer); resolve(); };
+      });
+      const offer = await a.createOffer();
+      await a.setLocalDescription(offer);
+      await b.setRemoteDescription(offer);
+      const answer = await b.createAnswer();
+      await b.setLocalDescription(answer);
+      await a.setRemoteDescription(answer);
+      await opened;
+      channel.send('grind-webrtc-ok');
+      const received = await incomingPromise;
+      const stats = await a.getStats();
+      return { ok: received === 'grind-webrtc-ok' && stats.size > 0, received, stats: stats.size, connectionState: a.connectionState };
+    } catch (error) {
+      return { ok: false, error: error?.message || String(error), connectionState: a.connectionState };
+    } finally {
+      try { incoming?.close(); } catch {}
+      a.close();
+      b.close();
+    }
+  })()`, true);
+  assert(rtcLoopback.ok, `WebRTC loopback failed: ${JSON.stringify(rtcLoopback)}`);
+
+  console.log(JSON.stringify({ capabilities, health: { status: health.status }, devices, audioGraph, rtcLoopback }, null, 2));
 } finally {
   client.close();
 }
