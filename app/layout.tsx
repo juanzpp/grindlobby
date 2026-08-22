@@ -4,6 +4,7 @@ import "./desktop-runtime.css";
 import "./mobile-responsive.css";
 import "./mobile-audit-overrides.css";
 import "./desktop-lite.css";
+import "./desktop-diagnostics.css";
 import type {Metadata,Viewport} from "next";
 import PersistentCallDock from "@/components/PersistentCallDock";
 import DesktopRuntimeMode from "@/components/DesktopRuntimeMode";
