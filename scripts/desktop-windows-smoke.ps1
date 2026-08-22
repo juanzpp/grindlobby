@@ -24,6 +24,12 @@ function Get-GrindEntry {
   return $null
 }
 
+function Get-CommandPath([string]$CommandLine) {
+  $value = $CommandLine.Trim()
+  if ($value -match '^"([^"]+)"') { return $Matches[1] }
+  return ($value -split '\s+')[0].Trim('"')
+}
+
 function Get-CpuTotal([int[]]$Pids) {
   $total = 0.0
   foreach ($id in $Pids) {
@@ -42,14 +48,30 @@ Assert-True ($null -ne $entry) 'GrindLobby uninstall registry entry was not crea
 
 $uninstallString = [string]$entry.UninstallString
 Assert-True (-not [string]::IsNullOrWhiteSpace($uninstallString)) 'GrindLobby uninstall command is missing.'
-$uninstaller = $uninstallString.Trim().Trim('"')
-$installDir = if (-not [string]::IsNullOrWhiteSpace([string]$entry.InstallLocation)) {
-  [string]$entry.InstallLocation
+$uninstaller = Get-CommandPath $uninstallString
+
+$rawInstallLocation = [string]$entry.InstallLocation
+$installDir = if (-not [string]::IsNullOrWhiteSpace($rawInstallLocation)) {
+  $rawInstallLocation.Trim().Trim('"')
 } else {
-  Split-Path -Parent $uninstaller
+  (Split-Path -Parent $uninstaller).Trim().Trim('"')
 }
-$appExe = Join-Path $installDir 'GrindLobby.exe'
-Assert-True (Test-Path $appExe) "Installed GrindLobby.exe was not found at $appExe"
+Assert-True (-not [string]::IsNullOrWhiteSpace($installDir)) 'Could not determine GrindLobby install directory.'
+Assert-True (Test-Path $installDir) "GrindLobby install directory does not exist: $installDir"
+
+$appCandidates = @(
+  (Join-Path $installDir 'GrindLobby.exe'),
+  (Join-Path $installDir 'grindlobby-desktop.exe')
+) | Where-Object { Test-Path $_ }
+if ($appCandidates.Count -eq 0) {
+  $appCandidates = @(Get-ChildItem -Path $installDir -Filter '*.exe' -File -ErrorAction SilentlyContinue |
+    Where-Object { $_.FullName -ne $uninstaller -and $_.Name -notmatch 'unins|uninstall' } |
+    Select-Object -ExpandProperty FullName)
+}
+Assert-True ($appCandidates.Count -gt 0) "No installed GrindLobby application executable was found in $installDir"
+$appExe = $appCandidates[0]
+$processName = [IO.Path]::GetFileNameWithoutExtension($appExe)
+Write-Host "Installed executable: $appExe"
 
 $version = (Get-Item $appExe).VersionInfo.ProductVersion
 Assert-True ($version -like '0.1.1*') "Unexpected desktop version: $version"
@@ -76,19 +98,19 @@ try {
   & node "$PSScriptRoot\desktop-runtime-smoke.mjs"
   Assert-True ($LASTEXITCODE -eq 0) 'Desktop WebView2 runtime smoke test failed.'
 
-  $running = @(Get-Process -Name 'GrindLobby' -ErrorAction SilentlyContinue)
-  Assert-True ($running.Count -eq 1) "Expected one GrindLobby process, found $($running.Count)."
+  $running = @(Get-Process -Name $processName -ErrorAction SilentlyContinue)
+  Assert-True ($running.Count -eq 1) "Expected one $processName process, found $($running.Count)."
 
   $second = Start-Process -FilePath $appExe -PassThru
   Start-Sleep -Seconds 3
-  $runningAfterSecondLaunch = @(Get-Process -Name 'GrindLobby' -ErrorAction SilentlyContinue)
-  Assert-True ($runningAfterSecondLaunch.Count -eq 1) "Single-instance guard failed; found $($runningAfterSecondLaunch.Count) GrindLobby processes."
+  $runningAfterSecondLaunch = @(Get-Process -Name $processName -ErrorAction SilentlyContinue)
+  Assert-True ($runningAfterSecondLaunch.Count -eq 1) "Single-instance guard failed; found $($runningAfterSecondLaunch.Count) $processName processes."
 
   $afterWebView = @(Get-Process -Name 'msedgewebview2' -ErrorAction SilentlyContinue)
   $newWebView = @($afterWebView | Where-Object { $beforeWebView -notcontains $_.Id })
   Assert-True ($newWebView.Count -gt 0) 'No WebView2 child process appeared after launching GrindLobby.'
 
-  $appProcesses = @(Get-Process -Name 'GrindLobby' -ErrorAction SilentlyContinue)
+  $appProcesses = @(Get-Process -Name $processName -ErrorAction SilentlyContinue)
   $workingSetBytes = ($appProcesses | Measure-Object -Property WorkingSet64 -Sum).Sum + ($newWebView | Measure-Object -Property WorkingSet64 -Sum).Sum
   $workingSetMb = [math]::Round($workingSetBytes / 1MB, 1)
   Write-Host "Desktop working set (app + new WebView2 processes): $workingSetMb MB"
@@ -103,7 +125,7 @@ try {
   Assert-True ($cpuDelta -lt 15) "Desktop idle CPU use is unexpectedly high: $cpuDelta CPU-seconds over 10 seconds."
 }
 finally {
-  Get-Process -Name 'GrindLobby' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+  Get-Process -Name $processName -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
   Start-Sleep -Seconds 1
   if (Test-Path $uninstaller) {
     Start-Process -FilePath $uninstaller -ArgumentList '/S' -Wait -NoNewWindow
@@ -111,6 +133,6 @@ finally {
   }
 }
 
-Assert-True (-not (Test-Path $appExe)) 'Silent uninstall left GrindLobby.exe behind.'
+Assert-True (-not (Test-Path $appExe)) 'Silent uninstall left the GrindLobby application executable behind.'
 Assert-True ($null -eq (Get-GrindEntry)) 'Silent uninstall left GrindLobby registry metadata behind.'
 Write-Host 'Desktop install/runtime/single-instance/resource/uninstall smoke test passed.'
