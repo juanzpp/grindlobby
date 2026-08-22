@@ -142,3 +142,29 @@
   }
   .stream-stage-badges::-webkit-scrollbar { display: none; }
 }
+
+@media (max-width: 1023px) and (hover: none) and (pointer: coarse) {
+  /* Undo the broad base rule that made every inline link/icon 42px tall. */
+  a,
+  button {
+    min-height: 0;
+  }
+
+  .lovable-mobile-nav > a,
+  .lovable-mobile-nav > button,
+  .lovable-dashboard-main input,
+  .lovable-dashboard-main select,
+  .lovable-dashboard-main textarea,
+  .community-modal input,
+  .community-modal textarea,
+  .stream-modal button,
+  .stream-command-row button,
+  .match-tabs button {
+    min-height: 42px;
+  }
+
+  .lovable-mobile-nav > a,
+  .lovable-mobile-nav > button {
+    min-height: 48px;
+  }
+}
