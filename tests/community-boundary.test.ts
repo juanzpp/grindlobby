@@ -44,4 +44,12 @@ describe('Community functional boundary',()=>{
     expect(migration).toContain("'20260821_community_invite_atomic'");
     expect(migration).toContain('grant execute on function public.accept_community_invite_atomic');
   });
+
+  it('uses compare-and-set when replacing or claiming an environment room',async()=>{
+    const room=await readFile('app/api/communities/[id]/environments/[environmentId]/room/route.ts','utf8');
+    expect(room).toContain(".eq('lobby_id',staleLobbyId)");
+    expect(room).toContain(".is('lobby_id',null)");
+    expect(room).toContain("const candidateLobbyId=lobby.id as string");
+    expect(room).toContain("update({status:'closed'}).eq('id',candidateLobbyId)");
+  });
 });
