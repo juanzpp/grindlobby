@@ -1,0 +1,144 @@
+/* Mobile audit corrections layered after mobile-responsive.css. */
+@media (max-width: 1023px) {
+  /* Match the current ScreenShare component classes. */
+  .stream-card,
+  .stream-center-card,
+  .stream-stage-home,
+  .stream-player-shell,
+  .stream-stage,
+  .stream-modal {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+  }
+
+  .stream-stage-home {
+    min-height: 0 !important;
+    overflow: hidden !important;
+    border-radius: 16px;
+  }
+
+  .stream-player-shell {
+    position: relative !important;
+    inset: auto !important;
+    transform: none !important;
+    max-height: none !important;
+  }
+
+  .stream-player-shell.stream-mode-floating,
+  .stream-player-shell.stream-mode-minimized {
+    position: relative !important;
+    left: auto !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: auto !important;
+    transform: none !important;
+    width: 100% !important;
+  }
+
+  .stream-stage {
+    aspect-ratio: 16 / 9;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: hidden;
+  }
+
+  .stream-stage video {
+    display: block;
+    width: 100% !important;
+    height: 100% !important;
+    max-width: 100%;
+    object-fit: contain !important;
+  }
+
+  .stream-player-head,
+  .stream-player-footer,
+  .stream-command-row,
+  .stream-available-rich {
+    min-width: 0;
+    max-width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .stream-view-buttons {
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .stream-view-buttons::-webkit-scrollbar { display: none; }
+
+  .stream-volume-control {
+    min-width: 0;
+    flex: 1 1 180px;
+  }
+  .stream-volume-control input { min-width: 0; width: 100%; }
+
+  .stream-modal-bg {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+
+  .stream-modal {
+    max-height: min(90dvh, 760px) !important;
+    overflow-y: auto !important;
+    border-radius: 24px 24px 0 0 !important;
+    padding-bottom: calc(20px + var(--gl-safe-bottom)) !important;
+  }
+
+  .source-grid,
+  .stream-quality-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .quality-row {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* Keep touch targets useful without inflating every inline link/icon control. */
+  .lovable-dashboard-main input,
+  .lovable-dashboard-main select,
+  .lovable-dashboard-main textarea,
+  .community-modal input,
+  .community-modal textarea,
+  .stream-modal button,
+  .stream-command-row button,
+  .match-tabs button {
+    min-height: 42px;
+  }
+}
+
+@media (max-width: 639px) {
+  .stream-card-head,
+  .stream-player-head,
+  .stream-player-footer {
+    padding-inline: 10px !important;
+  }
+
+  .stream-player-head > div:first-child {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .stream-player-head b {
+    display: block;
+    max-width: 48vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .source-grid,
+  .stream-quality-options {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .stream-stage-badges {
+    max-width: calc(100% - 12px);
+    overflow-x: auto;
+    white-space: nowrap;
+    scrollbar-width: none;
+  }
+  .stream-stage-badges::-webkit-scrollbar { display: none; }
+}
