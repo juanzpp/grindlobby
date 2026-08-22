@@ -60,4 +60,11 @@ describe('Community functional boundary',()=>{
     expect(hub).toContain('generation!==detailGeneration.current');
     expect(hub).toContain('controller.signal.aborted');
   });
+
+  it('always revalidates an environment room with the backend before navigating',async()=>{
+    const hub=await readFile('components/community/CommunityHub.tsx','utf8');
+    expect(hub).toContain("/environments/${environment.id}/room`,{method:'POST'}");
+    expect(hub).toContain('router.push(`/lobby/${b.lobbyId}`)');
+    expect(hub).not.toContain('if(environment.lobby_id){location.href=');
+  });
 });
