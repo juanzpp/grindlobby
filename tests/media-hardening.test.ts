@@ -59,6 +59,29 @@ describe('voice lifecycle regressions',()=>{
     expect(source).toContain('limiter.threshold.value=-3');
   });
 
+  it('serializes microphone publication and invalidates stale session work',async()=>{
+    const source=await readFile('lib/webrtc/useLobbyVoice.ts','utf8');
+    expect(source).toContain('let microphonePublishQueue:Promise<void>=Promise.resolve()');
+    expect(source).toContain('microphonePublishQueue=microphonePublishQueue.catch(()=>{}).then(operation)');
+    expect(source).toContain('room!==activeRoom||sessionGeneration!==connectGeneration');
+    expect(source).toContain('microphone-publish-failed');
+  });
+
+  it('stops raw microphone capture and processing after initial LiveKit failure',async()=>{
+    const source=await readFile('lib/webrtc/useLobbyVoice.ts','utf8');
+    expect(source).toContain('function stopRawMicrophoneStream');
+    expect(source).toContain('if(stream){stopRawMicrophoneStream(stream);if(activeStream===stream)activeStream=null}');
+    expect(source).toContain('cleanupMicProcessing();');
+  });
+
+  it('switches microphone devices transactionally before stopping the previous stream',async()=>{
+    const source=await readFile('lib/webrtc/useLobbyVoice.ts','utf8');
+    expect(source).toContain('const previous=activeStream');
+    expect(source).toContain('await publishOrReplaceMicrophone(room,next)');
+    expect(source).toContain('if(previous&&previous!==next)stopRawMicrophoneStream(previous)');
+    expect(source).toContain('stopRawMicrophoneStream(next);');
+  });
+
   it('keeps voice telemetry compatible with Lovable bearer auth',async()=>{
     const source=await readFile('app/api/lobbies/[id]/voice/metrics/route.ts','utf8');
     expect(source).toContain('getCurrentUser(request)');
