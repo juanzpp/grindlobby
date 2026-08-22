@@ -2,6 +2,7 @@ import "./globals.css";
 import "./lovable.css";
 import "./desktop-runtime.css";
 import "./mobile-responsive.css";
+import "./mobile-audit-overrides.css";
 import type {Metadata,Viewport} from "next";
 import PersistentCallDock from "@/components/PersistentCallDock";
 import DesktopRuntimeMode from "@/components/DesktopRuntimeMode";

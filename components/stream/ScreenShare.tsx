@@ -162,8 +162,13 @@ export default function ScreenShare({isPro=false,gameName="GrindLobby",gameBanne
     if(!room||room.state!==ConnectionState.Connected){setError("Entre no lobby antes de compartilhar a tela.");return}if(!screenAudio.supported){setError("Seu navegador não oferece captura de tela neste contexto.");return}
     setBusy(true);setError("");setScreenAudio(current=>({...current,available:null,published:false}));let createdTracks:LocalTrack[]=[];
     try{
-      const selected=qualityPresets.find(item=>item.height===quality)??qualityPresets[2];if(selected.height>entitlement.maxHeight)throw new Error(`Seu plano permite transmissão até ${entitlement.maxHeight}p.`);const maxFps=Math.min(selected.fps,entitlement.maxFps);
-      const [tracks,capability]=await Promise.all([room.localParticipant.createScreenTracks({audio:true,video:{displaySurface:surface},resolution:{width:selected.width,height:selected.height,frameRate:maxFps},contentHint:"motion",surfaceSwitching:"include",systemAudio:"include",suppressLocalAudioPlayback:false}),getServerEntitlement()]);createdTracks=tracks;if(capability.allowed===false)throw new Error(capability.reason||"Transmissão indisponível para esta conta.");
+      const capability=await getServerEntitlement();
+      if(capability.allowed===false)throw new Error(capability.reason||"Transmissão indisponível para esta conta.");
+      const selected=qualityPresets.find(item=>item.height===quality)??qualityPresets[2];
+      if(selected.height>capability.maxHeight)throw new Error(`Seu plano permite transmissão até ${capability.maxHeight}p.`);
+      const maxFps=Math.min(selected.fps,capability.maxFps);
+      const tracks=await room.localParticipant.createScreenTracks({audio:true,video:{displaySurface:surface},resolution:{width:selected.width,height:selected.height,frameRate:maxFps},contentHint:"motion",surfaceSwitching:"include",systemAudio:"include",suppressLocalAudioPlayback:false});
+      createdTracks=tracks;
       const video=tracks.find(track=>track instanceof LocalVideoTrack) as LocalVideoTrack|undefined,audio=tracks.find(track=>track instanceof LocalAudioTrack) as LocalAudioTrack|undefined;if(!video)throw new Error("O navegador não retornou uma faixa de vídeo da tela.");
       await video.mediaStreamTrack.applyConstraints({width:{max:Math.min(selected.width,capability.maxWidth)},height:{max:Math.min(selected.height,capability.maxHeight)},frameRate:{max:Math.min(maxFps,capability.maxFps)}}).catch(()=>{});setScreenAudio(current=>({...current,available:Boolean(audio),published:false}));
       await room.localParticipant.publishTrack(video,{source:Track.Source.ScreenShare,simulcast:shouldUseScreenSimulcast(selected.height,Math.min(maxFps,capability.maxFps)),videoCodec:"vp8",degradationPreference:"maintain-framerate",screenShareEncoding:{maxBitrate:selected.bitrate,maxFramerate:Math.min(maxFps,capability.maxFps)}});
