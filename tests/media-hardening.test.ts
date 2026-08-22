@@ -64,6 +64,15 @@ describe('voice lifecycle regressions',()=>{
     expect(source).toContain('getCurrentUser(request)');
   });
 
+  it('deduplicates repeated RTC stats and prevents overlapping telemetry reads',async()=>{
+    const telemetry=await readFile('lib/webrtc/useVoiceTelemetry.ts','utf8');
+    expect(telemetry).toContain('const seenStats=new Set<string>()');
+    expect(telemetry).toContain('if(seenStats.has(stat.id))return');
+    expect(telemetry).toContain('disposed=false,inFlight=false');
+    expect(telemetry).toContain('if(disposed||!room||inFlight)return');
+    expect(telemetry).toContain('finally{\n        inFlight=false;');
+  });
+
   it('refreshes valid membership while issuing a token and rejects closed lobbies',async()=>{
     const token=await readFile('app/api/lobbies/[id]/voice/token/route.ts','utf8');
     expect(token).not.toContain('.gt("last_seen_at"');
