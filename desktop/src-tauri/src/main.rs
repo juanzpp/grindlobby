@@ -4,6 +4,8 @@ use sysinfo::{get_current_pid, ProcessesToUpdate, System};
 use tauri::{State, WebviewUrl, WebviewWindowBuilder};
 use url::Url;
 
+const PRODUCTION_HOST: &str = "grindlobby.onrender.com";
+
 #[cfg(feature = "lite")]
 const PRODUCTION_URL: &str = "https://grindlobby.onrender.com/desktop-lite?desktop=lite";
 #[cfg(not(feature = "lite"))]
@@ -36,6 +38,10 @@ struct PerformanceSnapshot {
     process_uptime_seconds: u64,
     disk_read_bytes_delta: u64,
     disk_written_bytes_delta: u64,
+}
+
+fn is_allowed_navigation(url: &Url) -> bool {
+    url.scheme() == "https" && url.host_str() == Some(PRODUCTION_HOST)
 }
 
 fn belongs_to_process_tree(system: &System, candidate: sysinfo::Pid, root: sysinfo::Pid) -> bool {
@@ -123,6 +129,7 @@ fn main() {
         .setup(|app| {
             let url = Url::parse(PRODUCTION_URL).expect("invalid GrindLobby production URL");
             let builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url))
+                .on_navigation(is_allowed_navigation)
                 .title(WINDOW_TITLE)
                 .resizable(true)
                 .center();
