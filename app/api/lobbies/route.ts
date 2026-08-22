@@ -3,7 +3,7 @@ import {getCurrentUser} from "@/lib/auth";
 import {createAdminClient} from "@/lib/supabase/admin";
 import {assertTrustedMutation,InvalidRequestError,noStoreJson,readJsonBody} from "@/lib/security/request";
 import {enforceRateLimit,RateLimitExceededError,RateLimitUnavailableError,rateLimitResponse} from "@/lib/security/rate-limit";
-import {lobbyInviteHash} from "@/lib/lobby-invites";
+import {createLobbyInviteToken,lobbyInviteHash} from "@/lib/lobby-invites";
 
 const createSchema=z.object({
   name:z.string().trim().min(2).max(80),
@@ -14,6 +14,8 @@ const createSchema=z.object({
 }).strict();
 
 type LobbyCreateStage="request"|"authentication"|"rate_limit"|"payload_validation"|"game_lookup"|"lobby_insert"|"host_insert"|"invite_insert"|"rollback"|"complete";
+
+type CreatedInvite={token:string;path:string;expiresAt:string};
 
 class LobbyCreateError extends Error{
   code:string;
@@ -58,18 +60,22 @@ export async function POST(request:Request){
       const memberCode=safeErrorCode(memberError,"membership_create_failed");stage="rollback";
       await admin.from("lobbies").delete().eq("id",lobby.id);stage="host_insert";throw new LobbyCreateError(memberCode);
     }
+    let invite:CreatedInvite|null=null;
     if(body.visibility!=="public"){
       stage="invite_insert";
-      const {error:inviteError}=await admin.from("lobby_invites").insert({lobby_id:lobby.id,token_hash:lobbyInviteHash(lobby.id),created_by:user.id,max_uses:100,expires_at:new Date(Date.now()+7*24*3600000).toISOString()});
+      const token=createLobbyInviteToken();
+      const expiresAt=new Date(Date.now()+7*24*3600000).toISOString();
+      const {error:inviteError}=await admin.from("lobby_invites").insert({lobby_id:lobby.id,token_hash:lobbyInviteHash(token),created_by:user.id,max_uses:100,expires_at:expiresAt});
       if(inviteError){
         stage="rollback";
         await admin.from("lobbies").delete().eq("id",lobby.id);
         throw new LobbyCreateError(safeErrorCode(inviteError,"invite_create_failed"));
       }
+      invite={token,path:`/lobby/invite/${token}`,expiresAt};
     }
     stage="complete";
     logLobbyCreate({authenticated:true,userId,stage,outcome:"allowed",code:"created"});
-    return noStoreJson({ok:true,lobbyId:lobby.id},{status:201});
+    return noStoreJson({ok:true,lobbyId:lobby.id,invite},{status:201});
   }catch(error){
     if(error instanceof RateLimitExceededError||error instanceof RateLimitUnavailableError){
       logLobbyCreate({authenticated:Boolean(userId),userId,stage,outcome:error instanceof RateLimitExceededError?"blocked":"failed",code:error instanceof RateLimitUnavailableError?error.code:"rate_limit_exceeded"});
