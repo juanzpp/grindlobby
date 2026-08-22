@@ -159,6 +159,7 @@ async function ensureSession(lobbyId:string,userId:string,members:VoiceLobbyMemb
 export async function disconnectActiveLiveKitVoice(stopTracks=true){
  connectGeneration+=1;stopHeartbeat();stopBackgroundActivityLock();
  const room=activeRoom;setActiveRoom(null);activeLobbyId=null;activeUserId=null;activeMembers=[];activePresence=new Map();emitPresence();
+ if(stopTracks&&room&&room.state!==ConnectionState.Disconnected)await room.localParticipant.setScreenShareEnabled(false).catch(()=>{});
  if(stopTracks)stopRawMicrophoneStream(activeStream);activeStream=null;cleanupMicProcessing();
  if(room){room.removeAllListeners();await room.disconnect()}
 }
