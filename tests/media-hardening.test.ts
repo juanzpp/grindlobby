@@ -114,8 +114,12 @@ describe('voice lifecycle regressions',()=>{
     expect(dock).toMatch(/element\.play\(\)\.then\(\(\)=>\{setAudioBlocked\(false\);window\.removeEventListener/);
   });
 
-  it('does not subscribe desktop diagnostics to LiveKit in the normal web runtime',async()=>{
+  it('keeps desktop diagnostics opt-in and serializes expensive samples',async()=>{
     const diagnostics=await readFile('components/desktop/DesktopPerformanceDiagnostics.tsx','utf8');
     expect(diagnostics).toMatch(/useEffect\(\(\)=>\{\s*if\(!lite\)return;\s*return subscribeActiveLiveKitRoom/);
+    expect(diagnostics).toContain('sampleInFlight=false');
+    expect(diagnostics).toContain('if(disposed||sampleInFlight)return');
+    expect(diagnostics).toContain('const seenStats=new Set<string>()');
+    expect(diagnostics).toContain('if(seenStats.has(entry.id))return');
   });
 });
