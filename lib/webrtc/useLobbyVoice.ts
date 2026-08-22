@@ -25,6 +25,7 @@ let micSourceTrackId:string|null=null;
 let micProcessedStream:MediaStream|null=null;
 let microphoneGain=100;
 let connectGeneration=0;
+let microphonePublishQueue:Promise<void>=Promise.resolve();
 let releaseVoiceHeartbeat:(()=>void)|null=null;
 const volumes=new Map<string,{volume:number;muted:boolean}>();
 const roomListeners=new Set<(room:Room|null)=>void>();
@@ -83,6 +84,7 @@ function cleanupMicProcessing(){
  micProcessedStream=null;micGainNode=null;micLimiterNode=null;micSourceTrackId=null;
  micAudioContext?.close().catch(()=>{});micAudioContext=null;
 }
+function stopRawMicrophoneStream(stream:MediaStream|null){stream?.getTracks().forEach(track=>track.stop())}
 async function processedMicrophoneStream(stream:MediaStream){
  const sourceTrack=stream.getAudioTracks()[0];if(!sourceTrack)return null;
  if(micProcessedStream&&micSourceTrackId===sourceTrack.id&&micProcessedStream.getAudioTracks()[0]?.readyState==="live")return micProcessedStream;
@@ -96,19 +98,29 @@ async function processedMicrophoneStream(stream:MediaStream){
  micAudioContext=context;micGainNode=gain;micLimiterNode=limiter;micSourceTrackId=sourceTrack.id;micProcessedStream=destination.stream;
  return destination.stream;
 }
-async function publishOrReplaceMicrophone(room:Room,stream:MediaStream|null){
- if(!stream)return;
- const raw=stream.getAudioTracks()[0];if(!raw||raw.readyState!=="live")return;
- activeStream=stream;
- const processed=await processedMicrophoneStream(stream),next=processed?.getAudioTracks()[0];if(!next)return;
- const publication=room.localParticipant.getTrackPublication(Track.Source.Microphone),current=publication?.track;
- if(current instanceof LocalAudioTrack&&current.mediaStreamTrack===next)return;
- if(current)await room.localParticipant.unpublishTrack(current,false);
- await room.localParticipant.publishTrack(next,{source:Track.Source.Microphone,audioPreset:AudioPresets.music,dtx:true,red:true,stopMicTrackOnMute:false});
+function publishOrReplaceMicrophone(room:Room,stream:MediaStream|null){
+ const sessionGeneration=connectGeneration;
+ const operation=async()=>{
+  if(!stream||room!==activeRoom||sessionGeneration!==connectGeneration)return;
+  const raw=stream.getAudioTracks()[0];if(!raw||raw.readyState!=="live")return;
+  const processed=await processedMicrophoneStream(stream),next=processed?.getAudioTracks()[0];if(!next||next.readyState!=="live")return;
+  if(room!==activeRoom||sessionGeneration!==connectGeneration)return;
+  const publication=room.localParticipant.getTrackPublication(Track.Source.Microphone),current=publication?.track;
+  if(current instanceof LocalAudioTrack&&current.mediaStreamTrack===next){activeStream=stream;return}
+  if(current)await room.localParticipant.unpublishTrack(current,false);
+  if(room!==activeRoom||sessionGeneration!==connectGeneration)return;
+  await room.localParticipant.publishTrack(next,{source:Track.Source.Microphone,audioPreset:AudioPresets.music,dtx:true,red:true,stopMicTrackOnMute:false});
+  activeStream=stream;
+ };
+ microphonePublishQueue=microphonePublishQueue.catch(()=>{}).then(operation);
+ return microphonePublishQueue;
 }
 async function ensureSession(lobbyId:string,userId:string,members:VoiceLobbyMember[],stream:MediaStream|null){
  activeMembers=members;
- if(activeRoom&&activeLobbyId===lobbyId&&activeRoom.state!==ConnectionState.Disconnected){await publishOrReplaceMicrophone(activeRoom,stream);syncPresence(activeRoom);return}
+ if(activeRoom&&activeLobbyId===lobbyId&&activeRoom.state!==ConnectionState.Disconnected){
+  try{await publishOrReplaceMicrophone(activeRoom,stream);syncPresence(activeRoom)}catch(error){logError("microphone-publish-failed",{error:String(error)})}
+  return;
+ }
  await disconnectActiveLiveKitVoice(false);
  const generation=++connectGeneration,room=new Room({adaptiveStream:true,dynacast:true,disconnectOnPageLeave:false});
  activeLobbyId=lobbyId;activeUserId=userId;activeMembers=members;setActiveRoom(room);bindRoom(room);
@@ -121,13 +133,18 @@ async function ensureSession(lobbyId:string,userId:string,members:VoiceLobbyMemb
   if(stream)await publishOrReplaceMicrophone(room,stream);syncPresence(room);log("room-connected",{room:room.name,participantCount:room.numParticipants,microphone:Boolean(stream)});
  }catch(error){
   logError("room-connect-failed",{error:String(error)});
-  if(generation===connectGeneration){stopHeartbeat();room.removeAllListeners();await room.disconnect().catch(()=>{});setActiveRoom(null);activeLobbyId=null;activeUserId=null;activeMembers=[];activePresence=new Map();emitPresence()}
+  if(generation===connectGeneration){
+   stopHeartbeat();
+   if(stream){stopRawMicrophoneStream(stream);if(activeStream===stream)activeStream=null}
+   cleanupMicProcessing();
+   room.removeAllListeners();await room.disconnect().catch(()=>{});setActiveRoom(null);activeLobbyId=null;activeUserId=null;activeMembers=[];activePresence=new Map();emitPresence();
+  }
  }
 }
 export async function disconnectActiveLiveKitVoice(stopTracks=true){
  connectGeneration+=1;stopHeartbeat();
  const room=activeRoom;setActiveRoom(null);activeLobbyId=null;activeUserId=null;activeMembers=[];activePresence=new Map();emitPresence();
- if(stopTracks)activeStream?.getTracks().forEach(track=>track.stop());activeStream=null;cleanupMicProcessing();
+ if(stopTracks)stopRawMicrophoneStream(activeStream);activeStream=null;cleanupMicProcessing();
  if(room){room.removeAllListeners();await room.disconnect()}
 }
 export async function setLiveKitMicrophoneMuted(muted:boolean){const publication=activeRoom?.localParticipant.getTrackPublication(Track.Source.Microphone);if(!publication)return;if(muted)await publication.mute();else await publication.unmute();syncPresence()}
@@ -135,7 +152,20 @@ export function setLiveKitMicrophoneGain(value:number){
  microphoneGain=clampMediaPercent(value,MAX_MICROPHONE_GAIN_PERCENT);
  if(micGainNode&&micAudioContext){const now=micAudioContext.currentTime;micGainNode.gain.cancelScheduledValues(now);micGainNode.gain.setTargetAtTime(microphoneLinearGain(microphoneGain),now,.035)}
 }
-export async function switchLiveKitMicrophoneDevice(deviceId:string){const publication=activeRoom?.localParticipant.getTrackPublication(Track.Source.Microphone),track=publication?.track;if(!(track instanceof LocalAudioTrack))return null;await track.setDeviceId(deviceId||"default");activeStream=new MediaStream([track.mediaStreamTrack]);cleanupMicProcessing();return track.mediaStreamTrack}
+export async function switchLiveKitMicrophoneDevice(deviceId:string){
+ const room=activeRoom;if(!room||room.state!==ConnectionState.Connected)return null;
+ const previous=activeStream;
+ const next=await navigator.mediaDevices.getUserMedia({audio:{deviceId:deviceId?{exact:deviceId}:undefined},video:false});
+ try{
+  await publishOrReplaceMicrophone(room,next);
+  if(activeStream!==next)throw new Error("microphone_replace_failed");
+  if(previous&&previous!==next)stopRawMicrophoneStream(previous);
+  return next.getAudioTracks()[0]??null;
+ }catch(error){
+  stopRawMicrophoneStream(next);
+  throw error;
+ }
+}
 export async function setLiveKitScreenShareEnabled(enabled:boolean){await activeRoom?.localParticipant.setScreenShareEnabled(enabled)}
 export function getRemoteVoicePeerId(track:RemoteAudioTrack|null){return track?.sid}
 
