@@ -27,6 +27,8 @@ let microphoneGain=100;
 let connectGeneration=0;
 let microphonePublishQueue:Promise<void>=Promise.resolve();
 let releaseVoiceHeartbeat:(()=>void)|null=null;
+let releaseBackgroundActivity:(()=>void)|null=null;
+let backgroundActivityPromise:Promise<void>|null=null;
 const volumes=new Map<string,{volume:number;muted:boolean}>();
 const roomListeners=new Set<(room:Room|null)=>void>();
 const sessionListeners=new Set<(session:ActiveVoiceSession)=>void>();
@@ -67,9 +69,17 @@ function startHeartbeat(){
  if(!activeLobbyId)return;
  releaseVoiceHeartbeat=retainLobbyPresenceHeartbeat(activeLobbyId);
 }
+function stopBackgroundActivityLock(){releaseBackgroundActivity?.();releaseBackgroundActivity=null}
+function startBackgroundActivityLock(){
+ if(typeof navigator==="undefined"||!navigator.locks||backgroundActivityPromise)return;
+ let release!:()=>void;
+ const held=new Promise<void>(resolve=>{release=resolve});
+ releaseBackgroundActivity=release;
+ backgroundActivityPromise=navigator.locks.request("grindlobby-active-voice",{mode:"shared"},()=>held).catch(()=>{}).finally(()=>{backgroundActivityPromise=null;releaseBackgroundActivity=null});
+}
 function bindRoom(room:Room){
  const sync=()=>syncPresence(room);
- room.on(RoomEvent.Connected,()=>{startHeartbeat();sync()})
+ room.on(RoomEvent.Connected,()=>{startHeartbeat();startBackgroundActivityLock();sync()})
   .on(RoomEvent.ParticipantConnected,sync).on(RoomEvent.ParticipantDisconnected,sync)
   .on(RoomEvent.TrackSubscribed,sync).on(RoomEvent.TrackUnsubscribed,sync)
   .on(RoomEvent.TrackPublished,sync).on(RoomEvent.TrackUnpublished,sync)
@@ -77,7 +87,7 @@ function bindRoom(room:Room){
   .on(RoomEvent.TrackMuted,sync).on(RoomEvent.TrackUnmuted,sync)
   .on(RoomEvent.ActiveSpeakersChanged,sync).on(RoomEvent.Reconnecting,sync)
   .on(RoomEvent.Reconnected,sync).on(RoomEvent.ConnectionStateChanged,sync)
-  .on(RoomEvent.Disconnected,()=>{stopHeartbeat();sync()});
+  .on(RoomEvent.Disconnected,()=>{stopHeartbeat();stopBackgroundActivityLock();sync()});
 }
 function cleanupMicProcessing(){
  micProcessedStream?.getTracks().forEach(track=>track.stop());
@@ -134,7 +144,7 @@ async function ensureSession(lobbyId:string,userId:string,members:VoiceLobbyMemb
  }catch(error){
   logError("room-connect-failed",{error:String(error)});
   if(generation===connectGeneration){
-   stopHeartbeat();
+   stopHeartbeat();stopBackgroundActivityLock();
    if(stream){stopRawMicrophoneStream(stream);if(activeStream===stream)activeStream=null}
    cleanupMicProcessing();
    room.removeAllListeners();await room.disconnect().catch(()=>{});setActiveRoom(null);activeLobbyId=null;activeUserId=null;activeMembers=[];activePresence=new Map();emitPresence();
@@ -142,7 +152,7 @@ async function ensureSession(lobbyId:string,userId:string,members:VoiceLobbyMemb
  }
 }
 export async function disconnectActiveLiveKitVoice(stopTracks=true){
- connectGeneration+=1;stopHeartbeat();
+ connectGeneration+=1;stopHeartbeat();stopBackgroundActivityLock();
  const room=activeRoom;setActiveRoom(null);activeLobbyId=null;activeUserId=null;activeMembers=[];activePresence=new Map();emitPresence();
  if(stopTracks)stopRawMicrophoneStream(activeStream);activeStream=null;cleanupMicProcessing();
  if(room){room.removeAllListeners();await room.disconnect()}
