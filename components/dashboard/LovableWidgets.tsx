@@ -100,28 +100,36 @@ const musicEncoder=new TextEncoder(),musicDecoder=new TextDecoder();
 
 function YouTubeMusicPlayer({track,playing,volume,position,onPlayingChange,onEnded,onPosition}:{track:Track|null;playing:boolean;volume:number;position:number;onPlayingChange:(value:boolean)=>void;onEnded:()=>void;onPosition:(value:number)=>void}){
   const hostRef=useRef<HTMLDivElement|null>(null),playerRef=useRef<YTPlayer|null>(null),lastVideoRef=useRef<string|null>(null),lastRemotePosition=useRef(0);
-  const [ready,setReady]=useState(false);
+  const callbacksRef=useRef({onPlayingChange,onEnded,onPosition});
+  const latestRef=useRef({volume,playing,position});
+  const [apiReady,setApiReady]=useState(false),[playerReady,setPlayerReady]=useState(false);
+  useEffect(()=>{callbacksRef.current={onPlayingChange,onEnded,onPosition}},[onPlayingChange,onEnded,onPosition]);
+  useEffect(()=>{latestRef.current={volume,playing,position}},[volume,playing,position]);
   useEffect(()=>{
-    if(window.YT?.Player){setReady(true);return}
+    let disposed=false;
+    const markReady=()=>{if(!disposed)setApiReady(true)};
+    if(window.YT?.Player){const timer=window.setTimeout(markReady,0);return()=>{disposed=true;window.clearTimeout(timer)}}
     const existing=document.querySelector('script[data-grind-youtube-api="true"]');
     const previous=window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady=()=>{previous?.();setReady(true)};
+    const handler=()=>{previous?.();markReady()};
+    window.onYouTubeIframeAPIReady=handler;
     if(!existing){const script=document.createElement("script");script.src="https://www.youtube.com/iframe_api";script.async=true;script.dataset.grindYoutubeApi="true";document.head.appendChild(script)}
-    return()=>{if(window.onYouTubeIframeAPIReady&&previous)window.onYouTubeIframeAPIReady=previous};
+    return()=>{disposed=true;if(window.onYouTubeIframeAPIReady===handler)window.onYouTubeIframeAPIReady=previous};
   },[]);
   useEffect(()=>{
-    if(!ready||!hostRef.current||playerRef.current||!window.YT)return;
-    playerRef.current=new window.YT.Player(hostRef.current,{playerVars:{playsinline:1,controls:1,rel:0,modestbranding:1},events:{
-      onReady:event=>{event.target.setVolume(volume)},
-      onStateChange:event=>{if(!window.YT)return;if(event.data===window.YT.PlayerState.PLAYING)onPlayingChange(true);if(event.data===window.YT.PlayerState.PAUSED)onPlayingChange(false);if(event.data===window.YT.PlayerState.ENDED)onEnded()},
-      onAutoplayBlocked:()=>onPlayingChange(false),
+    if(!apiReady||!hostRef.current||playerRef.current||!window.YT)return;
+    const player=new window.YT.Player(hostRef.current,{playerVars:{playsinline:1,controls:1,rel:0,modestbranding:1},events:{
+      onReady:event=>{event.target.setVolume(latestRef.current.volume);setPlayerReady(true)},
+      onStateChange:event=>{if(!window.YT)return;const callbacks=callbacksRef.current;if(event.data===window.YT.PlayerState.PLAYING)callbacks.onPlayingChange(true);if(event.data===window.YT.PlayerState.PAUSED)callbacks.onPlayingChange(false);if(event.data===window.YT.PlayerState.ENDED)callbacks.onEnded()},
+      onAutoplayBlocked:()=>callbacksRef.current.onPlayingChange(false),
     }});
-    return()=>{playerRef.current?.destroy();playerRef.current=null};
-  },[ready]);
-  useEffect(()=>{const player=playerRef.current;if(!player||track?.provider!=="youtube"||!track.videoId)return;if(lastVideoRef.current!==track.videoId){lastVideoRef.current=track.videoId;if(playing)player.loadVideoById(track.videoId,position);else player.cueVideoById(track.videoId,position)}},[track?.id]);
-  useEffect(()=>{const player=playerRef.current;if(!player||track?.provider!=="youtube")return;player.setVolume(volume);if(playing)player.playVideo();else player.pauseVideo()},[playing,volume,track?.provider]);
-  useEffect(()=>{const player=playerRef.current;if(!player||track?.provider!=="youtube")return;if(Math.abs(position-lastRemotePosition.current)>2.5){lastRemotePosition.current=position;player.seekTo(position,true)}},[position,track?.provider]);
-  useEffect(()=>{if(track?.provider!=="youtube")return;const timer=window.setInterval(()=>{const value=playerRef.current?.getCurrentTime()??0;lastRemotePosition.current=value;onPosition(value)},500);return()=>window.clearInterval(timer)},[track?.provider,onPosition]);
+    playerRef.current=player;
+    return()=>{player.destroy();if(playerRef.current===player)playerRef.current=null};
+  },[apiReady]);
+  useEffect(()=>{const player=playerRef.current;if(!playerReady||!player||track?.provider!=="youtube"||!track.videoId)return;if(lastVideoRef.current!==track.videoId){lastVideoRef.current=track.videoId;if(playing)player.loadVideoById(track.videoId,position);else player.cueVideoById(track.videoId,position)}},[playerReady,track?.provider,track?.videoId,playing,position]);
+  useEffect(()=>{const player=playerRef.current;if(!playerReady||!player||track?.provider!=="youtube")return;player.setVolume(volume);if(playing)player.playVideo();else player.pauseVideo()},[playerReady,playing,volume,track?.provider]);
+  useEffect(()=>{const player=playerRef.current;if(!playerReady||!player||track?.provider!=="youtube")return;if(Math.abs(position-lastRemotePosition.current)>2.5){lastRemotePosition.current=position;player.seekTo(position,true)}},[playerReady,position,track?.provider]);
+  useEffect(()=>{if(!playerReady||track?.provider!=="youtube")return;const timer=window.setInterval(()=>{const value=playerRef.current?.getCurrentTime()??0;lastRemotePosition.current=value;callbacksRef.current.onPosition(value)},500);return()=>window.clearInterval(timer)},[playerReady,track?.provider]);
   return <div className={track?.provider==="youtube"?"mt-3 overflow-hidden rounded-xl border border-border bg-black":"hidden"}><div ref={hostRef} className="aspect-video min-h-[200px] w-full"/></div>;
 }
 
