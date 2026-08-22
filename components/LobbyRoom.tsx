@@ -15,6 +15,7 @@ import {setLiveKitMicrophoneGain,setLiveKitMicrophoneMuted,useLobbyVoice} from "
 import {useVoiceTelemetry} from "@/lib/webrtc/useVoiceTelemetry";
 import {loadAudioPreferences,playAudioEvent} from "@/lib/audio";
 import {getGameLobbyTheme} from "@/lib/lobby-game-theme";
+import {retainLobbyPresenceHeartbeat} from "@/lib/lobby-presence-heartbeat";
 
 type Member={
   user_id:string;
@@ -54,21 +55,32 @@ export default function LobbyRoom({id,user}:{id:string;user:LobbyUser}){
   useVoiceTelemetry(id,Boolean(lobby?.isMember));
   const roomConnected=useRef(false);
   const roomExitAnnounced=useRef(false);
+  const loadGeneration=useRef(0);
+  const loadController=useRef<AbortController|null>(null);
 
   const load=useCallback(async()=>{
+    const generation=++loadGeneration.current;
+    loadController.current?.abort();
+    const controller=new AbortController();
+    loadController.current=controller;
     try{
-      const response=await fetch(`/api/lobbies/${id}`,{cache:"no-store"});
+      const response=await fetch(`/api/lobbies/${id}`,{cache:"no-store",signal:controller.signal});
       const body=await response.json();
       if(!response.ok)throw new Error(body.error||"Falha ao carregar o lobby.");
+      if(generation!==loadGeneration.current)return;
       setLobby(body.lobby as Lobby);setError("");
-    }catch(cause){setError(cause instanceof Error?cause.message:"Falha ao carregar o lobby.")}
-    finally{setLoading(false)}
+    }catch(cause){
+      if(controller.signal.aborted)return;
+      if(generation===loadGeneration.current)setError(cause instanceof Error?cause.message:"Falha ao carregar o lobby.");
+    }finally{
+      if(generation===loadGeneration.current){setLoading(false);if(loadController.current===controller)loadController.current=null}
+    }
   },[id]);
 
   useEffect(()=>{
     void load();
     const timer=window.setInterval(()=>void load(),10_000);
-    return()=>window.clearInterval(timer);
+    return()=>{window.clearInterval(timer);loadController.current?.abort()};
   },[load]);
 
   useEffect(()=>{
@@ -89,11 +101,9 @@ export default function LobbyRoom({id,user}:{id:string;user:LobbyUser}){
       if(navigator.sendBeacon)navigator.sendBeacon(url,new Blob([],{type:"application/json"}));
       else fetch(url,{method:"POST",keepalive:true}).catch(()=>{});
     };
-    const heartbeat=()=>fetch(`/api/lobbies/${id}/heartbeat`,{method:"POST",keepalive:true}).then(response=>{if(response.status===401)expire()}).catch(()=>{});
-    void heartbeat();
-    const timer=window.setInterval(()=>void heartbeat(),10_000);
+    const releaseHeartbeat=retainLobbyPresenceHeartbeat(id,status=>{if(status===401)expire()});
     window.addEventListener("pagehide",expire);
-    return()=>{window.clearInterval(timer);window.removeEventListener("pagehide",expire)};
+    return()=>{releaseHeartbeat();window.removeEventListener("pagehide",expire)};
   },[id,lobby?.isMember]);
 
   async function join(){
