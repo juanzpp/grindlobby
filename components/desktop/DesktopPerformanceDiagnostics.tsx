@@ -85,7 +85,10 @@ export default function DesktopPerformanceDiagnostics(){
   const roomRef=useRef<Room|null>(null),baselineRef=useRef<ByteBaseline|null>(null),longTasks=useRef({count:0,ms:0});
 
   useEffect(()=>{setLite(new URLSearchParams(location.search).get("desktop")==="lite")},[]);
-  useEffect(()=>subscribeActiveLiveKitRoom(room=>{roomRef.current=room;baselineRef.current=null;if(!room)setMedia(emptyMedia)}),[]);
+  useEffect(()=>{
+    if(!lite)return;
+    return subscribeActiveLiveKitRoom(room=>{roomRef.current=room;baselineRef.current=null;if(!room)setMedia(emptyMedia)});
+  },[lite]);
   useEffect(()=>{
     if(!lite||!open)return;
     let frames=0,last=performance.now(),raf=0,disposed=false;
