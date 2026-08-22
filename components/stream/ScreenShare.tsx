@@ -125,18 +125,20 @@ export default function ScreenShare({isPro=false,gameName="GrindLobby",gameBanne
   useEffect(()=>{localStorage.setItem(streamVolumeKey,String(volume))},[volume]);
   useEffect(()=>{getServerEntitlement().catch(()=>{})},[]);
   useEffect(()=>{
-    if(!room){setShares([]);return}
+    if(!room){setShares([]);setReconnecting(false);return}
     const sync=()=>{const next=snapshot(room);setShares(next);const local=next.find(item=>item.local);setScreenAudio(current=>({...current,published:Boolean(local?.audioPublished)}));setViewerId(current=>current&&next.some(item=>item.ownerId===current)?current:(next.find(item=>!item.local)?.ownerId??next.find(item=>item.local)?.ownerId??null))};
-    const onReconnecting=()=>{setReconnecting(true);sync()},onReconnected=()=>{setReconnecting(false);sync()};sync();
-    room.on(RoomEvent.Connected,sync).on(RoomEvent.ParticipantConnected,sync).on(RoomEvent.ParticipantDisconnected,sync).on(RoomEvent.TrackPublished,sync).on(RoomEvent.TrackUnpublished,sync).on(RoomEvent.TrackSubscribed,sync).on(RoomEvent.TrackUnsubscribed,sync).on(RoomEvent.LocalTrackPublished,sync).on(RoomEvent.LocalTrackUnpublished,sync).on(RoomEvent.Reconnecting,onReconnecting).on(RoomEvent.Reconnected,onReconnected).on(RoomEvent.ConnectionStateChanged,sync).on(RoomEvent.Disconnected,sync);
-    return()=>{room.off(RoomEvent.Connected,sync).off(RoomEvent.ParticipantConnected,sync).off(RoomEvent.ParticipantDisconnected,sync).off(RoomEvent.TrackPublished,sync).off(RoomEvent.TrackUnpublished,sync).off(RoomEvent.TrackSubscribed,sync).off(RoomEvent.TrackUnsubscribed,sync).off(RoomEvent.LocalTrackPublished,sync).off(RoomEvent.LocalTrackUnpublished,sync).off(RoomEvent.Reconnecting,onReconnecting).off(RoomEvent.Reconnected,onReconnected).off(RoomEvent.ConnectionStateChanged,sync).off(RoomEvent.Disconnected,sync)};
+    const onConnected=()=>{setReconnecting(false);sync()},onReconnecting=()=>{setReconnecting(true);sync()},onReconnected=()=>{setReconnecting(false);sync()},onDisconnected=()=>{setReconnecting(false);sync()};
+    setReconnecting(room.state===ConnectionState.Reconnecting);sync();
+    room.on(RoomEvent.Connected,onConnected).on(RoomEvent.ParticipantConnected,sync).on(RoomEvent.ParticipantDisconnected,sync).on(RoomEvent.TrackPublished,sync).on(RoomEvent.TrackUnpublished,sync).on(RoomEvent.TrackSubscribed,sync).on(RoomEvent.TrackUnsubscribed,sync).on(RoomEvent.LocalTrackPublished,sync).on(RoomEvent.LocalTrackUnpublished,sync).on(RoomEvent.Reconnecting,onReconnecting).on(RoomEvent.Reconnected,onReconnected).on(RoomEvent.ConnectionStateChanged,sync).on(RoomEvent.Disconnected,onDisconnected);
+    return()=>{room.off(RoomEvent.Connected,onConnected).off(RoomEvent.ParticipantConnected,sync).off(RoomEvent.ParticipantDisconnected,sync).off(RoomEvent.TrackPublished,sync).off(RoomEvent.TrackUnpublished,sync).off(RoomEvent.TrackSubscribed,sync).off(RoomEvent.TrackUnsubscribed,sync).off(RoomEvent.LocalTrackPublished,sync).off(RoomEvent.LocalTrackUnpublished,sync).off(RoomEvent.Reconnecting,onReconnecting).off(RoomEvent.Reconnected,onReconnected).off(RoomEvent.ConnectionStateChanged,sync).off(RoomEvent.Disconnected,onDisconnected)};
   },[room]);
 
   const localShare=shares.find(item=>item.local),remoteShares=shares.filter(item=>!item.local),viewer=shares.find(item=>item.ownerId===viewerId)??null;
 
   useEffect(()=>{const mediaTrack=localShare?.track.mediaStreamTrack;if(!mediaTrack||!room)return;const ended=()=>{void stop()};mediaTrack.addEventListener("ended",ended,{once:true});return()=>mediaTrack.removeEventListener("ended",ended)},[localShare?.track,room]);
   useEffect(()=>{
-    if(!viewer){setStats({rtt:null,bitrate:null,fps:null,dropped:null,packetLoss:null});bytesRef.current=null;return}
+    bytesRef.current=null;
+    if(!viewer){setStats({rtt:null,bitrate:null,fps:null,dropped:null,packetLoss:null});return}
     let cancelled=false;
     const read=async()=>{
       try{
@@ -149,7 +151,7 @@ export default function ScreenShare({isPro=false,gameName="GrindLobby",gameBanne
         setStats({rtt,bitrate,fps:fps?Math.round(fps):null,dropped,packetLoss:measuredPacketLoss==null?null:Math.round(measuredPacketLoss*10)/10});
       }catch{}
     };
-    void read();const timer=window.setInterval(()=>void read(),2000);return()=>{cancelled=true;window.clearInterval(timer)};
+    void read();const timer=window.setInterval(()=>void read(),2000);return()=>{cancelled=true;window.clearInterval(timer);bytesRef.current=null};
   },[viewer?.track]);
   useEffect(()=>{
     const move=(event:PointerEvent)=>{const drag=dragRef.current;if(!drag)return;setFloatPos({x:Math.max(-window.innerWidth/2,Math.min(window.innerWidth/2,drag.left+event.clientX-drag.x)),y:Math.max(-window.innerHeight/2,Math.min(window.innerHeight/2,drag.top+event.clientY-drag.y))})};
