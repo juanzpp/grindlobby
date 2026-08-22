@@ -66,8 +66,13 @@ function syncPresence(room=activeRoom){
 function stopHeartbeat(){releaseVoiceHeartbeat?.();releaseVoiceHeartbeat=null}
 function startHeartbeat(){
  stopHeartbeat();
- if(!activeLobbyId)return;
- releaseVoiceHeartbeat=retainLobbyPresenceHeartbeat(activeLobbyId);
+ const lobbyId=activeLobbyId;if(!lobbyId)return;
+ releaseVoiceHeartbeat=retainLobbyPresenceHeartbeat(lobbyId,status=>{
+  if((status===401||status===404||status===410)&&activeLobbyId===lobbyId){
+   log("heartbeat-access-ended",{lobbyId,status});
+   void disconnectActiveLiveKitVoice(true);
+  }
+ });
 }
 function stopBackgroundActivityLock(){releaseBackgroundActivity?.();releaseBackgroundActivity=null}
 function startBackgroundActivityLock(){
