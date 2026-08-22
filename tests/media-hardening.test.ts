@@ -64,6 +64,14 @@ describe('voice lifecycle regressions',()=>{
     expect(source).toContain('getCurrentUser(request)');
   });
 
+  it('refreshes valid membership while issuing a token and rejects closed lobbies',async()=>{
+    const token=await readFile('app/api/lobbies/[id]/voice/token/route.ts','utf8');
+    expect(token).not.toContain('.gt("last_seen_at"');
+    expect(token).toContain('update({last_seen_at:new Date().toISOString()})');
+    expect(token).toContain('lobby.status!=="open"');
+    expect(token).toContain('"grindlobby.screen.maxBitrate"');
+  });
+
   it('recovers remote voice and persistent stream audio from autoplay blocks',async()=>{
     const voice=await readFile('components/RemoteVoiceAudio.tsx','utf8');
     const dock=await readFile('components/PersistentCallDock.tsx','utf8');
