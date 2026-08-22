@@ -30,13 +30,18 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
 
     await enforceRateLimit(request,{scope:"livekit-token",limit:20,windowSeconds:600,subject:user.id});
     const admin=createAdminClient();
-    const {data:member}=await admin.from("lobby_members")
-      .select("user_id")
+    const [{data:member,error:memberError},{data:lobby,error:lobbyError}]=await Promise.all([
+      admin.from("lobby_members").select("user_id").eq("lobby_id",id).eq("user_id",user.id).maybeSingle(),
+      admin.from("lobbies").select("id,status").eq("id",id).maybeSingle(),
+    ]);
+    if(memberError||lobbyError)throw new Error("livekit_membership_lookup_failed");
+    if(!member||!lobby||lobby.status!=="open")return noStoreJson({error:"Você não está presente neste lobby."},{status:403});
+
+    const {error:presenceError}=await admin.from("lobby_members")
+      .update({last_seen_at:new Date().toISOString()})
       .eq("lobby_id",id)
-      .eq("user_id",user.id)
-      .gt("last_seen_at",new Date(Date.now()-30_000).toISOString())
-      .maybeSingle();
-    if(!member)return noStoreJson({error:"Você não está presente neste lobby."},{status:403});
+      .eq("user_id",user.id);
+    if(presenceError)throw new Error("livekit_presence_refresh_failed");
 
     const url=normalizeServerEnv(process.env.NEXT_PUBLIC_LIVEKIT_URL);
     const apiKey=normalizeServerEnv(process.env.LIVEKIT_API_KEY);
@@ -59,6 +64,7 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
         "grindlobby.screen.maxWidth":String(screenShare.maxWidth),
         "grindlobby.screen.maxHeight":String(screenShare.maxHeight),
         "grindlobby.screen.maxFps":String(screenShare.maxFps),
+        "grindlobby.screen.maxBitrate":String(screenShare.maxBitrate),
       },
     });
     accessToken.addGrant({
