@@ -207,11 +207,12 @@ export async function getLiveKitMediaRttMs(){
 }
 
 export function useLobbyVoice(lobbyId:string,localUserId:string,lobbyMembers:VoiceLobbyMember[],localStream:MediaStream|null){
- const [voicePresence,setVoicePresence]=useState<Map<string,VoiceMemberState>>(()=>new Map(activePresence));activeMembers=lobbyMembers;
+ const [voicePresence,setVoicePresence]=useState<Map<string,VoiceMemberState>>(()=>new Map(activePresence));
+ const memberSignature=lobbyMembers.map(member=>`${member.userId}:${member.name}:${member.profileId??""}:${member.membershipId??""}`).join("|");
  useEffect(()=>{if(process.env.NEXT_PUBLIC_VOICE_DEBUG!=="true"||window.__GRINDLOBBY_VOICE_DEBUG__)return;window.__GRINDLOBBY_VOICE_DEBUG__=true;console.debug("[GrindLobby Voice] debug-enabled")},[]);
  useEffect(()=>{const listener=(value:Map<string,VoiceMemberState>)=>setVoicePresence(new Map(value));presenceListeners.add(listener);listener(activePresence);return()=>{presenceListeners.delete(listener)}},[]);
- useEffect(()=>{activeMembers=lobbyMembers;if(activeRoom&&activeLobbyId===lobbyId)syncPresence(activeRoom)},[lobbyMembers.map(member=>member.userId).join(","),lobbyId]);
- useEffect(()=>{if(!lobbyId||!localUserId||!lobbyMembers.length)return;void ensureSession(lobbyId,localUserId,lobbyMembers,localStream)},[localStream,lobbyId,localUserId,lobbyMembers.map(member=>member.userId).join(",")]);
+ useEffect(()=>{activeMembers=lobbyMembers;if(activeRoom&&activeLobbyId===lobbyId)syncPresence(activeRoom)},[lobbyMembers,lobbyId]);
+ useEffect(()=>{const members=activeMembers;if(!lobbyId||!localUserId||!members.length)return;void ensureSession(lobbyId,localUserId,members,localStream)},[localStream,lobbyId,localUserId,memberSignature]);
  const voiceMembers=[...voicePresence.values()],remotePeers=voiceMembers.filter(member=>member.userId!==localUserId&&member.connected);
  function setPeerVolume(userId:string,volume:number){const current=volumes.get(userId)??{volume:100,muted:false};volumes.set(userId,{...current,volume:clampMediaPercent(volume,100)});syncPresence()}
  function togglePeerMuted(userId:string){const current=volumes.get(userId)??{volume:100,muted:false};volumes.set(userId,{...current,muted:!current.muted});syncPresence()}
