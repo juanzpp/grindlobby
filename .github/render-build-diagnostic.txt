@@ -1,0 +1,1 @@
+Temporary CI trigger for Render build diagnosis on 2026-08-22. Safe to delete after diagnosis.
