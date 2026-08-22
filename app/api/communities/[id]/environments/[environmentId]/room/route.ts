@@ -17,23 +17,54 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string;e
     ]);
     if(communityError)throw communityError;if(environmentError)throw environmentError;
     if(!community||!environment)return noStoreJson({error:'Ambiente não encontrado.'},{status:404});
+
     let lobbyId=environment.lobby_id as string|null;
     if(lobbyId){
-      const {data:existing,error:existingError}=await admin.from('lobbies').select('id,status').eq('id',lobbyId).maybeSingle();
+      const staleLobbyId=lobbyId;
+      const {data:existing,error:existingError}=await admin.from('lobbies').select('id,status').eq('id',staleLobbyId).maybeSingle();
       if(existingError)throw existingError;
       if(!existing||existing.status!=='open'){
-        lobbyId=null;
-        const {error:clearError}=await admin.from('community_environments').update({lobby_id:null,updated_at:new Date().toISOString()}).eq('id',environmentId);
+        const {data:cleared,error:clearError}=await admin.from('community_environments')
+          .update({lobby_id:null,updated_at:new Date().toISOString()})
+          .eq('id',environmentId)
+          .eq('community_id',id)
+          .eq('lobby_id',staleLobbyId)
+          .select('id')
+          .maybeSingle();
         if(clearError)throw clearError;
+        if(cleared){
+          lobbyId=null;
+        }else{
+          const {data:authoritative,error:authoritativeError}=await admin.from('community_environments').select('lobby_id').eq('id',environmentId).eq('community_id',id).single();
+          if(authoritativeError)throw authoritativeError;
+          lobbyId=authoritative.lobby_id as string|null;
+        }
       }
     }
+
     if(!lobbyId){
       const {data:lobby,error}=await admin.from('lobbies').insert({owner_id:community.owner_id,game_id:null,name:`${community.name} · ${environment.name}`,description:environment.description||`Ambiente ${environment.name}`,visibility:'private',max_members:Math.min(100,Math.max(2,environment.capacity||10)),status:'open'}).select('id').single();
-      if(error)throw error;lobbyId=lobby.id;
-      const {error:updateError}=await admin.from('community_environments').update({lobby_id:lobbyId,updated_at:new Date().toISOString()}).eq('id',environmentId).is('lobby_id',null);if(updateError)throw updateError;
-      const {data:authoritative,error:authoritativeError}=await admin.from('community_environments').select('lobby_id').eq('id',environmentId).single();if(authoritativeError)throw authoritativeError;
-      if(authoritative?.lobby_id&&authoritative.lobby_id!==lobbyId){await admin.from('lobbies').update({status:'closed'}).eq('id',lobbyId);lobbyId=authoritative.lobby_id;}
+      if(error)throw error;
+      const candidateLobbyId=lobby.id as string;
+      const {data:claimed,error:updateError}=await admin.from('community_environments')
+        .update({lobby_id:candidateLobbyId,updated_at:new Date().toISOString()})
+        .eq('id',environmentId)
+        .eq('community_id',id)
+        .is('lobby_id',null)
+        .select('lobby_id')
+        .maybeSingle();
+      if(updateError)throw updateError;
+      if(claimed?.lobby_id===candidateLobbyId){
+        lobbyId=candidateLobbyId;
+      }else{
+        const {data:authoritative,error:authoritativeError}=await admin.from('community_environments').select('lobby_id').eq('id',environmentId).eq('community_id',id).single();
+        if(authoritativeError)throw authoritativeError;
+        await admin.from('lobbies').update({status:'closed'}).eq('id',candidateLobbyId);
+        lobbyId=authoritative.lobby_id as string|null;
+        if(!lobbyId)throw new Error('community_environment_room_claim_failed');
+      }
     }
+
     const role=user.id===community.owner_id?'owner':'member';
     const {error:memberError}=await admin.from('lobby_members').upsert({lobby_id:lobbyId,user_id:user.id,role,last_seen_at:new Date().toISOString()},{onConflict:'lobby_id,user_id'});if(memberError)throw memberError;
     return noStoreJson({lobbyId});
