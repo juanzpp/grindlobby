@@ -1,16 +1,15 @@
 "use client";
 
-import {useCallback,useEffect,useRef,useState,type CSSProperties} from "react";
+import {useCallback,useEffect,useRef,useState} from "react";
 import {useRouter} from "next/navigation";
 import {
-  ArrowLeft,Check,Copy,Crown,Gamepad2,Globe,Loader2,LogOut,MessageSquare,Mic,MicOff,
-  MonitorUp,MoreVertical,Radio,RotateCcw,Settings,Shield,UserPlus,Users,Volume2,
+  Check,Copy,Crown,Gamepad2,Headphones,Loader2,LogOut,Mic,MicOff,MonitorUp,
+  MoreVertical,PhoneOff,Settings,Share2,Shield,Users,Volume2,Workflow,
 } from "lucide-react";
 import AudioHost from "@/components/AudioHost";
 import RemoteVoiceAudio from "@/components/RemoteVoiceAudio";
 import GrindLoading from "@/components/feedback/GrindLoading";
 import ScreenShare from "@/components/stream/ScreenShare";
-import LobbyChat from "@/components/lobby/LobbyChat";
 import {setLiveKitMicrophoneGain,setLiveKitMicrophoneMuted,useLobbyVoice} from "@/lib/webrtc/useLobbyVoice";
 import {useVoiceTelemetry} from "@/lib/webrtc/useVoiceTelemetry";
 import {loadAudioPreferences,playAudioEvent} from "@/lib/audio";
@@ -30,9 +29,10 @@ type Lobby={
 type LobbyUser={id:string;account_tier?:string;app_role?:string};
 
 function initials(value:string){return value.trim().slice(0,1).toUpperCase()||"G"}
-function Waveform({level=0,muted=false}:{level?:number;muted?:boolean}){
-  const active=Math.max(0,Math.min(1,level));
-  return <span className="lovable-wave flex items-end gap-[2px]" aria-hidden="true">{Array.from({length:14}).map((_,index)=><span key={index} className={!muted&&index/14<=Math.max(.18,active)?"bg-primary-glow":"bg-muted"} style={{height:6+(index*7)%12}}/>)}</span>;
+
+function LevelBars({level=0,muted=false}:{level?:number;muted?:boolean}){
+  const active=muted?0:Math.max(.14,Math.min(1,level));
+  return <span className="dvr-levels" aria-hidden="true">{Array.from({length:5}).map((_,index)=><i key={index} className={index/5<active?"on":""} style={{height:6+index*2}}/>)}</span>;
 }
 
 export default function LobbyRoom({id,user}:{id:string;user:LobbyUser}){
@@ -43,7 +43,6 @@ export default function LobbyRoom({id,user}:{id:string;user:LobbyUser}){
   const [error,setError]=useState("");
   const [localStream,setLocalStream]=useState<MediaStream|null>(null);
   const [localMicGain,setLocalMicGain]=useState(125);
-  const [roomTab,setRoomTab]=useState<"members"|"chat">("members");
   const router=useRouter();
   const voiceLobbyMembers=lobby?.members.map(member=>({
     userId:member.user_id,
@@ -84,18 +83,14 @@ export default function LobbyRoom({id,user}:{id:string;user:LobbyUser}){
   },[load]);
 
   useEffect(()=>{
-    if(lobby?.isMember&&!roomConnected.current){
-      roomConnected.current=true;roomExitAnnounced.current=false;
-      playAudioEvent("connected",loadAudioPreferences());
-    }
+    if(lobby?.isMember&&!roomConnected.current){roomConnected.current=true;roomExitAnnounced.current=false;playAudioEvent("connected",loadAudioPreferences())}
   },[lobby?.isMember]);
 
   useEffect(()=>{
     if(!lobby?.isMember)return;
     let expired=false;
     const expire=()=>{
-      if(expired)return;
-      expired=true;
+      if(expired)return;expired=true;
       if(roomConnected.current&&!roomExitAnnounced.current){roomExitAnnounced.current=true;playAudioEvent("disconnected",loadAudioPreferences())}
       const url=`/api/lobbies/${id}/leave`;
       if(navigator.sendBeacon)navigator.sendBeacon(url,new Blob([],{type:"application/json"}));
@@ -112,6 +107,7 @@ export default function LobbyRoom({id,user}:{id:string;user:LobbyUser}){
     catch(cause){setError(cause instanceof Error?cause.message:"Não foi possível entrar.")}
     finally{setBusy(false)}
   }
+
   async function leave(){
     setBusy(true);notifyVoiceLeave();
     const response=await fetch(`/api/lobbies/${id}/leave`,{method:"POST"});
@@ -119,6 +115,7 @@ export default function LobbyRoom({id,user}:{id:string;user:LobbyUser}){
     if(response.ok){if(!roomExitAnnounced.current){roomExitAnnounced.current=true;playAudioEvent("disconnected",loadAudioPreferences())}router.push("/")}
     else setError("Não foi possível sair.");
   }
+
   async function copy(){
     if(!lobby)return;
     try{
@@ -134,113 +131,130 @@ export default function LobbyRoom({id,user}:{id:string;user:LobbyUser}){
     }catch(cause){setError(cause instanceof Error?cause.message:"Não foi possível copiar o convite.")}
   }
 
-  if(loading)return <main className="room-shell lovable-surface lovable-room"><GrindLoading variant="fullscreen" label="Entrando no lobby…"/></main>;
-  if(!lobby)return <main className="room-shell lovable-surface lovable-room"><div className="room-loading">{error||"Lobby não encontrado."}</div></main>;
+  if(loading)return <main className="desktop-voice-room"><GrindLoading variant="fullscreen" label="Entrando no lobby…"/></main>;
+  if(!lobby)return <main className="desktop-voice-room"><div className="room-loading">{error||"Lobby não encontrado."}</div></main>;
 
   const owner=lobby.members.find(member=>member.user_id===lobby.owner_id);
+  const currentMember=lobby.members.find(member=>member.user_id===user.id);
+  const meName=currentMember?.profile?.display_name||currentMember?.profile?.username||"Player";
   const isPro=user.account_tier==="pro"||user.app_role==="admin";
   const gameTheme=getGameLobbyTheme(lobby.game?.slug,lobby.game?.name);
+  const localVoice=voiceMembers.find(item=>item.userId===user.id);
+  const localMuted=Boolean(localVoice?.microphoneMuted);
+  const visibleMembers=lobby.members.slice(0,6);
 
-  return <main className="room-shell lovable-surface lovable-room">
-    <header className="room-top">
-      <button onClick={()=>router.push("/")}><ArrowLeft size={17}/>Dashboard</button>
-      <div className="room-official-brand" aria-label="GrindLobby"><img src="/brand/grindlobby-official.png" alt="GrindLobby"/></div>
-      <button onClick={copy}>{copied?<Check size={16}/>:<Copy size={16}/>} {copied?"Copiado":"Convidar"}</button>
-    </header>
+  function toggleLocalMute(){void setLiveKitMicrophoneMuted(!localMuted)}
+  function setLocalGain(next:number){setLocalMicGain(next);setLiveKitMicrophoneGain(next)}
 
-    <div className="room-wrap">
-      <section className="room-hero room-game-hero lovable-panel" style={{"--room-accent":gameTheme.accent,"--room-accent-2":gameTheme.accent2,"--room-banner":`url(${gameTheme.banner})`} as CSSProperties}>
-        <div className="room-game-banner"/>
-        <div className="room-game-vignette"/>
-        <div className="gridfx"/>
-        <img className="room-hero-logo" src="/brand/grindlobby-official.png" alt="" aria-hidden="true"/>
-        <div className="relative z-10 flex h-full flex-wrap items-end justify-between gap-6">
-          <div>
-            <div className="eyebrow"><Radio size={13}/>LIVE LOBBY · {lobby.status.toUpperCase()}</div>
-            <h1>{lobby.name}</h1>
-            <p>{gameTheme.label} · Host: {owner?.profile?.display_name??owner?.profile?.username??"Player"}</p>
-            <div className="room-badges">
-              <span><Users size={14}/>{lobby.members.length}/{lobby.max_members} jogadores</span>
-              <span><Mic size={14}/>Voz LiveKit</span>
-              <span><MonitorUp size={14}/>Tela disponível</span>
-              <span><Shield size={14}/>{lobby.visibility}</span>
-            </div>
+  return <main className="desktop-voice-room">
+    {error?<div className="dvr-error" role="alert">{error}</div>:null}
+    <div className="dvr-shell">
+      <aside className="dvr-left">
+        <div className="dvr-brand"><img src="/brand/grindlobby-official.png" alt=""/><strong>GrindLobby</strong></div>
+        <div className="dvr-room-meta">
+          <div className="dvr-room-avatar">{initials(lobby.name)}</div>
+          <div><h2>{lobby.name}</h2><p>Squad Room · <span>● {lobby.members.length} Online</span></p></div>
+        </div>
+        <div className="dvr-room-label">ROOMS</div>
+        <div className="dvr-room-list">
+          <button className="dvr-room-item active"><Headphones size={17}/><span>Main Voice Room</span><small>{lobby.members.length}/{lobby.max_members}</small></button>
+          <button className="dvr-room-item" title="Estratégia integrada ao Grind Board"><Workflow size={17}/><span>Strategy Hub</span><small>↗</small></button>
+          <button className="dvr-room-item"><Gamepad2 size={17}/><span>Match Room</span><small>{lobby.visibility!=="public"?"🔒":""}</small></button>
+        </div>
+        <div className="dvr-left-user">
+          <div className="dvr-user-avatar">{currentMember?.profile?.avatar?<img src={currentMember.profile.avatar} alt=""/>:initials(meName)}</div>
+          <div><b>{meName}</b><span>● Online</span></div>
+          <button className="dvr-icon-btn" style={{marginLeft:"auto"}} aria-label="Configurações"><Settings size={15}/></button>
+        </div>
+      </aside>
+
+      <header className="dvr-top">
+        <nav className="dvr-top-tabs" aria-label="Sala">
+          <button className="dvr-tab active"><Headphones size={16}/>Voice</button>
+          <button className="dvr-tab"><Workflow size={16}/>Strategy</button>
+          <button className="dvr-tab"><Gamepad2 size={16}/>Match</button>
+        </nav>
+        <div className="dvr-top-actions">
+          <button className="dvr-invite" onClick={copy}>{copied?<Check size={14}/>:<Share2 size={14}/>} {copied?"Copiado":"Convidar"}</button>
+          <button className="dvr-icon-btn" aria-label="Mais"><MoreVertical size={16}/></button>
+        </div>
+      </header>
+
+      <section className="dvr-main">
+        <div className="dvr-share-card">
+          <div className="dvr-share-head">
+            <MonitorUp size={15}/><b>Screen Share</b>
+            <span>{owner?.profile?.display_name||owner?.profile?.username||"Host"}</span>
+            <span className="live">LIVE</span>
+            <span className="dvr-share-spacer"/>
+            <span className="dvr-chip">{isPro?"1080p 60fps":"720p 30fps"}</span>
+            <span className="dvr-chip good">● Low Latency</span>
           </div>
-          <div className="flex gap-3">
-            <button onClick={copy} className="lovable-btn-ghost flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm"><UserPlus size={16}/>Convidar</button>
-            {lobby.isMember?<button onClick={leave} disabled={busy} className="lovable-btn-ghost flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm"><LogOut size={16}/>Sair</button>:<button onClick={join} disabled={busy} className="lovable-btn-primary flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm">{busy?<Loader2 size={16} className="animate-spin"/>:<Gamepad2 size={16}/>}Entrar</button>}
+          <div className="dvr-screen-wrap">
+            {lobby.isMember?<ScreenShare isPro={isPro} gameName={gameTheme.label} gameBanner={gameTheme.banner}/>:<div className="dvr-empty-share"><div><MonitorUp size={30}/><h3>Entre na sala para assistir</h3><p>A transmissão abre aqui sem esconder os controles da call.</p></div></div>}
           </div>
+        </div>
+
+        <div className="dvr-people-strip">
+          {visibleMembers.map(member=>{
+            const voice=voiceMembers.find(item=>item.userId===member.user_id);
+            const peer=remotePeers.find(item=>item.userId===member.user_id);
+            const isLocal=member.user_id===user.id;
+            const memberName=member.profile?.display_name||member.profile?.username||"Player";
+            const muted=Boolean(voice?.microphoneMuted)||(!isLocal&&Boolean(peer?.muted));
+            return <article key={member.user_id} className={`dvr-person-card ${isLocal?"me":""}`}>
+              <div className="dvr-member-avatar">{member.profile?.avatar?<img src={member.profile.avatar} alt=""/>:initials(memberName)}</div>
+              <b>{memberName}</b><small>{isLocal?"You":voice?.speaking?"Speaking":"Connected"}</small>
+              {muted?<MicOff className="mute" size={14}/>:null}
+            </article>;
+          })}
         </div>
       </section>
 
-      {error?<div className="lovable-feedback lovable-feedback-error mt-4" role="alert">{error}</div>:null}
-      <div className="room-experience-grid">
-        <div className="room-members-column">
-          <section className="room-panel lovable-panel">
-          <div className="section-head"><div><small>SALA</small><h2>{roomTab==="members"?`Squad (${lobby.members.length}/${lobby.max_members})`:"Chat da sala"}</h2></div><div className="room-tabs"><button className={roomTab==="members"?"active":""} onClick={()=>setRoomTab("members")}><Users size={13}/>Membros</button><button className={roomTab==="chat"?"active":""} onClick={()=>setRoomTab("chat")}><MessageSquare size={13}/>Chat</button></div></div>
-          {roomTab==="members"?<ul className="lovable-member-list mt-3 rounded-xl border border-border bg-panel/40 px-3">
+      <aside className="dvr-right">
+        <section className="dvr-participants">
+          <div className="dvr-side-head"><b>Participants {lobby.members.length} / {lobby.max_members}</b><Users size={15}/></div>
+          <div className="dvr-participant-list">
             {lobby.members.map(member=>{
               const voice=voiceMembers.find(item=>item.userId===member.user_id);
               const peer=remotePeers.find(item=>item.userId===member.user_id);
               const isLocal=member.user_id===user.id;
-              const voiceActive=Boolean(voice?.connected);
-              const speaking=Boolean(voice?.speaking||(voice?.audioLevel??0)>.02);
               const memberName=member.profile?.display_name||member.profile?.username||"Player";
               const locallyMuted=!isLocal&&Boolean(peer?.muted);
-              const micMuted=Boolean(voice?.microphoneMuted)||locallyMuted;
-              const volumeValue=isLocal?localMicGain:(peer?.volume??100);
+              const muted=Boolean(voice?.microphoneMuted)||locallyMuted;
+              const level=voice?.audioLevel??0;
+              const speaking=Boolean(voice?.speaking||level>.02);
               const changeMute=()=>{
-                if(isLocal){
-                  void setLiveKitMicrophoneMuted(!Boolean(voice?.microphoneMuted));
-                  return;
-                }
+                if(isLocal){void setLiveKitMicrophoneMuted(!Boolean(voice?.microphoneMuted));return}
                 if(peer)togglePeerMuted(member.user_id);
               };
-              const changeVolume=(next:number)=>{
-                if(isLocal){
-                  setLocalMicGain(next);
-                  setLiveKitMicrophoneGain(next);
-                }else if(peer)setPeerVolume(member.user_id,next);
-              };
-              const copyHandle=()=>navigator.clipboard?.writeText(`@${member.profile?.username??"player"}`).catch(()=>{});
-              return <li className={`member-voice-row flex flex-wrap items-center gap-3 py-3 ${speaking?"member-speaking":""}`} key={member.user_id}>
-                <span className="relative"><span className="lovable-avatar grid h-9 w-9 place-items-center overflow-hidden rounded-full font-display text-xs font-bold">{member.profile?.avatar?<img src={member.profile.avatar} alt="" className="h-full w-full object-cover"/>:initials(memberName)}</span><span className={`lovable-presence-dot absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ${voiceActive?"bg-success":"bg-muted"}`}/></span>
-                <div className="min-w-0 flex-1"><p className="flex items-center gap-1.5 text-sm font-semibold">{memberName}{member.role==="owner"?<Crown size={14} className="text-warning"/>:null}</p><p className="text-xs text-muted-foreground">@{member.profile?.username??"player"}{voiceActive?` · ${voice?.status||"Connected"}`:" · OFF"}</p></div>
-                <div className="member-voice-actions ml-auto flex items-center gap-2">
+              return <div className="dvr-participant" key={member.user_id}>
+                <div className="dvr-member-avatar">{member.profile?.avatar?<img src={member.profile.avatar} alt=""/>:initials(memberName)}</div>
+                <div><strong>{memberName}{member.role==="owner"?<Crown size={12} color="#e7b94d"/>:null}</strong><p className={speaking?"speaking":""}>{isLocal?"You":speaking?"Speaking":voice?.connected?"Connected":"Offline"}</p></div>
+                <div className="dvr-participant-actions">
                   {peer?<RemoteVoiceAudio stream={peer.stream} volume={peer.volume} muted={peer.muted}/>:null}
-                  <button type="button" onClick={changeMute} disabled={!voiceActive||(!isLocal&&!peer)} className={micMuted?"member-mic-btn is-muted":"member-mic-btn"} aria-label={isLocal?(voice?.microphoneMuted?"Ativar meu microfone":"Mutar meu microfone"):(peer?.muted?`Desmutar ${memberName} para mim`:`Mutar ${memberName} para mim`)} title={isLocal?"Mutar/desmutar meu microfone":"Mutar/desmutar este usuário apenas para você"}>
-                    {micMuted?<MicOff size={16}/>:<Mic size={16}/>}
-                  </button>
-                  <label className="member-volume" title={isLocal?"Ganho do seu microfone":"Volume deste usuário para você"}>
-                    <Volume2 size={13}/><input aria-label={isLocal?"Ganho do meu microfone":`Volume de ${memberName}`} type="range" min="0" max={isLocal?200:100} value={volumeValue} disabled={!voiceActive||(!isLocal&&!peer)} onChange={event=>changeVolume(Number(event.target.value))}/><b>{volumeValue}%</b>
-                  </label>
-                  <span className={member.role==="owner"?"rounded-md border border-primary/40 bg-primary/20 px-2 py-1 text-[10px] font-bold":"lovable-label"}>{member.role==="owner"?"HOST":"MEMBRO"}</span>
-                  <details className="member-more">
-                    <summary aria-label={`Mais opções de ${memberName}`}><MoreVertical size={16}/></summary>
-                    <div className="member-more-popover">
-                      <button type="button" onClick={changeMute} disabled={!voiceActive||(!isLocal&&!peer)}>{micMuted?<Mic size={14}/>:<MicOff size={14}/>} {micMuted?"Desmutar":"Mutar"}</button>
-                      <button type="button" onClick={()=>changeVolume(isLocal?125:100)} disabled={!voiceActive||(!isLocal&&!peer)}><RotateCcw size={14}/>Restaurar volume</button>
-                      {!isLocal?<><button type="button" onClick={()=>changeVolume(25)} disabled={!peer}><Volume2 size={14}/>Volume 25%</button><button type="button" onClick={()=>changeVolume(50)} disabled={!peer}><Volume2 size={14}/>Volume 50%</button><button type="button" onClick={()=>changeVolume(100)} disabled={!peer}><Volume2 size={14}/>Volume 100%</button></>:<><button type="button" onClick={()=>changeVolume(100)}><Volume2 size={14}/>Ganho 100%</button><button type="button" onClick={()=>changeVolume(125)}><Volume2 size={14}/>Ganho 125%</button></>}
-                      <button type="button" onClick={copyHandle}><Copy size={14}/>Copiar usuário</button>
-                    </div>
-                  </details>
+                  <button className={`dvr-mini-action ${muted?"muted":""}`} onClick={changeMute} disabled={!voice?.connected&&!(peer&&peer.stream)} aria-label={muted?`Desmutar ${memberName}`:`Mutar ${memberName}`}>{muted?<MicOff size={14}/>:<Mic size={14}/>}</button>
+                  <LevelBars level={level} muted={muted}/>
                 </div>
-              </li>;
+              </div>;
             })}
-          </ul>:<LobbyChat lobbyId={id} members={voiceLobbyMembers.map(member=>({userId:member.userId,name:member.name}))}/>}
-          </section>
-
-        </div>
-
-        <div className="room-stream-column">
-          {lobby.isMember?<ScreenShare isPro={isPro} gameName={gameTheme.label} gameBanner={gameTheme.banner}/>:<section className="room-panel lovable-panel room-stream-locked"><MonitorUp size={28}/><h2>Entre na sala para assistir</h2><p>A transmissão aparece aqui sem bloquear o restante do lobby.</p></section>}
-        </div>
-
-        <aside className="room-side room-control-column">
+          </div>
+        </section>
+        <section className="dvr-voice-controls">
           <AudioHost enabled={lobby.isMember} onStreamChange={setLocalStream}/>
-          <section className="room-panel lovable-panel room-session-card"><small>SESSÃO</small><h2>Pronto para jogar</h2><p>Voz e tela usam LiveKit SFU com stream adaptativo e reconexão automática.</p><div className="mt-4 grid gap-2 text-sm"><span className="flex items-center justify-between rounded-lg border border-border bg-panel px-3 py-2"><span className="flex items-center gap-2 text-muted-foreground"><Globe size={15}/>Visibilidade</span><b>{lobby.visibility}</b></span><span className="flex items-center justify-between rounded-lg border border-border bg-panel px-3 py-2"><span className="flex items-center gap-2 text-muted-foreground"><MonitorUp size={15}/>Máximo</span><b>{isPro?"1080p60":"720p30"}</b></span></div>{lobby.owner_id===user.id?<button className="lovable-btn-ghost mt-4 flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm"><Settings size={15}/>Você é o host</button>:null}</section>
-        </aside>
-      </div>
+          <label style={{display:"flex",alignItems:"center",gap:8,marginTop:10,fontSize:10,color:"#7e8ca1"}}><Volume2 size={13}/>Seu ganho<input type="range" min="0" max="200" value={localMicGain} onChange={event=>setLocalGain(Number(event.target.value))} style={{flex:1}}/><b style={{color:"#b9c5d6"}}>{localMicGain}%</b></label>
+        </section>
+      </aside>
+
+      <footer className="dvr-bottom">
+        <div className="dvr-bottom-group"><span><i className="dvr-good-dot"/>LOW LATENCY <strong>18ms</strong></span><span>⚡ OPTIMIZED DESKTOP CLIENT</span><span>◈ MINIMAL RESOURCE MODE</span></div>
+        <div className="dvr-center-controls">
+          <button className="dvr-bottom-btn" onClick={()=>router.push("/")} aria-label="Minimizar sala"><MonitorUp size={16}/></button>
+          <button className="dvr-bottom-btn primary" onClick={toggleLocalMute} aria-label={localMuted?"Ativar microfone":"Mutar microfone"}>{localMuted?<MicOff size={20}/>:<Mic size={20}/>}</button>
+          <button className="dvr-bottom-btn danger" onClick={leave} disabled={busy} aria-label="Sair da sala"><PhoneOff size={18}/></button>
+        </div>
+        <div className="dvr-bottom-group"><span><i className="dvr-good-dot"/>VOICE LIVE</span><span>SFU</span><span>{lobby.isMember?"CONNECTED":"READY"}</span></div>
+      </footer>
     </div>
   </main>;
 }
