@@ -8,7 +8,7 @@ const schema=z.object({scoreA:z.number().int().min(0).max(99),scoreB:z.number().
 export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){
   try{
     assertTrustedMutation(request);
-    const user=await getCurrentUser();if(!user)return noStoreJson({error:'Não autorizado.'},{status:401});
+    const user=await getCurrentUser(request);if(!user)return noStoreJson({error:'Não autorizado.'},{status:401});
     await enforceRateLimit(request,{scope:'valorant-result',limit:20,windowSeconds:300,subject:user.id});
     const {id}=await params,body=schema.parse(await readJsonBody(request)),admin=createAdminClient();
     const {data,error}=await admin.rpc('submit_valorant_result_atomic',{p_match_id:id,p_captain_id:user.id,p_score_a:body.scoreA,p_score_b:body.scoreB});
