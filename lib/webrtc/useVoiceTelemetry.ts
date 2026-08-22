@@ -39,10 +39,14 @@ export function useVoiceTelemetry(lobbyId:string,enabled:boolean){
   useEffect(()=>{
     if(!enabled)return;
     let room:Room|null=null,disposed=false,lastBytes:number|null=null,lastAt:number|null=null;
-    const unsubscribe=subscribeActiveLiveKitRoom(next=>{room=next;if(!next){lastBytes=null;lastAt=null}});
+    const unsubscribe=subscribeActiveLiveKitRoom(next=>{
+      if(room!==next){lastBytes=null;lastAt=null}
+      room=next;
+    });
     const send=async()=>{
       if(disposed||!room)return;
-      const raw=await readStats(room);if(disposed)return;
+      const sampledRoom=room;
+      const raw=await readStats(sampledRoom);if(disposed||room!==sampledRoom)return;
       const now=performance.now();
       const bitrateKbps=lastAt==null?null:bitrateKbpsFromDelta(raw.bytes,lastBytes,now-lastAt);
       lastBytes=raw.bytes;lastAt=now;
