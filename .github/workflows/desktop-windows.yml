@@ -1,9 +1,17 @@
 name: Desktop Windows
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'desktop/**'
+      - 'public/brand/grindlobby-official.png'
+      - '.github/workflows/desktop-windows.yml'
   pull_request:
     paths:
       - 'desktop/**'
+      - 'public/brand/grindlobby-official.png'
       - '.github/workflows/desktop-windows.yml'
   workflow_dispatch:
 
@@ -49,7 +57,7 @@ jobs:
           $img.Dispose()
 
       - name: Generate Windows icons from GrindLobby logo
-        run: npx --yes @tauri-apps/cli@2 icon app-icon.png
+        run: npx --yes @tauri-apps/cli@2.11.4 icon app-icon.png
 
       - name: Cargo check standard
         run: cargo check
@@ -58,7 +66,7 @@ jobs:
         run: cargo check --features lite
 
       - name: Build standard Windows installer
-        run: npx --yes @tauri-apps/cli@2 build --bundles nsis
+        run: npx --yes @tauri-apps/cli@2.11.4 build --bundles nsis
 
       - name: Upload standard EXE installer
         uses: actions/upload-artifact@v4
@@ -73,7 +81,7 @@ jobs:
           if (Test-Path 'target/release/bundle/nsis') { Remove-Item 'target/release/bundle/nsis' -Recurse -Force }
 
       - name: Build Performance Windows installer
-        run: npx --yes @tauri-apps/cli@2 build --bundles nsis --features lite --config tauri.lite.conf.json
+        run: npx --yes @tauri-apps/cli@2.11.4 build --bundles nsis --features lite --config tauri.lite.conf.json
 
       - name: Upload Performance EXE installer
         uses: actions/upload-artifact@v4
