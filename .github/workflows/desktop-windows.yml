@@ -51,15 +51,33 @@ jobs:
       - name: Generate Windows icons from GrindLobby logo
         run: npx --yes @tauri-apps/cli@2 icon app-icon.png
 
-      - name: Cargo check
+      - name: Cargo check standard
         run: cargo check
 
-      - name: Build Windows installer
+      - name: Cargo check performance
+        run: cargo check --features lite
+
+      - name: Build standard Windows installer
         run: npx --yes @tauri-apps/cli@2 build --bundles nsis
 
-      - name: Upload EXE installer
+      - name: Upload standard EXE installer
         uses: actions/upload-artifact@v4
         with:
           name: GrindLobby-Windows
+          path: desktop/src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error
+
+      - name: Clean standard bundle output
+        shell: pwsh
+        run: |
+          if (Test-Path 'target/release/bundle/nsis') { Remove-Item 'target/release/bundle/nsis' -Recurse -Force }
+
+      - name: Build Performance Windows installer
+        run: npx --yes @tauri-apps/cli@2 build --bundles nsis --features lite --config tauri.lite.conf.json
+
+      - name: Upload Performance EXE installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: GrindLobby-Performance-Windows
           path: desktop/src-tauri/target/release/bundle/nsis/*.exe
           if-no-files-found: error
