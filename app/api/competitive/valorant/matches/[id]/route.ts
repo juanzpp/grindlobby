@@ -2,6 +2,7 @@ import {getCurrentUser} from '@/lib/auth';
 import {createAdminClient} from '@/lib/supabase/admin';
 import {noStoreJson} from '@/lib/security/request';
 import {advanceExpiredValorantVeto} from '@/lib/competitive/veto';
+import {ensureValorantTeamRooms} from '@/lib/competitive/rooms';
 
 export async function GET(request:Request,{params}:{params:Promise<{id:string}>}){
  try{
@@ -12,6 +13,14 @@ export async function GET(request:Request,{params}:{params:Promise<{id:string}>}
   if(match.state==='ACCEPTING'&&match.accept_deadline&&new Date(match.accept_deadline).getTime()<Date.now()){
     const {count}=await admin.from('valorant_match_players').select('*',{count:'exact',head:true}).eq('match_id',id).eq('accepted',true);
     if((count??0)<10){await admin.from('valorant_matches').update({state:'CANCELLED',updated_at:new Date().toISOString()}).eq('id',id).eq('state','ACCEPTING');match={...match,state:'CANCELLED'};}
+  }
+  if((match.state==='MAP_SELECTED'||match.state==='LOBBY_READY')&&match.selected_map_slug){
+    await ensureValorantTeamRooms(id,match.selected_map_slug);
+    if(match.state==='MAP_SELECTED'){
+      const transition=await admin.from('valorant_matches').update({state:'LOBBY_READY',updated_at:new Date().toISOString()}).eq('id',id).eq('state','MAP_SELECTED').select('*').maybeSingle();
+      if(transition.error)throw transition.error;
+      if(transition.data)match=transition.data;
+    }
   }
   const [{data:squads},{data:players},{data:veto},{data:maps},{data:rooms},{data:sessions},{data:history}]=await Promise.all([
     admin.from('valorant_squads').select('id,name,captain_id,region').in('id',[match.squad_a_id,match.squad_b_id]),

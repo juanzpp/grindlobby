@@ -27,6 +27,13 @@ describe('screen share performance policy',()=>{
     expect(source).toContain('if(operationRef.current==="start"){stopRequestedRef.current=true;return}');
   });
 
+  it('unpublishes a just-published screen if the room changed',async()=>{
+    const source=await readFile('components/stream/ScreenShare.tsx','utf8');
+    expect(source).toContain('A sala mudou logo após a publicação da transmissão.');
+    expect(source).toContain('getTrackPublication(Track.Source.ScreenShare)');
+    expect(source).toContain('unpublishTrack(publication.track,true)');
+  });
+
   it('prevents overlapping viewer RTC stats reads',async()=>{
     const source=await readFile('components/stream/ScreenShare.tsx','utf8');
     expect(source).toContain('let cancelled=false,inFlight=false');
@@ -36,7 +43,7 @@ describe('screen share performance policy',()=>{
 
   it('clears reconnect state on disconnect and on room replacement',async()=>{
     const source=await readFile('components/stream/ScreenShare.tsx','utf8');
-    expect(source).toContain('if(!room){setShares([]);setReconnecting(false);return}');
+    expect(source).toContain('if(!room){const timer=window.setTimeout(()=>{setShares([]);setReconnecting(false)},0)');
     expect(source).toContain('onDisconnected=()=>{setReconnecting(false);sync()}');
     expect(source).toContain('RoomEvent.Disconnected,onDisconnected');
   });

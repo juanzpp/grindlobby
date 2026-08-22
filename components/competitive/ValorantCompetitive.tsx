@@ -1,5 +1,6 @@
 'use client';
 import Link from 'next/link';
+import {useRouter} from 'next/navigation';
 import {useCallback,useEffect,useState} from 'react';
 import {Crown,Gamepad2,Loader2,Search,Shield,Signal,Users,UserPlus} from 'lucide-react';
 
@@ -8,11 +9,12 @@ type Squad={id:string;name:string;captain_id:string;region:string;members:Member
 type Summary={season:{id:string;name:string}|null;squad:Squad|null;rating:{rating:number;peak_rating:number;placements_played:number;wins:number;losses:number}|null;queue:{id:string;status:string;average_gr:number;region:string;created_at:string}|null;activeMatch:{id:string;code:string;state:string}|null};
 function initials(v:string){return v.trim().slice(0,1).toUpperCase()||'G'}
 export default function ValorantCompetitive({userId}:{userId:string}){
+ const router=useRouter();
  const [data,setData]=useState<Summary|null>(null),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState('');const [name,setName]=useState('Grind Squad'),[members,setMembers]=useState(['','','','']);
  const load=useCallback(async()=>{try{const r=await fetch('/api/competitive/valorant',{cache:'no-store'}),b=await r.json();if(!r.ok)throw new Error(b.error||'Falha ao carregar competitivo.');setData(b);setError('');}catch(e){setError(e instanceof Error?e.message:'Falha ao carregar competitivo.')}finally{setLoading(false)}},[]);
- useEffect(()=>{void load();const timer=window.setInterval(()=>void load(),3000);return()=>window.clearInterval(timer)},[load]);
+ useEffect(()=>{const initial=window.setTimeout(()=>void load(),0);const timer=window.setInterval(()=>void load(),3000);return()=>{window.clearTimeout(initial);window.clearInterval(timer)}},[load]);
  async function createSquad(){setBusy(true);try{const r=await fetch('/api/competitive/valorant/squad',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,region:'BR-SAO',members})}),b=await r.json();if(!r.ok)throw new Error(b.error||'Falha ao criar squad.');await load();}catch(e){setError(e instanceof Error?e.message:'Falha ao criar squad.')}finally{setBusy(false)}}
- async function queue(){setBusy(true);try{const r=await fetch('/api/competitive/valorant/queue',{method:'POST'}),b=await r.json();if(!r.ok)throw new Error(b.error||'Falha ao entrar na fila.');if(b.matchId)location.href=`/competitive/valorant/match/${b.matchId}`;else await load();}catch(e){setError(e instanceof Error?e.message:'Falha ao entrar na fila.')}finally{setBusy(false)}}
+ async function queue(){setBusy(true);try{const r=await fetch('/api/competitive/valorant/queue',{method:'POST'}),b=await r.json();if(!r.ok)throw new Error(b.error||'Falha ao entrar na fila.');if(b.matchId)router.push(`/competitive/valorant/match/${b.matchId}`);else await load();}catch(e){setError(e instanceof Error?e.message:'Falha ao entrar na fila.')}finally{setBusy(false)}}
  if(loading)return <div className="competitive-loading"><Loader2 className="animate-spin"/>Carregando GRIND VALORANT</div>;
  const rating=data?.rating??{rating:1000,peak_rating:1000,placements_played:0,wins:0,losses:0};const squad=data?.squad;
  return <div className="competitive-shell"><header className="competitive-top"><Link href="/">← Dashboard</Link><div className="competitive-logo">GRIND <span>VALORANT</span></div><div className="competitive-season">{data?.season?.name||'Temporada indisponível'}</div></header><main className="competitive-page">

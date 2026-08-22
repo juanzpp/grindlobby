@@ -9,6 +9,7 @@ edition = "2021"
 default = []
 lite = []
 
+# Pin direct desktop dependencies; Cargo.lock pins the full transitive graph.
 [build-dependencies]
 tauri-build = { version = "=2.6.3", features = [] }
 

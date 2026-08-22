@@ -84,10 +84,9 @@ async function readMedia(room:Room,baseline:ByteBaseline|null):Promise<{snapshot
 }
 
 export default function DesktopPerformanceDiagnostics(){
-  const [lite,setLite]=useState(false),[open,setOpen]=useState(false),[native,setNative]=useState<NativeSnapshot|null>(null),[browser,setBrowser]=useState<BrowserSnapshot>(emptyBrowser),[media,setMedia]=useState<MediaSnapshot>(emptyMedia),[copied,setCopied]=useState(false);
+  const [lite]=useState(()=>typeof window!=="undefined"&&new URLSearchParams(window.location.search).get("desktop")==="lite"),[open,setOpen]=useState(false),[native,setNative]=useState<NativeSnapshot|null>(null),[browser,setBrowser]=useState<BrowserSnapshot>(emptyBrowser),[media,setMedia]=useState<MediaSnapshot>(emptyMedia),[copied,setCopied]=useState(false);
   const roomRef=useRef<Room|null>(null),baselineRef=useRef<ByteBaseline|null>(null),longTasks=useRef({count:0,ms:0});
 
-  useEffect(()=>{setLite(new URLSearchParams(location.search).get("desktop")==="lite")},[]);
   useEffect(()=>{
     if(!lite)return;
     return subscribeActiveLiveKitRoom(room=>{roomRef.current=room;baselineRef.current=null;if(!room)setMedia(emptyMedia)});

@@ -27,25 +27,8 @@ import {
 import {subscribeActiveLiveKitRoom} from "@/lib/webrtc/useLobbyVoice";
 import {shouldUseScreenSimulcast} from "@/lib/webrtc/mediaPolicy";
 
-type Entitlement={
-  tier:"free"|"pro";
-  maxWidth:number;
-  maxHeight:number;
-  maxFps:number;
-  allowed?:boolean;
-  reason?:string|null;
-};
-
-type Share={
-  ownerId:string;
-  ownerName:string;
-  track:VideoTrack;
-  audioTrack:RemoteAudioTrack|null;
-  audioPublished:boolean;
-  local:boolean;
-  quality:string;
-};
-
+type Entitlement={tier:"free"|"pro";maxWidth:number;maxHeight:number;maxFps:number;allowed?:boolean;reason?:string|null};
+type Share={ownerId:string;ownerName:string;track:VideoTrack;audioTrack:RemoteAudioTrack|null;audioPublished:boolean;local:boolean;quality:string};
 type ScreenAudioState={supported:boolean;available:boolean|null;published:boolean};
 type QualityPreset={height:360|480|720|1080;width:number;fps:number;bitrate:number;label:string};
 type ViewMode="player"|"split"|"floating"|"minimized";
@@ -71,7 +54,7 @@ function snapshot(room:Room|null):Share[]{
   const shares:Share[]=[];
   const localVideo=room.localParticipant.getTrackPublication(Track.Source.ScreenShare)?.track;
   const localAudioPublication=room.localParticipant.getTrackPublication(Track.Source.ScreenShareAudio);
-  if(localVideo instanceof LocalVideoTrack){shares.push({ownerId:room.localParticipant.identity,ownerName:room.localParticipant.name||"Você",track:localVideo,audioTrack:null,audioPublished:Boolean(localAudioPublication),local:true,quality:trackQuality(localVideo)})}
+  if(localVideo instanceof LocalVideoTrack)shares.push({ownerId:room.localParticipant.identity,ownerName:room.localParticipant.name||"Você",track:localVideo,audioTrack:null,audioPublished:Boolean(localAudioPublication),local:true,quality:trackQuality(localVideo)});
   for(const participant of room.remoteParticipants.values()){
     const video=participant.getTrackPublication(Track.Source.ScreenShare)?.track;
     const audioPublication=participant.getTrackPublication(Track.Source.ScreenShareAudio);
@@ -90,23 +73,16 @@ function StreamVideo({share,volume}:{share:Share;volume:number}){
   useEffect(()=>subscribeAudioOutput(setOutput),[]);
   useEffect(()=>{
     const element=videoRef.current;if(!element)return;
-    share.track.attach(element);element.autoplay=true;element.playsInline=true;element.muted=true;
-    element.play().catch(()=>{});
+    share.track.attach(element);element.autoplay=true;element.playsInline=true;element.muted=true;element.play().catch(()=>{});
     return()=>{share.track.detach(element)};
   },[share.track]);
   useEffect(()=>{
     const element=audioRef.current,track=share.audioTrack;if(!element||!track)return;
-    setPlaybackBlocked(false);track.attach(element);element.autoplay=true;element.volume=1;element.muted=gain<=0;
-    track.setVolume(gain);
+    setPlaybackBlocked(false);track.attach(element);element.autoplay=true;element.volume=1;element.muted=gain<=0;track.setVolume(gain);
     if(output.deviceId)track.setSinkId(output.deviceId).catch(()=>{});
     if(gain>0)element.play().catch(()=>setPlaybackBlocked(true));
     return()=>{track.detach(element);track.setVolume(1)};
-  },[share.audioTrack,output.deviceId]);
-  useEffect(()=>{
-    const element=audioRef.current,track=share.audioTrack;if(!track)return;
-    track.setVolume(gain);if(element)element.muted=gain<=0;
-    if(element&&gain>0&&element.paused)element.play().catch(()=>setPlaybackBlocked(true));
-  },[share.audioTrack,gain]);
+  },[share.audioTrack,output.deviceId,gain]);
 
   async function resumeAudio(){const element=audioRef.current;if(!element)return;element.muted=false;await element.play();setPlaybackBlocked(false)}
   return <><video ref={videoRef} autoPlay playsInline muted/><audio ref={audioRef} autoPlay playsInline/>{playbackBlocked?<button className="stream-unlock-audio" onClick={()=>resumeAudio().catch(()=>{})}><Volume2 size={15}/>Ativar áudio da transmissão</button>:null}</>;
@@ -124,14 +100,14 @@ export default function ScreenShare({isPro=false,gameName="GrindLobby",gameBanne
 
   useEffect(()=>subscribeActiveLiveKitRoom(next=>{roomRef.current=next;setRoom(next)}),[]);
   useEffect(()=>{localStorage.setItem(streamVolumeKey,String(volume))},[volume]);
-  useEffect(()=>{getServerEntitlement().catch(()=>{})},[]);
+  useEffect(()=>{const timer=window.setTimeout(()=>{void getServerEntitlement().catch(()=>{})},0);return()=>window.clearTimeout(timer)},[]);
   useEffect(()=>{
-    if(!room){setShares([]);setReconnecting(false);return}
+    if(!room){const timer=window.setTimeout(()=>{setShares([]);setReconnecting(false)},0);return()=>window.clearTimeout(timer)}
     const sync=()=>{const next=snapshot(room);setShares(next);const local=next.find(item=>item.local);setScreenAudio(current=>({...current,published:Boolean(local?.audioPublished)}));setViewerId(current=>current&&next.some(item=>item.ownerId===current)?current:(next.find(item=>!item.local)?.ownerId??next.find(item=>item.local)?.ownerId??null))};
     const onConnected=()=>{setReconnecting(false);sync()},onReconnecting=()=>{setReconnecting(true);sync()},onReconnected=()=>{setReconnecting(false);sync()},onDisconnected=()=>{setReconnecting(false);sync()};
-    setReconnecting(room.state===ConnectionState.Reconnecting);sync();
+    const initialTimer=window.setTimeout(()=>{setReconnecting(room.state===ConnectionState.Reconnecting);sync()},0);
     room.on(RoomEvent.Connected,onConnected).on(RoomEvent.ParticipantConnected,sync).on(RoomEvent.ParticipantDisconnected,sync).on(RoomEvent.TrackPublished,sync).on(RoomEvent.TrackUnpublished,sync).on(RoomEvent.TrackSubscribed,sync).on(RoomEvent.TrackUnsubscribed,sync).on(RoomEvent.LocalTrackPublished,sync).on(RoomEvent.LocalTrackUnpublished,sync).on(RoomEvent.Reconnecting,onReconnecting).on(RoomEvent.Reconnected,onReconnected).on(RoomEvent.ConnectionStateChanged,sync).on(RoomEvent.Disconnected,onDisconnected);
-    return()=>{room.off(RoomEvent.Connected,onConnected).off(RoomEvent.ParticipantConnected,sync).off(RoomEvent.ParticipantDisconnected,sync).off(RoomEvent.TrackPublished,sync).off(RoomEvent.TrackUnpublished,sync).off(RoomEvent.TrackSubscribed,sync).off(RoomEvent.TrackUnsubscribed,sync).off(RoomEvent.LocalTrackPublished,sync).off(RoomEvent.LocalTrackUnpublished,sync).off(RoomEvent.Reconnecting,onReconnecting).off(RoomEvent.Reconnected,onReconnected).off(RoomEvent.ConnectionStateChanged,sync).off(RoomEvent.Disconnected,onDisconnected)};
+    return()=>{window.clearTimeout(initialTimer);room.off(RoomEvent.Connected,onConnected).off(RoomEvent.ParticipantConnected,sync).off(RoomEvent.ParticipantDisconnected,sync).off(RoomEvent.TrackPublished,sync).off(RoomEvent.TrackUnpublished,sync).off(RoomEvent.TrackSubscribed,sync).off(RoomEvent.TrackUnsubscribed,sync).off(RoomEvent.LocalTrackPublished,sync).off(RoomEvent.LocalTrackUnpublished,sync).off(RoomEvent.Reconnecting,onReconnecting).off(RoomEvent.Reconnected,onReconnected).off(RoomEvent.ConnectionStateChanged,sync).off(RoomEvent.Disconnected,onDisconnected)};
   },[room]);
 
   const localShare=shares.find(item=>item.local),remoteShares=shares.filter(item=>!item.local),viewer=shares.find(item=>item.ownerId===viewerId)??null;
@@ -139,22 +115,20 @@ export default function ScreenShare({isPro=false,gameName="GrindLobby",gameBanne
   useEffect(()=>{const mediaTrack=localShare?.track.mediaStreamTrack;if(!mediaTrack||!room)return;const ended=()=>{void stop()};mediaTrack.addEventListener("ended",ended,{once:true});return()=>mediaTrack.removeEventListener("ended",ended)},[localShare?.track,room]);
   useEffect(()=>{
     bytesRef.current=null;
-    if(!viewer){setStats({rtt:null,bitrate:null,fps:null,dropped:null,packetLoss:null});return}
+    if(!viewer){const resetTimer=window.setTimeout(()=>setStats({rtt:null,bitrate:null,fps:null,dropped:null,packetLoss:null}),0);return()=>window.clearTimeout(resetTimer)}
     let cancelled=false,inFlight=false;
     const read=async()=>{
       if(inFlight)return;inFlight=true;
       try{
         const report=await (viewer.track as VideoTrack&{getRTCStatsReport?:()=>Promise<RTCStatsReport>}).getRTCStatsReport?.();if(!report||cancelled)return;
         let rtt:number|null=null,bytes:number|null=null,fps:number|null=null,dropped:number|null=null,packetLoss:number|null=null;
-        report.forEach(row=>{const stat=row as RTCStats&{currentRoundTripTime?:number;bytesReceived?:number;bytesSent?:number;framesPerSecond?:number;framesDropped?:number;packetsLost?:number;packetsReceived?:number;state?:string};if(stat.type==="candidate-pair"&&stat.state==="succeeded"&&typeof stat.currentRoundTripTime==="number")rtt=Math.round(stat.currentRoundTripTime*1000);if(stat.type==="inbound-rtp"&&!(stat as RTCInboundRtpStreamStats).kind?.includes("audio")){bytes=stat.bytesReceived??null;fps=stat.framesPerSecond??null;dropped=stat.framesDropped??null;const received=stat.packetsReceived??0,lost=stat.packetsLost??0;if(received+lost>0)packetLoss=lost/(received+lost)*100}}
-        );
+        report.forEach(row=>{const stat=row as RTCStats&{currentRoundTripTime?:number;bytesReceived?:number;framesPerSecond?:number;framesDropped?:number;packetsLost?:number;packetsReceived?:number;state?:string};if(stat.type==="candidate-pair"&&stat.state==="succeeded"&&typeof stat.currentRoundTripTime==="number")rtt=Math.round(stat.currentRoundTripTime*1000);if(stat.type==="inbound-rtp"&&!(stat as RTCInboundRtpStreamStats).kind?.includes("audio")){bytes=stat.bytesReceived??null;fps=stat.framesPerSecond??null;dropped=stat.framesDropped??null;const received=stat.packetsReceived??0,lost=stat.packetsLost??0;if(received+lost>0)packetLoss=lost/(received+lost)*100}});
         const now=performance.now();let bitrate:number|null=null;if(bytes!=null&&bytesRef.current){const deltaBytes=bytes-bytesRef.current.bytes,deltaSeconds=(now-bytesRef.current.at)/1000;if(deltaBytes>=0&&deltaSeconds>0)bitrate=Math.round(deltaBytes*8/deltaSeconds/1000)}if(bytes!=null)bytesRef.current={bytes,at:now};
-        const measuredPacketLoss = packetLoss as number | null;
-        setStats({rtt,bitrate,fps:fps?Math.round(fps):null,dropped,packetLoss:measuredPacketLoss==null?null:Math.round(measuredPacketLoss*10)/10});
+        const measuredPacketLoss=packetLoss as number|null;setStats({rtt,bitrate,fps:fps?Math.round(fps):null,dropped,packetLoss:measuredPacketLoss==null?null:Math.round(measuredPacketLoss*10)/10});
       }catch{}finally{inFlight=false}
     };
     void read();const timer=window.setInterval(()=>void read(),2000);return()=>{cancelled=true;window.clearInterval(timer);bytesRef.current=null};
-  },[viewer?.track]);
+  },[viewer]);
   useEffect(()=>{
     const move=(event:PointerEvent)=>{const drag=dragRef.current;if(!drag)return;setFloatPos({x:Math.max(-window.innerWidth/2,Math.min(window.innerWidth/2,drag.left+event.clientX-drag.x)),y:Math.max(-window.innerHeight/2,Math.min(window.innerHeight/2,drag.top+event.clientY-drag.y))})};
     const up=()=>{dragRef.current=null};window.addEventListener("pointermove",move);window.addEventListener("pointerup",up);return()=>{window.removeEventListener("pointermove",move);window.removeEventListener("pointerup",up)};
@@ -168,10 +142,8 @@ export default function ScreenShare({isPro=false,gameName="GrindLobby",gameBanne
     if(!targetRoom||targetRoom.state!==ConnectionState.Connected){setError("Entre no lobby antes de compartilhar a tela.");return}if(!screenAudio.supported){setError("Seu navegador não oferece captura de tela neste contexto.");return}
     operationRef.current="start";setBusy(true);setError("");setScreenAudio(current=>({...current,available:null,published:false}));let createdTracks:LocalTrack[]=[];
     try{
-      const capability=await getServerEntitlement();
-      if(capability.allowed===false)throw new Error(capability.reason||"Transmissão indisponível para esta conta.");
-      const selected=qualityPresets.find(item=>item.height===quality)??qualityPresets[2];
-      if(selected.height>capability.maxHeight)throw new Error(`Seu plano permite transmissão até ${capability.maxHeight}p.`);
+      const capability=await getServerEntitlement();if(capability.allowed===false)throw new Error(capability.reason||"Transmissão indisponível para esta conta.");
+      const selected=qualityPresets.find(item=>item.height===quality)??qualityPresets[2];if(selected.height>capability.maxHeight)throw new Error(`Seu plano permite transmissão até ${capability.maxHeight}p.`);
       const maxFps=Math.min(selected.fps,capability.maxFps);
       const tracks=await targetRoom.localParticipant.createScreenTracks({audio:true,video:{displaySurface:surface},resolution:{width:selected.width,height:selected.height,frameRate:maxFps},contentHint:"motion",surfaceSwitching:"include",systemAudio:"include",suppressLocalAudioPlayback:false});
       createdTracks=tracks;
@@ -180,15 +152,13 @@ export default function ScreenShare({isPro=false,gameName="GrindLobby",gameBanne
       await video.mediaStreamTrack.applyConstraints({width:{max:Math.min(selected.width,capability.maxWidth)},height:{max:Math.min(selected.height,capability.maxHeight)},frameRate:{max:Math.min(maxFps,capability.maxFps)}}).catch(()=>{});setScreenAudio(current=>({...current,available:Boolean(audio),published:false}));
       if(roomRef.current!==targetRoom||targetRoom.state!==ConnectionState.Connected)throw new Error("A sala mudou antes da publicação da transmissão.");
       await targetRoom.localParticipant.publishTrack(video,{source:Track.Source.ScreenShare,simulcast:shouldUseScreenSimulcast(selected.height,Math.min(maxFps,capability.maxFps)),videoCodec:"vp8",degradationPreference:"maintain-framerate",screenShareEncoding:{maxBitrate:selected.bitrate,maxFramerate:Math.min(maxFps,capability.maxFps)}});
-      if(audio){try{if(roomRef.current!==targetRoom)throw new Error("room_changed");await targetRoom.localParticipant.publishTrack(audio,{source:Track.Source.ScreenShareAudio,audioPreset:AudioPresets.musicHighQualityStereo,dtx:false,forceStereo:true});setScreenAudio(current=>({...current,published:true}))}catch{audio.stop();setError("A tela está sendo transmitida, mas o áudio não pôde ser publicado.")}}
-      setShares(snapshot(targetRoom));setViewerId(targetRoom.localParticipant.identity);setPanel(false);
+      if(roomRef.current!==targetRoom||targetRoom.state!==ConnectionState.Connected){const publication=targetRoom.localParticipant.getTrackPublication(Track.Source.ScreenShare);if(publication?.track)await targetRoom.localParticipant.unpublishTrack(publication.track,true).catch(()=>{});throw new Error("A sala mudou logo após a publicação da transmissão.")}
+      if(audio){try{if(roomRef.current!==targetRoom||targetRoom.state!==ConnectionState.Connected)throw new Error("room_changed");await targetRoom.localParticipant.publishTrack(audio,{source:Track.Source.ScreenShareAudio,audioPreset:AudioPresets.musicHighQualityStereo,dtx:false,forceStereo:true});if(roomRef.current!==targetRoom||targetRoom.state!==ConnectionState.Connected){const publication=targetRoom.localParticipant.getTrackPublication(Track.Source.ScreenShareAudio);if(publication?.track)await targetRoom.localParticipant.unpublishTrack(publication.track,true).catch(()=>{});throw new Error("room_changed")};setScreenAudio(current=>({...current,published:true}))}catch{audio.stop();setError("A tela está sendo transmitida, mas o áudio não pôde ser publicado.")}}
+      if(roomRef.current!==targetRoom)throw new Error("A sala mudou durante a transmissão.");setShares(snapshot(targetRoom));setViewerId(targetRoom.localParticipant.identity);setPanel(false);
     }catch(cause){for(const track of createdTracks){const publication=targetRoom.localParticipant.getTrackPublication(track.source);if(publication?.track)await targetRoom.localParticipant.unpublishTrack(publication.track,true).catch(()=>{});else track.stop()}if((cause as DOMException)?.name!=="NotAllowedError")setError(cause instanceof Error?cause.message:"Não foi possível iniciar a transmissão.")}finally{operationRef.current=null;setBusy(false);if(stopRequestedRef.current){stopRequestedRef.current=false;void stop()}}
   }
   async function stop(){
-    const targetRoom=roomRef.current;
-    if(!targetRoom)return;
-    if(operationRef.current==="start"){stopRequestedRef.current=true;return}
-    if(operationRef.current)return;
+    const targetRoom=roomRef.current;if(!targetRoom)return;if(operationRef.current==="start"){stopRequestedRef.current=true;return}if(operationRef.current)return;
     operationRef.current="stop";setBusy(true);
     try{const publications=[targetRoom.localParticipant.getTrackPublication(Track.Source.ScreenShare),targetRoom.localParticipant.getTrackPublication(Track.Source.ScreenShareAudio)];await Promise.all(publications.map(publication=>publication?.track?targetRoom.localParticipant.unpublishTrack(publication.track,true):Promise.resolve()));setScreenAudio(current=>({...current,available:null,published:false}));setViewerId(current=>current===targetRoom.localParticipant.identity?null:current);setShares(snapshot(targetRoom))}finally{operationRef.current=null;setBusy(false)}
   }
@@ -207,13 +177,9 @@ export default function ScreenShare({isPro=false,gameName="GrindLobby",gameBanne
         <footer className="stream-player-footer"><div className="stream-volume-control"><Volume2 size={15}/><input aria-label="Volume da transmissão" type="range" min="0" max="100" value={volume} onChange={event=>setVolume(Number(event.target.value))}/><b>{volume}%</b></div><div className="stream-tech-stats">{stats.fps!=null?<span>{stats.fps} FPS</span>:null}{stats.dropped!=null?<span>{stats.dropped} dropped</span>:null}</div></footer>
       </div>:<div className="stream-empty-stage"><img src="/brand/grindlobby-official.png" alt=""/><b>{gameName}</b><p>Nenhuma transmissão aberta. Quando alguém compartilhar a tela, ela aparece aqui sem bloquear o lobby.</p></div>}
     </div>
-
-    <div className="stream-command-row">
-      {localShare?<><div className="stream-active-copy"><b>{localShare.quality}</b><span>{localAudioLabel}</span></div><button onClick={()=>setViewerId(localShare.ownerId)}><Expand size={14}/>Abrir minha tela</button><button className="danger" onClick={stop} disabled={busy}><Square size={13}/>Parar</button></>:<button className="stream-start" onClick={openPanel} disabled={!room||reconnecting}><MonitorUp size={16}/>Compartilhar tela</button>}
-    </div>
+    <div className="stream-command-row">{localShare?<><div className="stream-active-copy"><b>{localShare.quality}</b><span>{localAudioLabel}</span></div><button onClick={()=>setViewerId(localShare.ownerId)}><Expand size={14}/>Abrir minha tela</button><button className="danger" onClick={stop} disabled={busy}><Square size={13}/>Parar</button></>:<button className="stream-start" onClick={openPanel} disabled={!room||reconnecting}><MonitorUp size={16}/>Compartilhar tela</button>}</div>
     {remoteShares.length?<div className="stream-friends-live"><small>TRANSMISSÕES NA SALA</small>{remoteShares.map(share=><button className="stream-available stream-available-rich" key={share.ownerId} onClick={()=>{setViewerId(share.ownerId);setMode("player")}}><span className="stream-share-icon"><MonitorUp size={16}/><i/></span><span className="stream-share-copy"><b>{share.ownerName}</b><small><Radio size={10}/> AO VIVO · {share.quality} · {share.audioPublished?"com áudio":"só vídeo"}</small></span><strong>Assistir</strong></button>)}</div>:null}
     {error?<p className="stream-error">{error}</p>:null}
-
     {panel?<div className="stream-modal-bg" role="dialog" aria-modal="true" aria-labelledby="share-title"><div className="stream-modal"><button className="modal-close" onClick={()=>setPanel(false)} aria-label="Fechar"><X/></button><small>PREPARAR TRANSMISSÃO</small><h2 id="share-title">O que você quer compartilhar?</h2><p>720p30 é o padrão recomendado para menor atraso. 1080p60 continua disponível no plano PRO.</p><div className="source-grid">{[["browser","Aba"],["window","Janela"],["monitor","Tela inteira"]].map(([value,label])=><button type="button" className={surface===value?"selected":""} onClick={()=>setSurface(value as typeof surface)} key={value}><MonitorUp/>{label}</button>)}</div><div className="stream-capability"><Volume2 size={16}/><span>{screenAudio.supported?"Áudio da tela disponível quando a fonte e o navegador oferecerem essa opção.":"Áudio da tela não disponível neste navegador."}</span></div><div className="stream-quality-picker"><div><span>Qualidade de captura</span><small><Zap size={12}/> 720p30 prioriza encode único; 1080p60 usa camadas adaptativas</small></div><div className="stream-quality-options">{qualityPresets.map(option=>{const locked=option.height>entitlement.maxHeight;return <button type="button" key={option.height} disabled={locked} className={quality===option.height?"selected":""} onClick={()=>setQuality(option.height)}><b>{option.label}</b><small>{option.fps} FPS{locked?" · PRO":""}</small></button>})}</div></div><div className="quality-row"><span>Plano {entitlement.tier.toUpperCase()}</span><b>Selecionado: {quality}p · até {Math.min(qualityPresets.find(item=>item.height===quality)?.fps??30,entitlement.maxFps)} FPS</b></div><button className="auth-primary" onClick={start} disabled={busy}>{busy?<GrindPortalLoading label="Preparando transmissão…"/>:"Abrir seletor do navegador"}</button></div></div>:null}
   </section>;
 }

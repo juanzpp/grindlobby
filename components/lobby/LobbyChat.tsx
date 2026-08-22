@@ -16,7 +16,7 @@ export default function LobbyChat({lobbyId,members}:Props){
  const [text,setText]=useState("");const endRef=useRef<HTMLDivElement>(null);
  const names=useMemo(()=>new Map(members.map(item=>[item.userId,item.name])),[members]);
  useEffect(()=>subscribeActiveLiveKitRoom(setRoom),[]);
- useEffect(()=>{setMessages(histories.get(lobbyId)??[])},[lobbyId]);
+ useEffect(()=>{const timer=window.setTimeout(()=>setMessages(histories.get(lobbyId)??[]),0);return()=>window.clearTimeout(timer)},[lobbyId]);
  useEffect(()=>{endRef.current?.scrollIntoView({behavior:"smooth",block:"nearest"})},[messages.length]);
  useEffect(()=>{
   if(!room||getActiveVoiceLobbyId()!==lobbyId)return;
