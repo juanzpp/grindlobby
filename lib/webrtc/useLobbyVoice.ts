@@ -26,6 +26,7 @@ let micProcessedStream:MediaStream|null=null;
 let microphoneGain=100;
 let connectGeneration=0;
 let microphonePublishQueue:Promise<void>=Promise.resolve();
+let microphoneSwitchQueue:Promise<unknown>=Promise.resolve();
 let releaseVoiceHeartbeat:(()=>void)|null=null;
 let releaseBackgroundActivity:(()=>void)|null=null;
 let backgroundActivityPromise:Promise<void>|null=null;
@@ -168,20 +169,25 @@ export function setLiveKitMicrophoneGain(value:number){
  microphoneGain=clampMediaPercent(value,MAX_MICROPHONE_GAIN_PERCENT);
  if(micGainNode&&micAudioContext){const now=micAudioContext.currentTime;micGainNode.gain.cancelScheduledValues(now);micGainNode.gain.setTargetAtTime(microphoneLinearGain(microphoneGain),now,.035)}
 }
-export async function switchLiveKitMicrophoneDevice(deviceId:string,requestedConstraints?:MediaTrackConstraints){
- const room=activeRoom;if(!room||room.state!==ConnectionState.Connected)return null;
- const previous=activeStream;
- const audioConstraints=requestedConstraints??{deviceId:deviceId?{exact:deviceId}:undefined};
- const next=await navigator.mediaDevices.getUserMedia({audio:audioConstraints,video:false});
- try{
-  await publishOrReplaceMicrophone(room,next);
-  if(activeStream!==next)throw new Error("microphone_replace_failed");
-  if(previous&&previous!==next)stopRawMicrophoneStream(previous);
-  return next.getAudioTracks()[0]??null;
- }catch(error){
-  stopRawMicrophoneStream(next);
-  throw error;
- }
+export function switchLiveKitMicrophoneDevice(deviceId:string,requestedConstraints?:MediaTrackConstraints){
+ const operation=async()=>{
+  const room=activeRoom;if(!room||room.state!==ConnectionState.Connected)return null;
+  const previous=activeStream;
+  const audioConstraints=requestedConstraints??{deviceId:deviceId?{exact:deviceId}:undefined};
+  const next=await navigator.mediaDevices.getUserMedia({audio:audioConstraints,video:false});
+  try{
+   await publishOrReplaceMicrophone(room,next);
+   if(room!==activeRoom||activeStream!==next)throw new Error("microphone_replace_failed");
+   if(previous&&previous!==next)stopRawMicrophoneStream(previous);
+   return next.getAudioTracks()[0]??null;
+  }catch(error){
+   stopRawMicrophoneStream(next);
+   throw error;
+  }
+ };
+ const result=microphoneSwitchQueue.catch(()=>{}).then(operation);
+ microphoneSwitchQueue=result.then(()=>undefined,()=>undefined);
+ return result;
 }
 export async function setLiveKitScreenShareEnabled(enabled:boolean){await activeRoom?.localParticipant.setScreenShareEnabled(enabled)}
 export function getRemoteVoicePeerId(track:RemoteAudioTrack|null){return track?.sid}
