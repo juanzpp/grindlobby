@@ -77,6 +77,7 @@ jobs:
           & '../../scripts/desktop-windows-smoke.ps1' -Installer $installer
 
       - name: Upload generated Cargo lockfile for audit branch
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: GrindLobby-Desktop-CargoLock
@@ -84,6 +85,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload EXE installer
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: GrindLobby-Windows
