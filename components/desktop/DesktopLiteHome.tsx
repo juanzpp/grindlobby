@@ -2,7 +2,7 @@
 
 import {useCallback,useEffect,useMemo,useState} from "react";
 import {useRouter} from "next/navigation";
-import {Headphones,Link2,LogOut,Mic,MonitorUp,Plus,RefreshCw,Settings,Shield,Users,Wifi,Zap} from "lucide-react";
+import {Headphones,Link2,LogOut,Mic,MonitorUp,RefreshCw,Settings,Shield,Users,Wifi,Zap} from "lucide-react";
 
 type DesktopUser={id:string;username:string;display_name:string;email?:string};
 type Lobby={id:string;name:string;visibility:string;max_members:number;memberCount:number;joined:boolean;game?:{name:string;slug:string}|null;owner?:{display_name:string;username:string}|null};
@@ -28,7 +28,7 @@ export default function DesktopLiteHome({user}:{user:DesktopUser}){
     try{
       const response=await fetch("/api/dashboard",{cache:"no-store"});
       const body=await response.json();
-      if(!response.ok)throw new Error(body.error||"Não foi possível carregar o GrindLobby Lite.");
+      if(!response.ok)throw new Error(body.error||"Não foi possível carregar o GrindLobby Performance.");
       setData(body as DashboardData);setError("");
     }catch(cause){setError(cause instanceof Error?cause.message:"Falha ao carregar.")}
     finally{setLoading(false)}
@@ -64,10 +64,10 @@ export default function DesktopLiteHome({user}:{user:DesktopUser}){
   return <main className="lite-shell">
     <aside className="lite-rail">
       <div className="lite-mark">G</div>
-      <nav aria-label="Navegação do GrindLobby Lite">
+      <nav aria-label="Navegação do GrindLobby Performance">
         <button className="active" title="Início"><Zap/></button>
-        <button onClick={()=>router.push("/desktop-lite")} title="Salas"><Headphones/></button>
-        <button onClick={()=>router.push("/settings?desktop=lite")} title="Configurações"><Settings/></button>
+        <button onClick={()=>router.push("/desktop-lite?desktop=lite")} title="Salas"><Headphones/></button>
+        <button onClick={()=>setError("As configurações de áudio e transmissão ficam dentro da sala para manter este cliente mais leve.")} title="Configurações"><Settings/></button>
       </nav>
       <button className="lite-avatar" title={display}>{data?.account?.avatar?<img src={data.account.avatar} alt=""/>:initials(display)}</button>
     </aside>
