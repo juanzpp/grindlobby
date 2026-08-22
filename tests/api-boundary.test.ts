@@ -1,3 +1,4 @@
+import {readFile} from 'node:fs/promises'
 import {describe,expect,it} from 'vitest'
 import {corsHeaders,isAllowedFrontendOrigin} from '@/lib/api/cors'
 import {apiError,apiJson,API_VERSION} from '@/lib/api/response'
@@ -24,6 +25,12 @@ describe('frontend API boundary',()=>{
     expect(()=>assertTrustedMutation(trusted)).not.toThrow()
     expect(()=>assertTrustedMutation(noBearer)).toThrow(InvalidRequestError)
     expect(()=>assertTrustedMutation(evil)).toThrow(InvalidRequestError)
+  })
+
+  it('keeps lobby invite creation bearer-aware',async()=>{
+    const source=await readFile('app/api/lobbies/[id]/invites/route.ts','utf8')
+    expect(source).toContain('getCurrentUser(request)')
+    expect(source).not.toContain('getCurrentUser();')
   })
 
   it('uses one versioned success/error envelope',async()=>{
