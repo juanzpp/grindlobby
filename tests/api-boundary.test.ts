@@ -4,6 +4,15 @@ import {corsHeaders,isAllowedFrontendOrigin} from '@/lib/api/cors'
 import {apiError,apiJson,API_VERSION} from '@/lib/api/response'
 import {assertTrustedMutation,InvalidRequestError} from '@/lib/security/request'
 
+const bearerAwareRoutes=[
+  'app/api/lobbies/[id]/invites/route.ts',
+  'app/api/competitive/valorant/route.ts',
+  'app/api/competitive/valorant/queue/route.ts',
+  'app/api/competitive/valorant/matches/[id]/accept/route.ts',
+  'app/api/competitive/valorant/matches/[id]/result/route.ts',
+  'app/api/competitive/valorant/matches/[id]/board/route.ts',
+]
+
 describe('frontend API boundary',()=>{
   it('allows the current Lovable frontend origins only',()=>{
     expect(isAllowedFrontendOrigin('https://pixel-perfect-clone-87933.lovable.app')).toBe(true)
@@ -27,10 +36,12 @@ describe('frontend API boundary',()=>{
     expect(()=>assertTrustedMutation(evil)).toThrow(InvalidRequestError)
   })
 
-  it('keeps lobby invite creation bearer-aware',async()=>{
-    const source=await readFile('app/api/lobbies/[id]/invites/route.ts','utf8')
-    expect(source).toContain('getCurrentUser(request)')
-    expect(source).not.toContain('getCurrentUser();')
+  it('keeps browser-facing API routes bearer-aware',async()=>{
+    for(const path of bearerAwareRoutes){
+      const source=await readFile(path,'utf8')
+      expect(source,`${path} must authenticate from Request`).toContain('getCurrentUser(request)')
+      expect(source,`${path} must not rely on cookie-only auth`).not.toContain('getCurrentUser();')
+    }
   })
 
   it('uses one versioned success/error envelope',async()=>{
