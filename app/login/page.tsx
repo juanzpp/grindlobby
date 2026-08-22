@@ -49,6 +49,15 @@ function LoginForm() {
     return new Promise<void>((resolve) => timers.current.push(window.setTimeout(resolve, ms)));
   }
 
+  function postLoginDestination() {
+    const rawCookie = document.cookie.split("; ").find((entry) => entry.startsWith("grindlobby_next="));
+    const encoded = rawCookie?.slice("grindlobby_next=".length) ?? "";
+    let next = "";
+    try { next = decodeURIComponent(encoded); } catch { next = ""; }
+    if (next.startsWith("/") && !next.startsWith("//")) return next;
+    return query.get("desktop") === "lite" ? "/desktop-lite?desktop=lite" : "/";
+  }
+
   async function completeLogin() {
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     setPhase("transitioning");
@@ -61,8 +70,9 @@ function LoginForm() {
     }
     setPhase("completing");
     await wait(reducedMotion ? 20 : 220);
-    router.prefetch("/");
-    router.replace("/");
+    const destination = postLoginDestination();
+    router.prefetch(destination);
+    router.replace(destination);
     router.refresh();
   }
 
