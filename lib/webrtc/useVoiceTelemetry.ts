@@ -17,10 +17,13 @@ async function readStats(room:Room):Promise<RawStats>{
     if(track instanceof RemoteAudioTrack)tracks.push(track);
   }
   let rtt:number|null=null,jitter:number|null=null,lost=0,received=0,bytes=0;
+  const seenStats=new Set<string>();
   for(const track of tracks){
     try{
       const report=await track.getRTCStatsReport();
       report?.forEach(stat=>{
+        if(seenStats.has(stat.id))return;
+        seenStats.add(stat.id);
         const row=stat as RTCStats&{currentRoundTripTime?:number;roundTripTime?:number;jitter?:number;packetsLost?:number;packetsReceived?:number;bytesReceived?:number;bytesSent?:number;state?:string};
         if(row.type==="candidate-pair"&&row.state==="succeeded"&&typeof row.currentRoundTripTime==="number")rtt=rtt===null?row.currentRoundTripTime*1000:Math.min(rtt,row.currentRoundTripTime*1000);
         if(row.type==="remote-inbound-rtp"&&typeof row.roundTripTime==="number")rtt=rtt===null?row.roundTripTime*1000:Math.min(rtt,row.roundTripTime*1000);
@@ -38,21 +41,26 @@ async function readStats(room:Room):Promise<RawStats>{
 export function useVoiceTelemetry(lobbyId:string,enabled:boolean){
   useEffect(()=>{
     if(!enabled)return;
-    let room:Room|null=null,disposed=false,lastBytes:number|null=null,lastAt:number|null=null;
+    let room:Room|null=null,disposed=false,inFlight=false,lastBytes:number|null=null,lastAt:number|null=null;
     const unsubscribe=subscribeActiveLiveKitRoom(next=>{
       if(room!==next){lastBytes=null;lastAt=null}
       room=next;
     });
     const send=async()=>{
-      if(disposed||!room)return;
+      if(disposed||!room||inFlight)return;
+      inFlight=true;
       const sampledRoom=room;
-      const raw=await readStats(sampledRoom);if(disposed||room!==sampledRoom)return;
-      const now=performance.now();
-      const bitrateKbps=lastAt==null?null:bitrateKbpsFromDelta(raw.bytes,lastBytes,now-lastAt);
-      lastBytes=raw.bytes;lastAt=now;
-      const {bytes:_,...sampleBase}=raw;
-      const sample:Sample={...sampleBase,bitrateKbps};
-      void fetch(`/api/lobbies/${lobbyId}/voice/metrics`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(sample),keepalive:true}).catch(()=>{});
+      try{
+        const raw=await readStats(sampledRoom);if(disposed||room!==sampledRoom)return;
+        const now=performance.now();
+        const bitrateKbps=lastAt==null?null:bitrateKbpsFromDelta(raw.bytes,lastBytes,now-lastAt);
+        lastBytes=raw.bytes;lastAt=now;
+        const {bytes:_,...sampleBase}=raw;
+        const sample:Sample={...sampleBase,bitrateKbps};
+        void fetch(`/api/lobbies/${lobbyId}/voice/metrics`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(sample),keepalive:true}).catch(()=>{});
+      }finally{
+        inFlight=false;
+      }
     };
     const timer=window.setInterval(()=>void send(),15_000);void send();
     return()=>{disposed=true;window.clearInterval(timer);unsubscribe()};
