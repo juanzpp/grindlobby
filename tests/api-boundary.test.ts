@@ -5,7 +5,13 @@ import {apiError,apiJson,API_VERSION} from '@/lib/api/response'
 import {assertTrustedMutation,InvalidRequestError} from '@/lib/security/request'
 
 const bearerAwareRoutes=[
+  'app/api/me/route.ts',
+  'app/api/me/capabilities/route.ts',
+  'app/api/dashboard/route.ts',
+  'app/api/profile/route.ts',
+  'app/api/profile/upload/route.ts',
   'app/api/lobbies/[id]/invites/route.ts',
+  'app/api/lobbies/invite/[token]/route.ts',
   'app/api/competitive/valorant/route.ts',
   'app/api/competitive/valorant/queue/route.ts',
   'app/api/competitive/valorant/squad/route.ts',
