@@ -8,7 +8,7 @@ const schema=z.object({accepted:z.boolean()}).strict();
 export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){
   try{
     assertTrustedMutation(request);
-    const user=await getCurrentUser();if(!user)return noStoreJson({error:'Não autorizado.'},{status:401});
+    const user=await getCurrentUser(request);if(!user)return noStoreJson({error:'Não autorizado.'},{status:401});
     await enforceRateLimit(request,{scope:'valorant-accept',limit:20,windowSeconds:60,subject:user.id});
     const {id}=await params,body=schema.parse(await readJsonBody(request)),admin=createAdminClient();
     const {data,error}=await admin.rpc('valorant_accept_match_atomic',{p_match_id:id,p_user_id:user.id,p_accepted:body.accepted});
