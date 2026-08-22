@@ -71,5 +71,6 @@ describe('voice lifecycle regressions',()=>{
     expect(voice).toContain('pointerdown');
     expect(dock).toContain('subscribeAudioOutput');
     expect(dock).toContain('audioBlocked');
+    expect(dock).toMatch(/element\.play\(\)\.then\(\(\)=>\{setAudioBlocked\(false\);window\.removeEventListener/);
   });
 });
