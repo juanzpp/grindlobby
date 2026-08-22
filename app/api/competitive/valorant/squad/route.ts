@@ -6,11 +6,11 @@ import {assertTrustedMutation,InvalidRequestError,noStoreJson,readJsonBody} from
 
 const schema=z.object({name:z.string().trim().min(2).max(40),region:z.string().trim().min(2).max(30).default('BR-SAO'),members:z.array(z.string().trim().min(3).max(80)).length(4)});
 
-export async function GET(){const user=await getCurrentUser();if(!user)return noStoreJson({error:'Não autorizado.'},{status:401});try{return noStoreJson({squad:await userSquad(user.id)});}catch{return noStoreJson({error:'Não foi possível carregar o squad.'},{status:500});}}
+export async function GET(request:Request){const user=await getCurrentUser(request);if(!user)return noStoreJson({error:'Não autorizado.'},{status:401});try{return noStoreJson({squad:await userSquad(user.id)});}catch{return noStoreJson({error:'Não foi possível carregar o squad.'},{status:500});}}
 
 export async function POST(request:Request){
  try{
-  assertTrustedMutation(request);const user=await getCurrentUser();if(!user)return noStoreJson({error:'Não autorizado.'},{status:401});
+  assertTrustedMutation(request);const user=await getCurrentUser(request);if(!user)return noStoreJson({error:'Não autorizado.'},{status:401});
   if(await userSquad(user.id))return noStoreJson({error:'Você já pertence a um squad competitivo.'},{status:409});
   const body=schema.parse(await readJsonBody(request));const admin=createAdminClient();
   const handles=[...new Set(body.members.map(value=>value.replace(/^@/,'').toLowerCase()))];if(handles.length!==4)return noStoreJson({error:'Informe quatro jogadores diferentes.'},{status:400});
