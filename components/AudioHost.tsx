@@ -3,7 +3,7 @@ import {useEffect,useRef,useState} from "react";
 import {playAudioEvent} from "@/lib/audio";
 import {AudioOutputPreferences,loadAudioOutputPreferences,saveAudioOutputPreferences} from "@/lib/audio-output";
 import {unlockRemoteAudioContexts} from "./RemoteVoiceAudio";
-import {disconnectActiveLiveKitVoice,getActiveMicrophoneStream,setLiveKitMicrophoneGain,setLiveKitMicrophoneMuted,subscribeActiveLiveKitRoom} from "@/lib/webrtc/useLobbyVoice";
+import {disconnectActiveLiveKitVoice,getActiveMicrophoneStream,setLiveKitMicrophoneGain,setLiveKitMicrophoneMuted,subscribeActiveLiveKitRoom,switchLiveKitMicrophoneDevice} from "@/lib/webrtc/useLobbyVoice";
 import {
   Mic,MicOff,Headphones,SlidersHorizontal,Radio,PhoneOff,
   X,Settings2,Volume2,Play
@@ -83,13 +83,13 @@ export default function AudioHost({enabled,onStreamChange}:Props){
   an.fftSize=256;
   src.connect(inputGain);
   inputGain.connect(an);
-    setSmoothGain(inputGain,input/100);
+  setSmoothGain(inputGain,input/100);
   if(monitor){
     const destination=ac.createMediaStreamDestination();
     inputGain.connect(destination);
-   const audio=testAudio.current;
-     if(audio){audio.srcObject=destination.stream;audio.volume=1}
-   ac.resume().catch(()=>{});
+    const audio=testAudio.current;
+    if(audio){audio.srcObject=destination.stream;audio.volume=1}
+    ac.resume().catch(()=>{});
   }
   const data=new Uint8Array(an.frequencyBinCount);
   const tick=()=>{
@@ -103,16 +103,16 @@ export default function AudioHost({enabled,onStreamChange}:Props){
  async function connect(){
   if(!enabled)return;
   try{
-  await unlockRemoteAudioContexts();
-  disconnect();
+   await unlockRemoteAudioContexts();
+   disconnect();
    const s=await navigator.mediaDevices.getUserMedia({audio:constraints(),video:false});
    stream.current=s;
-  onStreamChange?.(s);
+   onStreamChange?.(s);
    s.getAudioTracks().forEach(t=>t.enabled=!muted);
-  updateApplied(s);
+   updateApplied(s);
    setActive(true);
    await refreshDevices();
-  startMeter(s);
+   startMeter(s);
   }catch(e){
    console.error(e);
    setActive(false);
@@ -123,18 +123,18 @@ export default function AudioHost({enabled,onStreamChange}:Props){
   setMicId(device);
   if(!active||!stream.current)return;
   try{
-   const nextStream=await navigator.mediaDevices.getUserMedia({audio:constraints(true,device),video:false});
-   const previous=stream.current;
+   const nextTrack=await switchLiveKitMicrophoneDevice(device,constraints(true,device));
+   if(!nextTrack)throw new Error("microphone_switch_unavailable");
+   nextTrack.enabled=!muted;
+   const nextStream=new MediaStream([nextTrack]);
    stream.current=nextStream;
-   nextStream.getAudioTracks().forEach(track=>track.enabled=!muted);
    onStreamChange?.(nextStream);
-   previous.getTracks().forEach(track=>track.stop());
    updateApplied(nextStream);
    startMeter(nextStream);
   }catch(error){console.error(error);alert("Não foi possível trocar o microfone.");}
  }
  function disconnect(){
-  stopMicTest();
+  stopMicTest(false);
   const current=stream.current;
   stream.current=null;
   current?.getTracks().forEach(t=>t.stop());
@@ -153,17 +153,16 @@ export default function AudioHost({enabled,onStreamChange}:Props){
  }
  async function runMicTest(mode=testMode){
   try{
-   stopMicTest();
+   stopMicTest(false);
    const s=stream.current??await navigator.mediaDevices.getUserMedia({audio:constraints(mode==="processed"),video:false});
    if(!stream.current)testStream.current=s;
-  playAudioEvent("mic_test");
+   playAudioEvent("mic_test");
    updateApplied(s);
    const audio=new Audio();
    testAudio.current=audio;
    audio.autoplay=true;
-  setTesting(true);
-  startMeter(s,true);
-
+   setTesting(true);
+   startMeter(s,true);
    await audio.play();
   }catch(e){
    console.error(e);
@@ -171,14 +170,14 @@ export default function AudioHost({enabled,onStreamChange}:Props){
    alert("Não foi possível iniciar o monitoramento do microfone.");
   }
  }
- function stopMicTest(){
+ function stopMicTest(restartMeter=true){
   testAudio.current?.pause();
   if(testAudio.current)testAudio.current.srcObject=null;
   testAudio.current=null;
   if(testStream.current!==stream.current)testStream.current?.getTracks().forEach(t=>t.stop());
   testStream.current=null;
   stopMeter();
-  if(active&&stream.current){
+  if(restartMeter&&active&&stream.current){
    updateApplied(stream.current);
    startMeter(stream.current);
   }
@@ -212,7 +211,7 @@ export default function AudioHost({enabled,onStreamChange}:Props){
    unsubscribe();
    window.removeEventListener("grindlobby:set-mic-muted",onExternalMute);
    window.removeEventListener("grindlobby:set-mic-gain",onExternalGain);
-   stopMicTest();stopMeter();
+   stopMicTest(false);stopMeter();
   };
  },[]);
  useEffect(()=>{
@@ -226,7 +225,7 @@ export default function AudioHost({enabled,onStreamChange}:Props){
  },[noise,echo,agc]);
  async function chooseTestMode(mode:"direct"|"processed"){
   setTestMode(mode);
-  if(testing){stopMicTest();await runMicTest(mode)}
+  if(testing){stopMicTest(false);await runMicTest(mode)}
  }
  return <>
  <div className="voice-engine compact">
@@ -302,7 +301,7 @@ export default function AudioHost({enabled,onStreamChange}:Props){
       <div className="mic-test-actions">
        {!testing
         ? <button className="primary" onClick={()=>runMicTest()}><Mic size={15}/>Testar microfone</button>
-        : <button className="voice-danger" onClick={stopMicTest}><MicOff size={15}/>Sair do teste</button>}
+        : <button className="voice-danger" onClick={()=>stopMicTest()}><MicOff size={15}/>Sair do teste</button>}
       </div>
       <p className="voice-note"><Headphones size={13}/> Use fones de ouvido durante o teste para evitar eco ou microfonia.</p>
      </div>
