@@ -41,6 +41,16 @@ jobs:
       - name: Resolve Rust dependency lock
         run: cargo generate-lockfile
 
+      - name: Verify Rust dependency lock
+        shell: pwsh
+        run: |
+          $expected = '97c9eab69cda90cacf01f53c08b049fa306405503da35805492e97c7376d3934'
+          $actual = (Get-FileHash 'Cargo.lock' -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $expected) {
+            throw "Cargo.lock dependency graph changed. Expected $expected but resolved $actual. Review dependency updates before shipping."
+          }
+          Write-Host "Cargo.lock verified: $actual"
+
       - name: Upload Cargo lock
         uses: actions/upload-artifact@v4
         with:
