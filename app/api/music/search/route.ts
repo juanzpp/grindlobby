@@ -1,4 +1,7 @@
 import {NextRequest,NextResponse} from "next/server";
+import {z} from "zod";
+import {getCurrentUser} from "@/lib/auth";
+import {enforceRateLimit,RateLimitExceededError,RateLimitUnavailableError,rateLimitResponse} from "@/lib/security/rate-limit";
 
 export const dynamic="force-dynamic";
 export const runtime="nodejs";
@@ -10,6 +13,9 @@ type MusicResult={
 
 type SpotifyTokenCache={token:string;expiresAt:number};
 let spotifyTokenCache:SpotifyTokenCache|null=null;
+
+const querySchema=z.string().trim().min(1).max(120);
+const sourceSchema=z.enum(["all","youtube","spotify"]);
 
 function parseIsoDuration(value:string){
   const match=value.match(/^P(?:(\d+)D)?T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/);
@@ -68,13 +74,18 @@ async function searchYouTube(query:string):Promise<MusicResult[]>{
 }
 
 export async function GET(request:NextRequest){
-  const query=request.nextUrl.searchParams.get("q")?.trim();
-  const source=(request.nextUrl.searchParams.get("source")||"all") as "all"|Provider;
-  if(!query)return NextResponse.json({error:"Digite o nome de uma música ou artista."},{status:400});
-  const youtubeConfigured=Boolean(process.env.YOUTUBE_API_KEY?.trim());
-  const spotifyConfigured=Boolean(process.env.SPOTIFY_CLIENT_ID?.trim()&&process.env.SPOTIFY_CLIENT_SECRET?.trim());
-  if(!youtubeConfigured&&!spotifyConfigured)return NextResponse.json({error:"Bot de música não configurado. Adicione YOUTUBE_API_KEY e/ou SPOTIFY_CLIENT_ID + SPOTIFY_CLIENT_SECRET no servidor."},{status:503});
   try{
+    const user=await getCurrentUser(request);
+    if(!user)return NextResponse.json({error:"Não autorizado."},{status:401,headers:{"Cache-Control":"no-store"}});
+    await enforceRateLimit(request,{scope:"music-search",limit:60,windowSeconds:300,subject:user.id});
+    const parsedQuery=querySchema.safeParse(request.nextUrl.searchParams.get("q")??"");
+    const parsedSource=sourceSchema.safeParse(request.nextUrl.searchParams.get("source")||"all");
+    if(!parsedQuery.success)return NextResponse.json({error:"Digite o nome de uma música ou artista."},{status:400,headers:{"Cache-Control":"no-store"}});
+    if(!parsedSource.success)return NextResponse.json({error:"Fonte de música inválida."},{status:400,headers:{"Cache-Control":"no-store"}});
+    const query=parsedQuery.data,source=parsedSource.data;
+    const youtubeConfigured=Boolean(process.env.YOUTUBE_API_KEY?.trim());
+    const spotifyConfigured=Boolean(process.env.SPOTIFY_CLIENT_ID?.trim()&&process.env.SPOTIFY_CLIENT_SECRET?.trim());
+    if(!youtubeConfigured&&!spotifyConfigured)return NextResponse.json({error:"Bot de música não configurado. Adicione YOUTUBE_API_KEY e/ou SPOTIFY_CLIENT_ID + SPOTIFY_CLIENT_SECRET no servidor."},{status:503,headers:{"Cache-Control":"no-store"}});
     const tasks:Promise<MusicResult[]>[]=[];
     if((source==="all"||source==="youtube")&&youtubeConfigured)tasks.push(searchYouTube(query));
     if((source==="all"||source==="spotify")&&spotifyConfigured)tasks.push(searchSpotify(query));
@@ -82,7 +93,8 @@ export async function GET(request:NextRequest){
     if(!results.length&&settled.some(item=>item.status==="rejected"))console.error("[GrindLobby Music] provider search failed",settled.filter(item=>item.status==="rejected"));
     return NextResponse.json({results,configured:{youtube:youtubeConfigured,spotify:spotifyConfigured}},{headers:{"Cache-Control":"no-store"}});
   }catch(error){
+    if(error instanceof RateLimitExceededError||error instanceof RateLimitUnavailableError)return rateLimitResponse(error);
     console.error("[GrindLobby Music] search failed",error);
-    return NextResponse.json({error:"Não foi possível buscar músicas agora."},{status:502});
+    return NextResponse.json({error:"Não foi possível buscar músicas agora."},{status:502,headers:{"Cache-Control":"no-store"}});
   }
 }
