@@ -44,10 +44,13 @@ async function readMedia(room:Room,baseline:ByteBaseline|null):Promise<{snapshot
   }
 
   let rtt:number|null=null,jitter:number|null=null,lost=0,received=0,audioBytes=0,videoBytes=0,width:number|null=null,height:number|null=null,fps:number|null=null,dropped=0,framesEncoded=0,framesDecoded=0,totalEncode=0,totalDecode=0;
+  const seenStats=new Set<string>();
   for(const track of tracks){
     try{
       const report=await (track as typeof track&{getRTCStatsReport?:()=>Promise<RTCStatsReport>}).getRTCStatsReport?.();
       report?.forEach(entry=>{
+        if(seenStats.has(entry.id))return;
+        seenStats.add(entry.id);
         const row=entry as RTCStats&{kind?:string;mediaType?:string;currentRoundTripTime?:number;roundTripTime?:number;jitter?:number;packetsLost?:number;packetsReceived?:number;bytesReceived?:number;bytesSent?:number;frameWidth?:number;frameHeight?:number;framesPerSecond?:number;framesDropped?:number;framesEncoded?:number;framesDecoded?:number;totalEncodeTime?:number;totalDecodeTime?:number;state?:string};
         if(row.type==="candidate-pair"&&row.state==="succeeded"&&typeof row.currentRoundTripTime==="number")rtt=rtt==null?row.currentRoundTripTime*1000:Math.min(rtt,row.currentRoundTripTime*1000);
         if(row.type==="remote-inbound-rtp"&&typeof row.roundTripTime==="number")rtt=rtt==null?row.roundTripTime*1000:Math.min(rtt,row.roundTripTime*1000);
@@ -91,7 +94,7 @@ export default function DesktopPerformanceDiagnostics(){
   },[lite]);
   useEffect(()=>{
     if(!lite||!open)return;
-    let frames=0,last=performance.now(),raf=0,disposed=false;
+    let frames=0,last=performance.now(),raf=0,disposed=false,sampleInFlight=false;
     const tick=(now:number)=>{frames+=1;if(now-last>=1000){const fpsValue=Math.round(frames*1000/(now-last));frames=0;last=now;setBrowser(current=>({...current,uiFps:fpsValue}))}raf=requestAnimationFrame(tick)};
     raf=requestAnimationFrame(tick);
     let observer:PerformanceObserver|null=null;
@@ -100,13 +103,18 @@ export default function DesktopPerformanceDiagnostics(){
       observer.observe({entryTypes:["longtask"]});
     }catch{}
     const sample=async()=>{
-      if(disposed)return;
-      const memory=performance.memory,connection=navigator.connection;
-      setBrowser(current=>({...current,longTasks:longTasks.current.count,longTaskMs:Math.round(longTasks.current.ms),jsHeapUsedBytes:memory?.usedJSHeapSize??null,jsHeapTotalBytes:memory?.totalJSHeapSize??null,jsHeapLimitBytes:memory?.jsHeapSizeLimit??null,hardwareConcurrency:navigator.hardwareConcurrency||null,deviceMemoryGb:navigator.deviceMemory??null,networkRttMs:connection?.rtt??null,downlinkMbps:connection?.downlink??null,effectiveType:connection?.effectiveType??null}));
-      const invoke=window.__TAURI__?.core?.invoke;
-      if(invoke)invoke<NativeSnapshot>("performance_snapshot").then(value=>{if(!disposed)setNative(value)}).catch(()=>{});
-      const room=roomRef.current;
-      if(room){const result=await readMedia(room,baselineRef.current);baselineRef.current=result.baseline;if(!disposed)setMedia(result.snapshot)}
+      if(disposed||sampleInFlight)return;
+      sampleInFlight=true;
+      try{
+        const memory=performance.memory,connection=navigator.connection;
+        setBrowser(current=>({...current,longTasks:longTasks.current.count,longTaskMs:Math.round(longTasks.current.ms),jsHeapUsedBytes:memory?.usedJSHeapSize??null,jsHeapTotalBytes:memory?.totalJSHeapSize??null,jsHeapLimitBytes:memory?.jsHeapSizeLimit??null,hardwareConcurrency:navigator.hardwareConcurrency||null,deviceMemoryGb:navigator.deviceMemory??null,networkRttMs:connection?.rtt??null,downlinkMbps:connection?.downlink??null,effectiveType:connection?.effectiveType??null}));
+        const invoke=window.__TAURI__?.core?.invoke;
+        if(invoke){try{const value=await invoke<NativeSnapshot>("performance_snapshot");if(!disposed)setNative(value)}catch{}}
+        const room=roomRef.current;
+        if(room){const result=await readMedia(room,baselineRef.current);baselineRef.current=result.baseline;if(!disposed&&roomRef.current===room)setMedia(result.snapshot)}
+      }finally{
+        sampleInFlight=false;
+      }
     };
     void sample();const timer=window.setInterval(()=>void sample(),3000);
     return()=>{disposed=true;cancelAnimationFrame(raf);observer?.disconnect();window.clearInterval(timer)};
