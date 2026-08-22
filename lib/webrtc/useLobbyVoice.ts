@@ -104,7 +104,7 @@ async function publishOrReplaceMicrophone(room:Room,stream:MediaStream|null){
  const publication=room.localParticipant.getTrackPublication(Track.Source.Microphone),current=publication?.track;
  if(current instanceof LocalAudioTrack&&current.mediaStreamTrack===next)return;
  if(current)await room.localParticipant.unpublishTrack(current,false);
- await room.localParticipant.publishTrack(next,{source:Track.Source.Microphone,audioPreset:AudioPresets.speech,dtx:true,red:true,stopMicTrackOnMute:false});
+ await room.localParticipant.publishTrack(next,{source:Track.Source.Microphone,audioPreset:AudioPresets.music,dtx:true,red:true,stopMicTrackOnMute:false});
 }
 async function ensureSession(lobbyId:string,userId:string,members:VoiceLobbyMember[],stream:MediaStream|null){
  activeMembers=members;
