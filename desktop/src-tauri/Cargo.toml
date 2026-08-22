@@ -5,6 +5,10 @@ description = "GrindLobby desktop client"
 authors = ["GrindLobby"]
 edition = "2021"
 
+[features]
+default = []
+lite = []
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
