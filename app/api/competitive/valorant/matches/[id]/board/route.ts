@@ -29,13 +29,13 @@ async function context(matchId:string,userId:string){
  return {admin,session,squad,canEdit};
 }
 
-export async function GET(_:Request,{params}:{params:Promise<{id:string}>}){
- try{const user=await getCurrentUser();if(!user)return noStoreJson({error:'Não autorizado.'},{status:401});const {id}=await params;const ctx=await context(id,user.id);if(!ctx)return noStoreJson({error:'Board não disponível.'},{status:404});const {data:objects,error}=await ctx.admin.from('strategy_objects').select('id,type,data,author_id,version,created_at,updated_at').eq('session_id',ctx.session.id).order('created_at');if(error)throw error;return noStoreJson({session:ctx.session,objects:objects??[],canEdit:ctx.canEdit,isCaptain:ctx.squad.captain_id===user.id});}catch{return noStoreJson({error:'Não foi possível carregar o Grind Board.'},{status:500});}
+export async function GET(request:Request,{params}:{params:Promise<{id:string}>}){
+ try{const user=await getCurrentUser(request);if(!user)return noStoreJson({error:'Não autorizado.'},{status:401});const {id}=await params;const ctx=await context(id,user.id);if(!ctx)return noStoreJson({error:'Board não disponível.'},{status:404});const {data:objects,error}=await ctx.admin.from('strategy_objects').select('id,type,data,author_id,version,created_at,updated_at').eq('session_id',ctx.session.id).order('created_at');if(error)throw error;return noStoreJson({session:ctx.session,objects:objects??[],canEdit:ctx.canEdit,isCaptain:ctx.squad.captain_id===user.id});}catch{return noStoreJson({error:'Não foi possível carregar o Grind Board.'},{status:500});}
 }
 
 export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){
  try{
-  assertTrustedMutation(request);const user=await getCurrentUser();if(!user)return noStoreJson({error:'Não autorizado.'},{status:401});const {id}=await params;const body=mutationSchema.parse(await readJsonBody(request,64_000));const ctx=await context(id,user.id);if(!ctx)return noStoreJson({error:'Board não disponível.'},{status:404});
+  assertTrustedMutation(request);const user=await getCurrentUser(request);if(!user)return noStoreJson({error:'Não autorizado.'},{status:401});const {id}=await params;const body=mutationSchema.parse(await readJsonBody(request,64_000));const ctx=await context(id,user.id);if(!ctx)return noStoreJson({error:'Board não disponível.'},{status:404});
   if(body.action==='permissions'){
     if(ctx.squad.captain_id!==user.id)return noStoreJson({error:'Somente o capitão pode alterar permissões.'},{status:403});
     if(body.iglUserId){const {data:igl}=await ctx.admin.from('valorant_match_players').select('user_id').eq('match_id',id).eq('squad_id',ctx.session.squad_id).eq('user_id',body.iglUserId).maybeSingle();if(!igl)return noStoreJson({error:'IGL precisa pertencer ao squad.'},{status:400});}
