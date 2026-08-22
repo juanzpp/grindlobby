@@ -49,9 +49,15 @@ jobs:
       - name: Build production app
         run: npm run build
 
+      - name: Prepare standalone runtime
+        run: |
+          cp -R public .next/standalone/public
+          mkdir -p .next/standalone/.next
+          cp -R .next/static .next/standalone/.next/static
+
       - name: Start production server for smoke test
         run: |
-          npx next start -p 3100 > /tmp/grindlobby-next.log 2>&1 &
+          PORT=3100 HOSTNAME=127.0.0.1 node .next/standalone/server.js > /tmp/grindlobby-next.log 2>&1 &
           echo $! > /tmp/grindlobby-next.pid
 
       - name: HTTP smoke test
