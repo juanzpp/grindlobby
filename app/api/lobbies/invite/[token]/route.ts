@@ -10,7 +10,7 @@ const tokenSchema=z.string().min(20).max(128).regex(/^[A-Za-z0-9_-]+$/);
 export async function POST(request:Request,{params}:{params:Promise<{token:string}>}){
   try{
     assertTrustedMutation(request);
-    const user=await getCurrentUser();if(!user)return noStoreJson({error:"Faça login para aceitar o convite."},{status:401});
+    const user=await getCurrentUser(request);if(!user)return noStoreJson({error:"Faça login para aceitar o convite."},{status:401});
     await enforceRateLimit(request,{scope:"redeem-lobby-invite",limit:30,windowSeconds:300,subject:user.id});
     const token=tokenSchema.parse((await params).token),admin=createAdminClient();
     const {data,error}=await admin.rpc("redeem_lobby_invite",{p_token_hash:lobbyInviteHash(token),p_user_id:user.id});
