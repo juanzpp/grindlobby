@@ -2,6 +2,7 @@
 import {useEffect,useState} from "react";
 import {AudioPresets,ConnectionState,LocalAudioTrack,RemoteAudioTrack,Room,RoomEvent,Track} from "livekit-client";
 import {MAX_MICROPHONE_GAIN_PERCENT,clampMediaPercent,microphoneLinearGain} from "@/lib/webrtc/mediaPolicy";
+import {retainLobbyPresenceHeartbeat} from "@/lib/lobby-presence-heartbeat";
 
 export type VoiceMemberState={userId:string;connected:boolean;stream:RemoteAudioTrack|null;status:"Offline"|"Connecting"|"Connected"|"Reconnecting";speaking:boolean;audioLevel:number;microphoneMuted:boolean;volume:number;muted:boolean};
 export type VoiceLobbyMember={userId:string;name:string;profileId:string|null;membershipId:string|null};
@@ -24,7 +25,7 @@ let micSourceTrackId:string|null=null;
 let micProcessedStream:MediaStream|null=null;
 let microphoneGain=100;
 let connectGeneration=0;
-let heartbeatTimer:number|undefined;
+let releaseVoiceHeartbeat:(()=>void)|null=null;
 const volumes=new Map<string,{volume:number;muted:boolean}>();
 const roomListeners=new Set<(room:Room|null)=>void>();
 const sessionListeners=new Set<(session:ActiveVoiceSession)=>void>();
@@ -59,12 +60,11 @@ function syncPresence(room=activeRoom){
  }
  activePresence=snapshot;emitPresence();emitSession();
 }
-function stopHeartbeat(){if(heartbeatTimer){window.clearInterval(heartbeatTimer);heartbeatTimer=undefined}}
+function stopHeartbeat(){releaseVoiceHeartbeat?.();releaseVoiceHeartbeat=null}
 function startHeartbeat(){
  stopHeartbeat();
- if(!activeLobbyId||typeof window==="undefined")return;
- const ping=()=>{if(activeLobbyId)fetch(`/api/lobbies/${activeLobbyId}/heartbeat`,{method:"POST",keepalive:true}).catch(()=>{})};
- void ping();heartbeatTimer=window.setInterval(ping,10_000);
+ if(!activeLobbyId)return;
+ releaseVoiceHeartbeat=retainLobbyPresenceHeartbeat(activeLobbyId);
 }
 function bindRoom(room:Room){
  const sync=()=>syncPresence(room);
