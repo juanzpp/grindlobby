@@ -28,12 +28,12 @@ function PersistentScreenPreview({session,onOpenLobby}:{session:ActiveVoiceSessi
  useEffect(()=>{const element=videoRef.current;if(!element||!share)return;share.video.attach(element);element.play().catch(()=>{});return()=>{share.video.detach(element)}},[share?.video]);
  useEffect(()=>{
   const element=audioRef.current,track=share?.audio;if(!element||!track)return;
-  let disposed=false;const retry=()=>{if(disposed||element.muted)return;void element.play().then(()=>{blockedRemoteAudio.delete(element);window.removeEventListener("pointerdown",retry,true);window.removeEventListener("touchend",retry,true)}).catch(()=>{})};
-  const blockedRemoteAudio=new Set<HTMLAudioElement>();
+  let disposed=false;
+  const retry=()=>{if(disposed||element.muted)return;void element.play().then(()=>{setAudioBlocked(false);window.removeEventListener("pointerdown",retry,true);window.removeEventListener("touchend",retry,true)}).catch(()=>{})};
   setAudioBlocked(false);track.attach(element);element.volume=1;track.setVolume(gain);element.muted=gain===0;
   if(output.deviceId)track.setSinkId(output.deviceId).catch(()=>{});
-  if(gain>0)element.play().catch(()=>{setAudioBlocked(true);blockedRemoteAudio.add(element);window.addEventListener("pointerdown",retry,true);window.addEventListener("touchend",retry,true)});
-  return()=>{disposed=true;blockedRemoteAudio.delete(element);window.removeEventListener("pointerdown",retry,true);window.removeEventListener("touchend",retry,true);track.detach(element);track.setVolume(1)};
+  if(gain>0)element.play().catch(()=>{setAudioBlocked(true);window.addEventListener("pointerdown",retry,true);window.addEventListener("touchend",retry,true)});
+  return()=>{disposed=true;window.removeEventListener("pointerdown",retry,true);window.removeEventListener("touchend",retry,true);track.detach(element);track.setVolume(1)};
  },[share?.audio,output.deviceId]);
  useEffect(()=>{const track=share?.audio,element=audioRef.current;if(!track)return;track.setVolume(gain);if(element){element.muted=gain===0;if(gain>0&&element.paused)element.play().then(()=>setAudioBlocked(false)).catch(()=>setAudioBlocked(true))}},[share?.audio,gain]);
  if(!share||hidden)return null;
