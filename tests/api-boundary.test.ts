@@ -16,7 +16,9 @@ const bearerAwareRoutes=[
   'app/api/competitive/valorant/queue/route.ts',
   'app/api/competitive/valorant/squad/route.ts',
   'app/api/competitive/valorant/history/route.ts',
+  'app/api/competitive/valorant/matches/[id]/route.ts',
   'app/api/competitive/valorant/matches/[id]/accept/route.ts',
+  'app/api/competitive/valorant/matches/[id]/veto/route.ts',
   'app/api/competitive/valorant/matches/[id]/result/route.ts',
   'app/api/competitive/valorant/matches/[id]/board/route.ts',
 ]
