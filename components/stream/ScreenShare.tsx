@@ -120,8 +120,9 @@ export default function ScreenShare({isPro=false,gameName="GrindLobby",gameBanne
   const [entitlement,setEntitlement]=useState<Entitlement>(initialEntitlement),[screenAudio,setScreenAudio]=useState<ScreenAudioState>(()=>({supported:supportsScreenCapture(),available:null,published:false}));
   const [mode,setMode]=useState<ViewMode>("player"),[stats,setStats]=useState<StreamStats>({rtt:null,bitrate:null,fps:null,dropped:null,packetLoss:null});
   const [floatPos,setFloatPos]=useState({x:0,y:0}),dragRef=useRef<{x:number;y:number;left:number;top:number}|null>(null),playerRef=useRef<HTMLDivElement>(null),bytesRef=useRef<{bytes:number;at:number}|null>(null);
+  const roomRef=useRef<Room|null>(null),operationRef=useRef<"start"|"stop"|null>(null),stopRequestedRef=useRef(false);
 
-  useEffect(()=>subscribeActiveLiveKitRoom(setRoom),[]);
+  useEffect(()=>subscribeActiveLiveKitRoom(next=>{roomRef.current=next;setRoom(next)}),[]);
   useEffect(()=>{localStorage.setItem(streamVolumeKey,String(volume))},[volume]);
   useEffect(()=>{getServerEntitlement().catch(()=>{})},[]);
   useEffect(()=>{
@@ -139,8 +140,9 @@ export default function ScreenShare({isPro=false,gameName="GrindLobby",gameBanne
   useEffect(()=>{
     bytesRef.current=null;
     if(!viewer){setStats({rtt:null,bitrate:null,fps:null,dropped:null,packetLoss:null});return}
-    let cancelled=false;
+    let cancelled=false,inFlight=false;
     const read=async()=>{
+      if(inFlight)return;inFlight=true;
       try{
         const report=await (viewer.track as VideoTrack&{getRTCStatsReport?:()=>Promise<RTCStatsReport>}).getRTCStatsReport?.();if(!report||cancelled)return;
         let rtt:number|null=null,bytes:number|null=null,fps:number|null=null,dropped:number|null=null,packetLoss:number|null=null;
@@ -149,7 +151,7 @@ export default function ScreenShare({isPro=false,gameName="GrindLobby",gameBanne
         const now=performance.now();let bitrate:number|null=null;if(bytes!=null&&bytesRef.current){const deltaBytes=bytes-bytesRef.current.bytes,deltaSeconds=(now-bytesRef.current.at)/1000;if(deltaBytes>=0&&deltaSeconds>0)bitrate=Math.round(deltaBytes*8/deltaSeconds/1000)}if(bytes!=null)bytesRef.current={bytes,at:now};
         const measuredPacketLoss = packetLoss as number | null;
         setStats({rtt,bitrate,fps:fps?Math.round(fps):null,dropped,packetLoss:measuredPacketLoss==null?null:Math.round(measuredPacketLoss*10)/10});
-      }catch{}
+      }catch{}finally{inFlight=false}
     };
     void read();const timer=window.setInterval(()=>void read(),2000);return()=>{cancelled=true;window.clearInterval(timer);bytesRef.current=null};
   },[viewer?.track]);
@@ -161,24 +163,35 @@ export default function ScreenShare({isPro=false,gameName="GrindLobby",gameBanne
   async function getServerEntitlement(){const response=await fetch("/api/me/capabilities",{cache:"no-store"});if(!response.ok)throw new Error("Não foi possível validar o plano da conta.");const data=await response.json() as {screenShare:Entitlement};setEntitlement(data.screenShare);return data.screenShare}
   async function openPanel(){setError("");try{const capability=await getServerEntitlement();if(capability.allowed===false)throw new Error(capability.reason||"Transmissão indisponível para esta conta.");setPanel(true)}catch(cause){setError(cause instanceof Error?cause.message:"Não foi possível validar a transmissão.")}}
   async function start(){
-    if(!room||room.state!==ConnectionState.Connected){setError("Entre no lobby antes de compartilhar a tela.");return}if(!screenAudio.supported){setError("Seu navegador não oferece captura de tela neste contexto.");return}
-    setBusy(true);setError("");setScreenAudio(current=>({...current,available:null,published:false}));let createdTracks:LocalTrack[]=[];
+    const targetRoom=room;
+    if(operationRef.current)return;
+    if(!targetRoom||targetRoom.state!==ConnectionState.Connected){setError("Entre no lobby antes de compartilhar a tela.");return}if(!screenAudio.supported){setError("Seu navegador não oferece captura de tela neste contexto.");return}
+    operationRef.current="start";setBusy(true);setError("");setScreenAudio(current=>({...current,available:null,published:false}));let createdTracks:LocalTrack[]=[];
     try{
       const capability=await getServerEntitlement();
       if(capability.allowed===false)throw new Error(capability.reason||"Transmissão indisponível para esta conta.");
       const selected=qualityPresets.find(item=>item.height===quality)??qualityPresets[2];
       if(selected.height>capability.maxHeight)throw new Error(`Seu plano permite transmissão até ${capability.maxHeight}p.`);
       const maxFps=Math.min(selected.fps,capability.maxFps);
-      const tracks=await room.localParticipant.createScreenTracks({audio:true,video:{displaySurface:surface},resolution:{width:selected.width,height:selected.height,frameRate:maxFps},contentHint:"motion",surfaceSwitching:"include",systemAudio:"include",suppressLocalAudioPlayback:false});
+      const tracks=await targetRoom.localParticipant.createScreenTracks({audio:true,video:{displaySurface:surface},resolution:{width:selected.width,height:selected.height,frameRate:maxFps},contentHint:"motion",surfaceSwitching:"include",systemAudio:"include",suppressLocalAudioPlayback:false});
       createdTracks=tracks;
+      if(roomRef.current!==targetRoom||targetRoom.state!==ConnectionState.Connected)throw new Error("A sala mudou enquanto a captura de tela era preparada.");
       const video=tracks.find(track=>track instanceof LocalVideoTrack) as LocalVideoTrack|undefined,audio=tracks.find(track=>track instanceof LocalAudioTrack) as LocalAudioTrack|undefined;if(!video)throw new Error("O navegador não retornou uma faixa de vídeo da tela.");
       await video.mediaStreamTrack.applyConstraints({width:{max:Math.min(selected.width,capability.maxWidth)},height:{max:Math.min(selected.height,capability.maxHeight)},frameRate:{max:Math.min(maxFps,capability.maxFps)}}).catch(()=>{});setScreenAudio(current=>({...current,available:Boolean(audio),published:false}));
-      await room.localParticipant.publishTrack(video,{source:Track.Source.ScreenShare,simulcast:shouldUseScreenSimulcast(selected.height,Math.min(maxFps,capability.maxFps)),videoCodec:"vp8",degradationPreference:"maintain-framerate",screenShareEncoding:{maxBitrate:selected.bitrate,maxFramerate:Math.min(maxFps,capability.maxFps)}});
-      if(audio){try{await room.localParticipant.publishTrack(audio,{source:Track.Source.ScreenShareAudio,audioPreset:AudioPresets.musicHighQualityStereo,dtx:false,forceStereo:true});setScreenAudio(current=>({...current,published:true}))}catch{audio.stop();setError("A tela está sendo transmitida, mas o áudio não pôde ser publicado.")}}
-      setShares(snapshot(room));setViewerId(room.localParticipant.identity);setPanel(false);
-    }catch(cause){for(const track of createdTracks){const publication=room.localParticipant.getTrackPublication(track.source);if(publication?.track)await room.localParticipant.unpublishTrack(publication.track,true).catch(()=>{});else track.stop()}if((cause as DOMException)?.name!=="NotAllowedError")setError(cause instanceof Error?cause.message:"Não foi possível iniciar a transmissão.")}finally{setBusy(false)}
+      if(roomRef.current!==targetRoom||targetRoom.state!==ConnectionState.Connected)throw new Error("A sala mudou antes da publicação da transmissão.");
+      await targetRoom.localParticipant.publishTrack(video,{source:Track.Source.ScreenShare,simulcast:shouldUseScreenSimulcast(selected.height,Math.min(maxFps,capability.maxFps)),videoCodec:"vp8",degradationPreference:"maintain-framerate",screenShareEncoding:{maxBitrate:selected.bitrate,maxFramerate:Math.min(maxFps,capability.maxFps)}});
+      if(audio){try{if(roomRef.current!==targetRoom)throw new Error("room_changed");await targetRoom.localParticipant.publishTrack(audio,{source:Track.Source.ScreenShareAudio,audioPreset:AudioPresets.musicHighQualityStereo,dtx:false,forceStereo:true});setScreenAudio(current=>({...current,published:true}))}catch{audio.stop();setError("A tela está sendo transmitida, mas o áudio não pôde ser publicado.")}}
+      setShares(snapshot(targetRoom));setViewerId(targetRoom.localParticipant.identity);setPanel(false);
+    }catch(cause){for(const track of createdTracks){const publication=targetRoom.localParticipant.getTrackPublication(track.source);if(publication?.track)await targetRoom.localParticipant.unpublishTrack(publication.track,true).catch(()=>{});else track.stop()}if((cause as DOMException)?.name!=="NotAllowedError")setError(cause instanceof Error?cause.message:"Não foi possível iniciar a transmissão.")}finally{operationRef.current=null;setBusy(false);if(stopRequestedRef.current){stopRequestedRef.current=false;void stop()}}
   }
-  async function stop(){if(!room)return;setBusy(true);try{const publications=[room.localParticipant.getTrackPublication(Track.Source.ScreenShare),room.localParticipant.getTrackPublication(Track.Source.ScreenShareAudio)];await Promise.all(publications.map(publication=>publication?.track?room.localParticipant.unpublishTrack(publication.track,true):Promise.resolve()));setScreenAudio(current=>({...current,available:null,published:false}));setViewerId(current=>current===room.localParticipant.identity?null:current);setShares(snapshot(room))}finally{setBusy(false)}}
+  async function stop(){
+    const targetRoom=roomRef.current;
+    if(!targetRoom)return;
+    if(operationRef.current==="start"){stopRequestedRef.current=true;return}
+    if(operationRef.current)return;
+    operationRef.current="stop";setBusy(true);
+    try{const publications=[targetRoom.localParticipant.getTrackPublication(Track.Source.ScreenShare),targetRoom.localParticipant.getTrackPublication(Track.Source.ScreenShareAudio)];await Promise.all(publications.map(publication=>publication?.track?targetRoom.localParticipant.unpublishTrack(publication.track,true):Promise.resolve()));setScreenAudio(current=>({...current,available:null,published:false}));setViewerId(current=>current===targetRoom.localParticipant.identity?null:current);setShares(snapshot(targetRoom))}finally{operationRef.current=null;setBusy(false)}
+  }
   async function fullscreen(){const target=playerRef.current;if(!target)return;if(document.fullscreenElement)await document.exitFullscreen();else await target.requestFullscreen()}
   function beginDrag(event:ReactPointerEvent){if(mode!=="floating"&&mode!=="minimized")return;dragRef.current={x:event.clientX,y:event.clientY,left:floatPos.x,top:floatPos.y}}
 
