@@ -1,0 +1,4 @@
+html.grind-desktop-runtime,html.grind-desktop-runtime body{overscroll-behavior:none;background:#07070b}
+html.grind-desktop-runtime body{min-width:960px;min-height:640px}
+html.grind-desktop-background *,html.grind-desktop-background *::before,html.grind-desktop-background *::after{animation-play-state:paused!important;transition:none!important;scroll-behavior:auto!important}
+html.grind-desktop-background [style*="filter"],html.grind-desktop-background [style*="backdrop-filter"]{filter:none!important;backdrop-filter:none!important}

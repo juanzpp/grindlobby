@@ -1,0 +1,65 @@
+name: Desktop Windows
+
+on:
+  pull_request:
+    paths:
+      - 'desktop/**'
+      - '.github/workflows/desktop-windows.yml'
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: desktop/src-tauri
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Prepare square desktop icon
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.Drawing
+          $src = (Resolve-Path '../../public/brand/grindlobby-official.png').Path
+          $img = [System.Drawing.Image]::FromFile($src)
+          $size = [Math]::Max($img.Width, $img.Height)
+          $bmp = New-Object System.Drawing.Bitmap $size, $size
+          $graphics = [System.Drawing.Graphics]::FromImage($bmp)
+          $graphics.Clear([System.Drawing.Color]::Transparent)
+          $x = [int](($size - $img.Width) / 2)
+          $y = [int](($size - $img.Height) / 2)
+          $graphics.DrawImage($img, $x, $y, $img.Width, $img.Height)
+          $bmp.Save((Join-Path $PWD 'app-icon.png'), [System.Drawing.Imaging.ImageFormat]::Png)
+          $graphics.Dispose()
+          $bmp.Dispose()
+          $img.Dispose()
+
+      - name: Generate Windows icons from GrindLobby logo
+        run: npx --yes @tauri-apps/cli@2 icon app-icon.png
+
+      - name: Cargo check
+        run: cargo check
+
+      - name: Build Windows installer
+        run: npx --yes @tauri-apps/cli@2 build --bundles nsis
+
+      - name: Upload EXE installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: GrindLobby-Windows
+          path: desktop/src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error
