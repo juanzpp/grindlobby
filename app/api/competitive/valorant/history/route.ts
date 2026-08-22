@@ -2,9 +2,9 @@ import {getCurrentUser} from '@/lib/auth';
 import {createAdminClient} from '@/lib/supabase/admin';
 import {noStoreJson} from '@/lib/security/request';
 
-export async function GET(){
+export async function GET(request:Request){
   try{
-    const user=await getCurrentUser();if(!user)return noStoreJson({error:'Não autorizado.'},{status:401});
+    const user=await getCurrentUser(request);if(!user)return noStoreJson({error:'Não autorizado.'},{status:401});
     const admin=createAdminClient();
     const {data:playerRows,error}=await admin.from('valorant_match_players').select('match_id,squad_id').eq('user_id',user.id).order('created_at',{ascending:false}).limit(60);if(error)throw error;
     const ids=(playerRows??[]).map(row=>row.match_id);if(!ids.length)return noStoreJson({matches:[]});
