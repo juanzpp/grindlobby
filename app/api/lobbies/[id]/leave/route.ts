@@ -5,6 +5,7 @@ import {assertTrustedMutation,InvalidRequestError,noStoreJson} from "@/lib/secur
 import {enforceRateLimit,RateLimitExceededError,RateLimitUnavailableError,rateLimitResponse} from "@/lib/security/rate-limit";
 import {logSecurityEvent} from "@/lib/security/logging";
 import {isExplicitLobbyLeave} from "@/lib/lobby-leave";
+import {closeLiveKitLobbyRoom,disconnectLobbyParticipant} from "@/lib/livekit-admin";
 
 const idSchema=z.string().uuid();
 
@@ -33,7 +34,8 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
     if(lobby.owner_id===user.id){
       const {error}=await admin.from("lobbies").delete().eq("id",id).eq("owner_id",user.id);
       if(error)throw new Error("owner_leave_failed");
-      logSecurityEvent({event:"lobby_leave",outcome:"allowed",actorId:user.id,reason:"owner_closed_lobby",route:"/api/lobbies/[id]/leave"});
+      const liveKitClosed=await closeLiveKitLobbyRoom(id);
+      logSecurityEvent({event:"lobby_leave",outcome:"allowed",actorId:user.id,reason:liveKitClosed?"owner_closed_lobby":"owner_closed_lobby_livekit_cleanup_deferred",route:"/api/lobbies/[id]/leave"});
       return noStoreJson({ok:true,closed:true});
     }
 
@@ -46,7 +48,8 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
     if(error)throw new Error("leave_failed");
     if(!data)return noStoreJson({error:"Participação não encontrada."},{status:404});
 
-    logSecurityEvent({event:"lobby_leave",outcome:"allowed",actorId:user.id,route:"/api/lobbies/[id]/leave"});
+    const liveKitDisconnected=await disconnectLobbyParticipant(id,user.id);
+    logSecurityEvent({event:"lobby_leave",outcome:"allowed",actorId:user.id,reason:liveKitDisconnected?undefined:"livekit_cleanup_deferred",route:"/api/lobbies/[id]/leave"});
     return noStoreJson({ok:true,closed:false});
   }catch(error){
     if(error instanceof RateLimitExceededError||error instanceof RateLimitUnavailableError)return rateLimitResponse(error);
