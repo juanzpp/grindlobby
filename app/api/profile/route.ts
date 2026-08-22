@@ -104,7 +104,7 @@ function buildCosmeticState(profile: any, isAdmin: boolean) {
 
 export async function GET(request: Request) {
   try {
-    const user = await getCurrentUser();
+    const user = await getCurrentUser(request);
     if (!user) return noStoreJson({ error: "Não autorizado." }, { status: 401 });
     await enforceRateLimit(request, { scope: "profile-read", limit: 120, windowSeconds: 600, subject: user.id });
 
@@ -153,7 +153,7 @@ export async function GET(request: Request) {
 export async function PATCH(request: Request) {
   try {
     assertTrustedMutation(request);
-    const user = await getCurrentUser();
+    const user = await getCurrentUser(request);
     if (!user) return noStoreJson({ error: "Não autorizado." }, { status: 401 });
     await enforceRateLimit(request, { scope: "profile-write", limit: 30, windowSeconds: 600, subject: user.id });
 
@@ -179,8 +179,6 @@ export async function PATCH(request: Request) {
       bundle: requestedEquipped.bundle ?? "",
     };
 
-    // Ownership is authoritative on the server. The client may choose among
-    // owned items, but it cannot grant itself cosmetics by PATCHing owned[].
     const cosmeticState = enforceOwnedSelections(normalizeCosmeticState({
       owned: persistedOwned,
       equipped: equippedInput,
