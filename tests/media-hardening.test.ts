@@ -73,4 +73,9 @@ describe('voice lifecycle regressions',()=>{
     expect(dock).toContain('audioBlocked');
     expect(dock).toMatch(/element\.play\(\)\.then\(\(\)=>\{setAudioBlocked\(false\);window\.removeEventListener/);
   });
+
+  it('does not subscribe desktop diagnostics to LiveKit in the normal web runtime',async()=>{
+    const diagnostics=await readFile('components/desktop/DesktopPerformanceDiagnostics.tsx','utf8');
+    expect(diagnostics).toMatch(/useEffect\(\(\)=>\{\s*if\(!lite\)return;\s*return subscribeActiveLiveKitRoom/);
+  });
 });
