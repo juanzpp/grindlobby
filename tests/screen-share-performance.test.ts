@@ -19,6 +19,21 @@ describe('screen share performance policy',()=>{
     expect(source).not.toContain('simulcast:true');
   });
 
+  it('serializes screen start/stop operations and rejects stale rooms',async()=>{
+    const source=await readFile('components/stream/ScreenShare.tsx','utf8');
+    expect(source).toContain('operationRef=useRef<"start"|"stop"|null>(null)');
+    expect(source).toContain('if(operationRef.current)return');
+    expect(source).toContain('if(roomRef.current!==targetRoom||targetRoom.state!==ConnectionState.Connected)');
+    expect(source).toContain('if(operationRef.current==="start"){stopRequestedRef.current=true;return}');
+  });
+
+  it('prevents overlapping viewer RTC stats reads',async()=>{
+    const source=await readFile('components/stream/ScreenShare.tsx','utf8');
+    expect(source).toContain('let cancelled=false,inFlight=false');
+    expect(source).toContain('if(inFlight)return;inFlight=true');
+    expect(source).toContain('catch{}finally{inFlight=false}');
+  });
+
   it('clears reconnect state on disconnect and on room replacement',async()=>{
     const source=await readFile('components/stream/ScreenShare.tsx','utf8');
     expect(source).toContain('if(!room){setShares([]);setReconnecting(false);return}');
