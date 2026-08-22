@@ -27,7 +27,7 @@ function hasValidImageSignature(bytes: Uint8Array, mime: string) {
 export async function POST(request: Request) {
   try {
     assertTrustedMutation(request);
-    const user = await getCurrentUser();
+    const user = await getCurrentUser(request);
     if (!user) return noStoreJson({ error: "Não autorizado." }, { status: 401 });
     await enforceRateLimit(request, { scope: "profile-upload", limit: 20, windowSeconds: 600, subject: user.id });
 
