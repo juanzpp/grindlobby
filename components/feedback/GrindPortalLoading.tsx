@@ -26,6 +26,18 @@ export default function GrindPortalLoading({variant="inline",label="Carregandoâ€
       <div className="gl-energy-ring r2"/>
       <div className="gl-energy-ring r3"/>
       <span className="gl-particle p1"/><span className="gl-particle p2"/><span className="gl-particle p3"/><span className="gl-particle p4"/><span className="gl-particle p5"/>
+
+      <div className="gl-desktop-portal-shell">
+        <span className="gl-desktop-orbit orbit-a"/>
+        <span className="gl-desktop-orbit orbit-b"/>
+        <span className="gl-desktop-orbit orbit-c"/>
+        <span className="gl-desktop-iris iris-1"/><span className="gl-desktop-iris iris-2"/><span className="gl-desktop-iris iris-3"/>
+        <span className="gl-desktop-iris iris-4"/><span className="gl-desktop-iris iris-5"/><span className="gl-desktop-iris iris-6"/>
+        <span className="gl-desktop-energy-scan"/>
+        <span className="gl-desktop-core-flare"/>
+        <span className="gl-desktop-spark s1"/><span className="gl-desktop-spark s2"/><span className="gl-desktop-spark s3"/><span className="gl-desktop-spark s4"/>
+      </div>
+
       <div className="gl-loader-logo-wrap">
         <span className="gl-loader-logo-glow"/>
         <Image src="/brand/grindlobby-official.png" alt="" width={156} height={191} priority sizes="160px" className="gl-loader-logo"/>
