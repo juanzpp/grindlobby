@@ -12,15 +12,15 @@ function initialStreamVolume(){if(typeof window==="undefined")return 30;const va
 
 function PersistentScreenPreview({session,onOpenLobby}:{session:ActiveVoiceSession;onOpenLobby:()=>void}){
  const videoRef=useRef<HTMLVideoElement>(null),audioRef=useRef<HTMLAudioElement>(null),[volume,setVolume]=useState(initialStreamVolume),[hiddenTrackId,setHiddenTrackId]=useState<string|null>(null),[output,setOutput]=useState<AudioOutputPreferences>(loadAudioOutputPreferences),[audioBlocked,setAudioBlocked]=useState(false);
- const share=useMemo(()=>{
-  const room=session.room;if(!room)return null;
+ const room=session.room;
+ let share:{name:string;video:RemoteVideoTrack;audio:RemoteAudioTrack|null}|null=null;
+ if(room){
   for(const participant of room.remoteParticipants.values()){
    const video=participant.getTrackPublication(Track.Source.ScreenShare)?.track;
    const audio=participant.getTrackPublication(Track.Source.ScreenShareAudio)?.track;
-   if(video instanceof RemoteVideoTrack)return{name:participant.name||"Player",video,audio:audio instanceof RemoteAudioTrack?audio:null};
+   if(video instanceof RemoteVideoTrack){share={name:participant.name||"Player",video,audio:audio instanceof RemoteAudioTrack?audio:null};break}
   }
-  return null;
- },[session.room]);
+ }
  const shareTrackId=share?.video.sid??share?.video.mediaStreamTrack.id??null;
  const gain=perceptualPlaybackGain(volume)*perceptualPlaybackGain(output.volume);
  useEffect(()=>subscribeAudioOutput(setOutput),[]);
