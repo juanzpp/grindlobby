@@ -18,7 +18,7 @@ export default function AudioHost({enabled,onStreamChange}:Props){
  const [testMode,setTestMode]=useState<"direct"|"processed">("processed"),[applied,setApplied]=useState<Partial<MediaTrackSettings>>({});
  const [devices,setDevices]=useState<MediaDeviceInfo[]>([]),[micId,setMicId]=useState("");
  const [outputPreferences,setOutputPreferences]=useState<AudioOutputPreferences>(loadAudioOutputPreferences);
- const [outputSupported,setOutputSupported]=useState(false);
+ const [outputSupported]=useState(()=>typeof HTMLMediaElement!=="undefined"&&"setSinkId" in HTMLMediaElement.prototype);
  const [testing,setTesting]=useState(false);
  const stream=useRef<MediaStream|null>(null),ctx=useRef<AudioContext|null>(null),gain=useRef<GainNode|null>(null),raf=useRef<number|undefined>(undefined);
  const testStream=useRef<MediaStream|null>(null),testAudio=useRef<HTMLAudioElement|null>(null);
@@ -51,14 +51,6 @@ export default function AudioHost({enabled,onStreamChange}:Props){
  function updateApplied(s:MediaStream){
   const track=s.getAudioTracks()[0];
   if(track)setApplied(track.getSettings());
- }
- async function applyProcessing(s:MediaStream,processed=true){
-  const track=s.getAudioTracks()[0];
-  if(!track)return;
-  try{
-   await track.applyConstraints({echoCancellation:processed?echo:false,noiseSuppression:processed?noise:false,autoGainControl:processed?agc:false});
-   updateApplied(s);
-  }catch(e){console.warn("As configurações de processamento não puderam ser aplicadas",e)}
  }
  function setSmoothGain(node:GainNode|null,value:number){
   if(!node||!ctx.current)return;
@@ -184,10 +176,13 @@ export default function AudioHost({enabled,onStreamChange}:Props){
   setTesting(false);
  }
  useEffect(()=>{
-  setOutputSupported(typeof HTMLMediaElement!=="undefined"&&"setSinkId" in HTMLMediaElement.prototype);
-  refreshDevices().catch(()=>{});
-  const existing=getActiveMicrophoneStream();
-  if(existing){stream.current=existing;setActive(true);updateApplied(existing);startMeter(existing);onStreamChange?.(existing)}
+  let disposed=false;
+  const initialize=window.setTimeout(()=>{
+   if(disposed)return;
+   refreshDevices().catch(()=>{});
+   const existing=getActiveMicrophoneStream();
+   if(existing){stream.current=existing;setActive(true);updateApplied(existing);startMeter(existing);onStreamChange?.(existing)}
+  },0);
   const onExternalMute=(event:Event)=>{
    const detail=(event as CustomEvent<{muted?:boolean}>).detail;
    const next=Boolean(detail?.muted);
@@ -208,6 +203,7 @@ export default function AudioHost({enabled,onStreamChange}:Props){
    if(live&&!stream.current){stream.current=live;setActive(true);updateApplied(live);startMeter(live);onStreamChange?.(live)}
   });
   return()=>{
+   disposed=true;window.clearTimeout(initialize);
    unsubscribe();
    window.removeEventListener("grindlobby:set-mic-muted",onExternalMute);
    window.removeEventListener("grindlobby:set-mic-gain",onExternalGain);
@@ -220,9 +216,17 @@ export default function AudioHost({enabled,onStreamChange}:Props){
   setLiveKitMicrophoneGain(input);
  },[input]);
  useEffect(()=>{
-  if(stream.current)applyProcessing(stream.current,true).catch(()=>{});
-  if(testStream.current)applyProcessing(testStream.current,testMode==="processed").catch(()=>{});
- },[noise,echo,agc]);
+  const apply=async(s:MediaStream,processed=true)=>{
+   const track=s.getAudioTracks()[0];
+   if(!track)return;
+   try{
+    await track.applyConstraints({echoCancellation:processed?echo:false,noiseSuppression:processed?noise:false,autoGainControl:processed?agc:false});
+    updateApplied(s);
+   }catch(e){console.warn("As configurações de processamento não puderam ser aplicadas",e)}
+  };
+  if(stream.current)void apply(stream.current,true);
+  if(testStream.current)void apply(testStream.current,testMode==="processed");
+ },[noise,echo,agc,testMode]);
  async function chooseTestMode(mode:"direct"|"processed"){
   setTestMode(mode);
   if(testing){stopMicTest(false);await runMicTest(mode)}
