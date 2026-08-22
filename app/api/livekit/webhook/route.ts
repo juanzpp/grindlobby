@@ -1,7 +1,7 @@
 import {RoomServiceClient,TrackSource,WebhookReceiver,type TrackInfo} from "livekit-server-sdk";
 import {createAdminClient} from "@/lib/supabase/admin";
 import {isConfiguredAdmin} from "@/lib/admin-config";
-import {getScreenSharePolicy,isResolutionWithinPolicy} from "@/lib/livekit-screen-policy";
+import {getScreenSharePolicy,isBitrateWithinPolicy,isResolutionWithinPolicy} from "@/lib/livekit-screen-policy";
 import {logSecurityEvent} from "@/lib/security/logging";
 
 export const runtime="nodejs";
@@ -38,6 +38,14 @@ function trackDimensions(track:TrackInfo){
   );
 }
 
+function trackMaxBitrate(track:TrackInfo){
+  const values=[
+    ...track.layers.map(layer=>Number((layer as {bitrate?:number}).bitrate)||0),
+    ...track.codecs.flatMap(codec=>codec.layers.map(layer=>Number((layer as {bitrate?:number}).bitrate)||0)),
+  ];
+  return Math.max(0,...values);
+}
+
 function response(status=200){
   return Response.json({ok:status<400},{status,headers:{"Cache-Control":"no-store"}});
 }
@@ -72,24 +80,34 @@ export async function POST(request:Request){
     const {data:profile,error}=await admin.from("profiles").select("account_tier").eq("id",identity).maybeSingle();
     if(error)throw error;
     const policy=getScreenSharePolicy(isConfiguredAdmin(identity)||profile?.account_tier==="pro");
+    const roomService=new RoomServiceClient(url,apiKey,apiSecret);
 
-    let dimensions=trackDimensions(event.track);
-    if(dimensions.width===0||dimensions.height===0){
-      const participant=await new RoomServiceClient(url,apiKey,apiSecret).getParticipant(room,identity);
+    let inspectedTrack=event.track;
+    let dimensions=trackDimensions(inspectedTrack);
+    let bitrate=trackMaxBitrate(inspectedTrack);
+    if(dimensions.width===0||dimensions.height===0||bitrate===0){
+      const participant=await roomService.getParticipant(room,identity);
       const currentTrack=participant.tracks.find(track=>track.sid===trackSid);
-      if(currentTrack)dimensions=trackDimensions(currentTrack);
+      if(currentTrack){
+        inspectedTrack=currentTrack;
+        dimensions=trackDimensions(currentTrack);
+        bitrate=trackMaxBitrate(currentTrack);
+      }
     }
 
-    if(isResolutionWithinPolicy(dimensions.width,dimensions.height,policy)){
-      logSecurityEvent({event:"screen_share_resolution",outcome:"allowed",actorId:identity,reason:`${policy.tier}:${dimensions.width}x${dimensions.height}`,route:"/api/livekit/webhook"});
+    const resolutionAllowed=isResolutionWithinPolicy(dimensions.width,dimensions.height,policy);
+    const bitrateAllowed=isBitrateWithinPolicy(bitrate,policy);
+    if(resolutionAllowed&&bitrateAllowed){
+      logSecurityEvent({event:"screen_share_policy",outcome:"allowed",actorId:identity,reason:`${policy.tier}:${dimensions.width}x${dimensions.height}:${bitrate}`,route:"/api/livekit/webhook"});
       return response();
     }
 
-    await new RoomServiceClient(url,apiKey,apiSecret).mutePublishedTrack(room,identity,trackSid,true);
-    logSecurityEvent({event:"screen_share_resolution",outcome:"blocked",actorId:identity,reason:`${policy.tier}:${dimensions.width}x${dimensions.height}`,route:"/api/livekit/webhook"});
+    await roomService.mutePublishedTrack(room,identity,trackSid,true);
+    const reason=!resolutionAllowed?`resolution:${dimensions.width}x${dimensions.height}`:`bitrate:${bitrate}`;
+    logSecurityEvent({event:"screen_share_policy",outcome:"blocked",actorId:identity,reason:`${policy.tier}:${reason}`,route:"/api/livekit/webhook"});
     return response();
   }catch{
-    logSecurityEvent({event:"screen_share_resolution",outcome:"failed",actorId:identity,reason:"enforcement_failed",route:"/api/livekit/webhook"});
+    logSecurityEvent({event:"screen_share_policy",outcome:"failed",actorId:identity,reason:"enforcement_failed",route:"/api/livekit/webhook"});
     return response(500);
   }
 }
