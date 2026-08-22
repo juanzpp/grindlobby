@@ -35,7 +35,7 @@ export default function DesktopLiteHome({user}:{user:DesktopUser}){
     finally{setLoading(false)}
   },[]);
 
-  useEffect(()=>{void load()},[load]);
+  useEffect(()=>{const timer=window.setTimeout(()=>void load(),0);return()=>window.clearTimeout(timer)},[load]);
 
   const visibleLobbies=useMemo(()=>data?.lobbies?.filter(lobby=>lobby.visibility==="public").slice(0,5)??[],[data?.lobbies]);
   const display=data?.account?.displayName||user.display_name||user.username;
