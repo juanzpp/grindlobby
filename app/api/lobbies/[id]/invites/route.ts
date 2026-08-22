@@ -11,7 +11,7 @@ const bodySchema=z.object({maxUses:z.coerce.number().int().min(1).max(100).optio
 export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){
   try{
     assertTrustedMutation(request);
-    const user=await getCurrentUser();if(!user)return noStoreJson({error:"Não autorizado."},{status:401});
+    const user=await getCurrentUser(request);if(!user)return noStoreJson({error:"Não autorizado."},{status:401});
     await enforceRateLimit(request,{scope:"create-lobby-invite",limit:20,windowSeconds:3600,subject:user.id});
     const id=idSchema.parse((await params).id),body=bodySchema.parse(await readJsonBody(request,2048).catch(()=>({}))),admin=createAdminClient();
     const {data:lobby}=await admin.from("lobbies").select("id,owner_id,status").eq("id",id).maybeSingle();
