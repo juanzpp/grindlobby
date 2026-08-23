@@ -5,8 +5,8 @@ import {cookies} from "next/headers";
 import {redirect} from "next/navigation";
 
 type SearchParams=Promise<Record<string,string|string[]|undefined>>;
-type DesktopView="home"|"store"|"profile"|"settings";
-const desktopViews=new Set<DesktopView>(["home","store","profile","settings"]);
+type DesktopView="home"|"lobbies"|"community"|"friends"|"messages"|"tournaments"|"events"|"store"|"profile"|"settings";
+const desktopViews=new Set<DesktopView>(["home","lobbies","community","friends","messages","tournaments","events","store","profile","settings"]);
 
 export default async function Home({searchParams}:{searchParams:SearchParams}){
   const query=await searchParams;
