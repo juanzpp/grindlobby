@@ -35,9 +35,10 @@ describe('friends and direct messages contracts',()=>{
 
   it('forces social mutations through server APIs at the database boundary',async()=>{
     const migration=await readFile('supabase/migrations/20260823154800_social_server_only_dml_hardening.sql','utf8');
+    const cleanup=await readFile('supabase/migrations/20260823155200_drop_duplicate_friendship_index.sql','utf8');
     expect(migration).toContain('revoke insert, update, delete on table public.friendships from authenticated');
     expect(migration).toContain('revoke insert, update, delete on table public.direct_messages from authenticated');
-    expect(migration).toContain('friendships_unordered_pair_uidx');
+    expect(cleanup).toContain('drop index if exists public.friendships_unordered_pair_uidx');
   });
 
   it('enables real social tabs in the desktop build and voice reliability hardening',async()=>{
