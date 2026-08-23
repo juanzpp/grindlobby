@@ -1,0 +1,30 @@
+/* Desktop login viewport guard.
+   Prevents the guest/login surface from inheriting any desktop shell column and
+   keeps the portal artwork visible at the common 900–1150px window widths. */
+html,body,#root{width:100%!important;height:100%!important;min-width:0!important;margin:0!important;padding:0!important;overflow:hidden!important}
+#root:has(.portal-login),#root:has(.login-screen){position:fixed!important;inset:0!important;display:block!important;width:100vw!important;height:100vh!important;overflow:hidden!important;background:#05070b!important}
+.portal-login,.login-screen{position:fixed!important;inset:0!important;width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;margin:0!important;padding:0!important;grid-column:1/-1!important;grid-row:1/-1!important;transform:none!important;overflow:hidden!important}
+.portal-login{isolation:isolate!important;background:radial-gradient(circle at 29% 51%,rgba(108,31,196,.24),transparent 28%),radial-gradient(circle at 78% 48%,rgba(71,20,126,.08),transparent 31%),linear-gradient(135deg,#030407 0%,#06070b 52%,#08060d 100%)!important}
+.portal-login-stage{min-width:0!important;overflow:hidden!important;background:radial-gradient(circle at 50% 50%,rgba(120,38,216,.09),transparent 43%)!important}
+.portal-login-card{min-width:0!important}
+@media(max-width:1150px) and (min-width:761px){
+  .portal-login{grid-template-columns:minmax(330px,.88fr) minmax(430px,1.12fr)!important}
+  .portal-login-stage{display:flex!important;padding:20px 14px!important}
+  .portal-login-mark{width:260px!important;height:260px!important}
+  .portal-login-mark img{width:126px!important;height:126px!important}
+  .ring-a{width:174px!important;height:174px!important}
+  .ring-b{width:214px!important;height:214px!important}
+  .ring-c{width:250px!important;height:250px!important}
+  .portal-halo{width:156px!important;height:156px!important}
+  .portal-login-copy{margin-top:-22px!important;max-width:280px!important}
+  .portal-login-copy h1{font-size:21px!important}
+  .portal-login-copy p{font-size:9px!important}
+  .portal-login-card{width:min(390px,calc(100% - 34px))!important;padding:26px!important}
+}
+@media(max-width:760px){
+  .portal-login{display:grid!important;grid-template-columns:1fr!important;place-items:center!important;background:radial-gradient(circle at 50% 42%,rgba(111,31,199,.18),transparent 34%),#05070b!important}
+  .portal-login-stage{position:absolute!important;inset:0!important;display:flex!important;opacity:.18!important;pointer-events:none!important;padding:0!important}
+  .portal-login-mark{width:420px!important;height:420px!important;transform:translateY(-3%)!important}
+  .portal-login-copy{display:none!important}
+  .portal-login-card{width:min(420px,calc(100vw - 34px))!important;justify-self:center!important;background:rgba(8,10,15,.94)!important;backdrop-filter:blur(10px)!important}
+}
