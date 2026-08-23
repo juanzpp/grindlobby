@@ -7,6 +7,11 @@ export function fixNativeBridge(code){
   );
 
   fixed=fixed.replace(
+    'useEffect(()=>()=>{roomRef.current?.disconnect()},[]);',
+    'useEffect(()=>()=>{roomRef.current?.disconnect()},[]);useEffect(()=>{const lobbyId=call?.lobby?.id;if(!lobbyId)return;const beat=()=>API("POST",`/api/lobbies/${lobbyId}/heartbeat`,{}).catch(()=>{});void beat();const timer=window.setInterval(beat,15000);return()=>window.clearInterval(timer)},[call?.lobby?.id]);'
+  );
+
+  fixed=fixed.replace(
     'const login=async(identifier,password,remember)=>{const response=await API("POST","/api/auth/login",{identifier,password,remember});if(!response?.ok)throw new Error(errorText(response,"Credenciais inválidas."));await loadDashboard();notify("Bem-vindo ao GrindLobby.")};',
     'const login=async(identifier,password,remember)=>{let response;try{response=await API("POST","/api/auth/login",{identifier,password,remember})}catch(error){throw new Error(error?.message||"Não foi possível conectar ao GrindLobby.")}if(!response)throw new Error("O cliente desktop não recebeu resposta da API.");if(response.status===401)throw new Error("Usuário/e-mail ou senha inválidos.");if(!response.ok)throw new Error(errorText(response,`Falha de autenticação (HTTP ${response.status}).`));const loaded=await loadDashboard();if(!loaded)throw new Error("Login aceito, mas a sessão não pôde ser carregada.");notify("Bem-vindo ao GrindLobby.")};'
   );
