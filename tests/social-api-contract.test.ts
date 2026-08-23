@@ -41,11 +41,12 @@ describe('friends and direct messages contracts',()=>{
     expect(cleanup).toContain('drop index if exists public.friendships_unordered_pair_uidx');
   });
 
-  it('enables real social tabs in the desktop build and voice reliability hardening',async()=>{
-    const [vite,social,voice]=await Promise.all([
+  it('enables real social tabs and resilient tier-aware media in desktop',async()=>{
+    const [vite,social,voice,tokenRoute]=await Promise.all([
       readFile('desktop/ui/vite.config.mjs','utf8'),
       readFile('desktop/ui/social-tabs-transform.mjs','utf8'),
       readFile('desktop/ui/voice-reliability-transform.mjs','utf8'),
+      readFile('app/api/lobbies/[id]/voice/token/route.ts','utf8'),
     ]);
     expect(vite).toContain('socialTabsTransformPlugin()');
     expect(vite).toContain('voiceReliabilityTransformPlugin()');
@@ -53,6 +54,9 @@ describe('friends and direct messages contracts',()=>{
     expect(social).toContain('/api/messages');
     expect(voice).toContain('RoomEvent.Reconnecting');
     expect(voice).toContain('RoomEvent.TrackUnsubscribed');
-    expect(voice).toContain('setScreenShareEnabled(true,{audio:false})');
+    expect(voice).toContain('connectVoice(lobby)');
+    expect(voice).toContain('resolution:{width:policy.maxWidth,height:policy.maxHeight,frameRate:policy.maxFps}');
+    expect(tokenRoute).toContain('TrackSource.CAMERA');
+    expect(tokenRoute).toContain('return noStoreJson({token:jwt,url,screenShare})');
   });
 });
