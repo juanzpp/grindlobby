@@ -88,7 +88,7 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
     }
 
     logSecurityEvent({event:"livekit_token",outcome:"allowed",actorId:user.id,route:"/api/lobbies/[id]/voice/token"});
-    return noStoreJson({token:jwt,url});
+    return noStoreJson({token:jwt,url,screenShare});
   }catch(error){
     if(error instanceof RateLimitExceededError||error instanceof RateLimitUnavailableError)return rateLimitResponse(error);
     if(error instanceof z.ZodError||error instanceof InvalidRequestError)return noStoreJson({error:"Requisição inválida."},{status:400});
