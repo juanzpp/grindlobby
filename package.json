@@ -5,9 +5,10 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "postbuild": "node scripts/prepare-standalone.mjs",
     "lint": "eslint .",
     "test": "vitest run",
-    "start": "node scripts/verify-schema.mjs && next start"
+    "start": "node scripts/verify-schema.mjs && node .next/standalone/server.js"
   },
   "dependencies": {
     "@supabase/ssr": "^0.7.0",
