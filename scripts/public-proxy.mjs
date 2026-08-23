@@ -1,5 +1,5 @@
 import http from 'node:http';
-import { pipeline } from 'node:stream';
+import { pipeline, Readable } from 'node:stream';
 
 const port = Number(process.env.PORT || 10000);
 const upstream = new URL('https://grindlobby.onrender.com');
@@ -39,6 +39,7 @@ const server = http.createServer(async (req, res) => {
     const nodeStream = Readable.fromWeb(response.body);
     pipeline(nodeStream, res, () => {});
   } catch (error) {
+    console.error('Proxy upstream failure', error);
     res.statusCode = 502;
     res.setHeader('content-type', 'application/json; charset=utf-8');
     res.setHeader('cache-control', 'no-store');
