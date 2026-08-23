@@ -1,0 +1,13 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "local-main",
+  "description": "Native permissions for the bundled GrindLobby desktop frontend.",
+  "windows": ["main"],
+  "local": true,
+  "platforms": ["windows"],
+  "permissions": [
+    "allow-api-request",
+    "allow-window-controls",
+    "allow-performance-snapshot"
+  ]
+}
