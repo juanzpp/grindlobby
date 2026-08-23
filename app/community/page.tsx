@@ -13,5 +13,5 @@ export default async function CommunityPage({searchParams}:{searchParams:SearchP
   if(lite)redirect('/desktop-lite?desktop=lite');
   const content=<CommunityHub/>;
   if(desktop)return <DesktopModuleShell section="community" title="Communities" subtitle="PRIVATE GROUP HUB">{content}</DesktopModuleShell>;
-  return content;
+  return <div className="web-refresh-scope web-community-v2">{content}</div>;
 }
