@@ -1,14 +1,28 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "GrindLobby Performance",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "identifier": "com.grindlobby.performance",
   "build": {
     "frontendDist": "../dist"
   },
   "app": {
     "withGlobalTauri": true,
-    "windows": [],
+    "windows": [
+      {
+        "label": "main",
+        "title": "GrindLobby Performance",
+        "url": "index.html",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 600,
+        "center": true,
+        "resizable": true,
+        "decorations": false,
+        "visible": true
+      }
+    ],
     "security": {
       "csp": null
     }
