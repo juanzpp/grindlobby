@@ -1,5 +1,8 @@
+import {deadTabsTransformPlugin} from "./dead-tabs-transform.mjs";
+
 export default {
   plugins: [
+    deadTabsTransformPlugin(),
     {
       name: "grindlobby-desktop-css-contract",
       enforce: "pre",
