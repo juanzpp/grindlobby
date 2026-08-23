@@ -9,6 +9,8 @@ describe('desktop production hardening',()=>{
     expect(cargo).toContain('url = "=2.5.8"');
     expect(cargo).toContain('serde = { version = "=1.0.229"');
     expect(cargo).toContain('sysinfo = { version = "=0.33.1"');
+    expect(cargo).toContain('reqwest = { version = "=0.12.23"');
+    expect(cargo).toContain('features = ["json", "cookies", "rustls-tls"]');
   });
 
   it('uses one locked dependency resolution for checks and both installers',async()=>{
@@ -29,7 +31,7 @@ describe('desktop production hardening',()=>{
     expect(workflow).toContain('name: GrindLobby-Performance-Windows');
   });
 
-  it('keeps native IPC read-only and scoped to the official remote origin',async()=>{
+  it('keeps legacy performance IPC read-only and scoped to the official remote origin',async()=>{
     const capability=await readFile('desktop/src-tauri/capabilities/performance-remote.json','utf8');
     const permission=await readFile('desktop/src-tauri/permissions/performance.toml','utf8');
     expect(capability).toContain('https://grindlobby.onrender.com/*');
@@ -39,14 +41,33 @@ describe('desktop production hardening',()=>{
     expect(permission).not.toContain('fs:');
   });
 
-  it('prevents the native webview from navigating away from the GrindLobby origin',async()=>{
+  it('bundles the desktop UI locally and restricts backend access to the fixed GrindLobby API',async()=>{
     const native=await readFile('desktop/src-tauri/src/main.rs','utf8');
-    expect(native).toContain('const PRODUCTION_HOST: &str = "grindlobby.onrender.com"');
-    expect(native).toContain('url.scheme() == "https" && url.host_str() == Some(PRODUCTION_HOST)');
-    expect(native).toContain('.on_navigation(is_allowed_navigation)');
+    expect(native).toContain('const API_ORIGIN: &str = "https://grindlobby.onrender.com"');
+    expect(native).toContain('WebviewUrl::App("index.html".into())');
+    expect(native).not.toContain('WebviewUrl::External');
+    expect(native).toContain('.decorations(false)');
+    expect(native).toContain('path.starts_with("/api/")');
+    expect(native).toContain('!path.contains("://")');
+    expect(native).toContain('!path.contains("..")');
+    expect(native).toContain('.cookie_store(true)');
+    expect(native).toContain('.header("Origin", API_ORIGIN)');
   });
 
-  it('holds a Web Lock only while voice is active so minimized sessions stay alive',async()=>{
+  it('grants only explicit local bridge and window commands to the bundled main window',async()=>{
+    const capability=await readFile('desktop/src-tauri/capabilities/local-main.json','utf8');
+    const permission=await readFile('desktop/src-tauri/permissions/desktop.toml','utf8');
+    expect(capability).toContain('allow-api-request');
+    expect(capability).toContain('allow-window-controls');
+    expect(permission).toContain('commands.allow = ["api_request"]');
+    expect(permission).toContain('window_minimize');
+    expect(permission).toContain('window_toggle_maximize');
+    expect(permission).toContain('window_close');
+    expect(permission).not.toContain('shell');
+    expect(permission).not.toContain('fs:');
+  });
+
+  it('holds a Web Lock only while voice is active so minimized legacy sessions stay alive',async()=>{
     const voice=await readFile('lib/webrtc/useLobbyVoice.ts','utf8');
     expect(voice).toContain('navigator.locks.request("grindlobby-active-voice",{mode:"shared"}');
     expect(voice).toContain('startBackgroundActivityLock()');
@@ -54,7 +75,7 @@ describe('desktop production hardening',()=>{
     expect(voice).toContain('RoomEvent.Disconnected,()=>{stopHeartbeat();stopBackgroundActivityLock();sync()}');
   });
 
-  it('preserves desktop mode and safe invite return paths through login',async()=>{
+  it('preserves desktop mode and safe invite return paths through legacy compatibility routes',async()=>{
     const login=await readFile('app/login/page.tsx','utf8');
     const lobby=await readFile('app/lobby/[id]/page.tsx','utf8');
     const invite=await readFile('app/lobby/invite/[token]/page.tsx','utf8');
