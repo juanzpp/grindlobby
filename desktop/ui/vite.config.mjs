@@ -4,6 +4,7 @@ import {musicTabTransformPlugin} from "./music-tab-transform.mjs";
 import {lobbyMusicAudioTransformPlugin} from "./lobby-music-audio-transform.mjs";
 import {voiceReliabilityTransformPlugin} from "./voice-reliability-transform.mjs";
 import {nativeBridgeTransformPlugin} from "./native-bridge-transform.mjs";
+import {referenceUiTransformPlugin} from "./reference-ui-transform.mjs";
 
 export default {
   plugins: [
@@ -13,6 +14,7 @@ export default {
     musicTabTransformPlugin(),
     lobbyMusicAudioTransformPlugin(),
     voiceReliabilityTransformPlugin(),
+    referenceUiTransformPlugin(),
     {
       name: "grindlobby-desktop-css-contract",
       enforce: "pre",
