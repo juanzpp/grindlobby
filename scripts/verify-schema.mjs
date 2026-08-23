@@ -1,6 +1,6 @@
 const url=process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/,"");
 const key=process.env.SUPABASE_SERVICE_ROLE_KEY;
-const expectedVersion="20260823_friends_direct_messages";
+const expectedVersion="20260823_social_server_only_dml";
 
 if(!url||!key){
   console.error("[schema-check] missing Supabase server environment variables");
