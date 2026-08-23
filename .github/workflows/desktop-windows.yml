@@ -187,3 +187,4 @@ jobs:
           if-no-files-found: error
 
 # Rebuild desktop installers after official 07 logo update.
+# Final desktop rebuild requested on 2026-08-23 after API-only desktop cleanup.
