@@ -5,8 +5,8 @@ describe('native desktop secondary modules',()=>{
   it('wraps Community in the native desktop shell only for desktop=1',async()=>{
     const source=await readFile('app/community/page.tsx','utf8');
     expect(source).toContain("const desktop=query.desktop==='1',lite=query.desktop==='lite'");
-    expect(source).toContain('<DesktopModuleShell section="community"');
-    expect(source).toContain('return content;');
+    expect(source).toContain('if(desktop)return <DesktopModuleShell section="community"');
+    expect(source).toContain('return <div className="web-refresh-scope web-community-v2">{content}</div>;');
   });
 
   it('wraps Valorant matchmaking and match rooms in the native desktop shell',async()=>{
