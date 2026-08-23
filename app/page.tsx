@@ -1,12 +1,12 @@
 import Dashboard from "@/components/Dashboard";
-import DesktopReferenceUI,{type DesktopReferenceView} from "@/components/desktop/DesktopReferenceUI";
+import DesktopHome from "@/components/desktop/DesktopHome";
 import {getCurrentUser} from "@/lib/auth";
 import {cookies} from "next/headers";
 import {redirect} from "next/navigation";
 
 type SearchParams=Promise<Record<string,string|string[]|undefined>>;
-type DesktopView=DesktopReferenceView;
-const desktopViews=new Set<DesktopView>(["home","lobbies","community","music","friends","messages","tournaments","events","store","profile","settings"]);
+type DesktopView="home"|"lobbies"|"community"|"friends"|"messages"|"events"|"store"|"profile"|"settings";
+const desktopViews=new Set<DesktopView>(["home","lobbies","community","friends","messages","events","store","profile","settings"]);
 
 export default async function Home({searchParams}:{searchParams:SearchParams}){
   const query=await searchParams;
@@ -22,7 +22,7 @@ export default async function Home({searchParams}:{searchParams:SearchParams}){
   if(standardDesktop){
     const requested=typeof query.view==="string"?query.view:"home";
     const initialView=desktopViews.has(requested as DesktopView)?requested as DesktopView:"home";
-    return <DesktopReferenceUI user={user} initialView={initialView}/>;
+    return <DesktopHome user={user} initialView={initialView}/>;
   }
   return <Dashboard user={user}/>;
 }
