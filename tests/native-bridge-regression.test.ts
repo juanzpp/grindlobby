@@ -18,4 +18,11 @@ describe('native desktop bridge hardening',()=>{
     expect(transformed).toContain('O cliente desktop não recebeu resposta da API.');
     expect(transformed).toContain('Login aceito, mas a sessão não pôde ser carregada.');
   });
+
+  it('uses the explicit leave contract so lobby membership is actually removed',async()=>{
+    const source=await readFile('desktop/ui/src/main.jsx','utf8');
+    const transformed=fixNativeBridge(source);
+    expect(transformed).toContain('/leave?intent=explicit');
+    expect(transformed).not.toContain('`/api/lobbies/${lobby.id}/leave`,{}).catch(()=>{});');
+  });
 });
