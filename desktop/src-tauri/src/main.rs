@@ -80,8 +80,8 @@ async fn api_request(state: State<'_, ApiState>, request: ApiRequest) -> Result<
         .0
         .request(method.clone(), url)
         .header("Accept", "application/json")
-        .header("Origin", API_ORIGIN)
-        .header("Referer", format!("{API_ORIGIN}/"));
+        .header("Sec-Fetch-Site", "same-origin")
+        .header("X-GrindLobby-Client", "desktop-native");
 
     if method != Method::GET {
         builder = builder.header("Content-Type", "application/json");
@@ -234,13 +234,13 @@ fn main() {
 
             #[cfg(feature = "lite")]
             let builder = builder
-                .inner_size(1180.0, 760.0)
-                .min_inner_size(900.0, 620.0);
+                .inner_size(1280.0, 820.0)
+                .min_inner_size(980.0, 660.0);
 
             #[cfg(not(feature = "lite"))]
             let builder = builder
-                .inner_size(1480.0, 920.0)
-                .min_inner_size(1080.0, 680.0);
+                .inner_size(1536.0, 960.0)
+                .min_inner_size(1160.0, 740.0);
 
             builder.build()?;
             Ok(())
