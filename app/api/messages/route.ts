@@ -27,7 +27,7 @@ export async function GET(request:Request){
     }
     const {data,error}=await admin.from('direct_messages').select('id,sender_id,recipient_id,body,created_at,read_at').or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`).order('created_at',{ascending:false}).limit(300);
     if(error)throw error;
-    const latest=new Map<string,typeof data[number]>();const unread=new Map<string,number>();
+    const latest=new Map<string,{id:string;sender_id:string;recipient_id:string;body:string;created_at:string;read_at:string|null}>();const unread=new Map<string,number>();
     for(const row of data??[]){const peer=row.sender_id===user.id?row.recipient_id:row.sender_id;if(!latest.has(peer))latest.set(peer,row);if(row.recipient_id===user.id&&!row.read_at)unread.set(peer,(unread.get(peer)??0)+1);}
     const ids=[...latest.keys()];const {data:profiles,error:profileError}=ids.length?await admin.from('profiles').select('id,username,display_name,avatar,status,last_seen_at').in('id',ids):{data:[],error:null};if(profileError)throw profileError;
     const byId=new Map((profiles??[]).map(p=>[p.id,p]));
