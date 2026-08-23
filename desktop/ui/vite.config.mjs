@@ -1,8 +1,10 @@
 import {deadTabsTransformPlugin} from "./dead-tabs-transform.mjs";
+import {musicTabTransformPlugin} from "./music-tab-transform.mjs";
 
 export default {
   plugins: [
     deadTabsTransformPlugin(),
+    musicTabTransformPlugin(),
     {
       name: "grindlobby-desktop-css-contract",
       enforce: "pre",
