@@ -1,6 +1,6 @@
 [package]
 name = "grindlobby-desktop"
-version = "0.2.0"
+version = "0.2.1"
 description = "GrindLobby native desktop client"
 authors = ["GrindLobby"]
 edition = "2021"
