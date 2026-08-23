@@ -7,10 +7,20 @@ import {nativeBridgeTransformPlugin} from "./native-bridge-transform.mjs";
 import {referenceUiTransformPlugin} from "./reference-ui-transform.mjs";
 
 const approvedReferenceUiPlugin={...referenceUiTransformPlugin(),enforce:"pre"};
+const dedicatedMusicSurfacePlugin={
+  name:"grindlobby-dedicated-music-surface",
+  enforce:"pre",
+  transform(code,id){
+    if(!id.endsWith("main.jsx"))return null;
+    const fixed=code.replace('<MusicBar notify={notify}/>','{view==="music"&&<MusicBar notify={notify}/>}');
+    return fixed===code?null:{code:fixed,map:null};
+  }
+};
 
 export default {
   plugins: [
     approvedReferenceUiPlugin,
+    dedicatedMusicSurfacePlugin,
     nativeBridgeTransformPlugin(),
     deadTabsTransformPlugin(),
     socialTabsTransformPlugin(),
