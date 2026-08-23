@@ -119,7 +119,7 @@ jobs:
       - name: Verify Rust dependency lock
         shell: pwsh
         run: |
-          $expected = '97c9eab69cda90cacf01f53c08b049fa306405503da35805492e97c7376d3934'
+          $expected = '85c45c252595c308d3c146ce801cb09d9fc7195aeecbd3b51259a1cd0d3c24f2'
           $actual = (Get-FileHash 'Cargo.lock' -Algorithm SHA256).Hash.ToLowerInvariant()
           if ($actual -ne $expected) {
             throw "Cargo.lock dependency graph changed. Expected $expected but resolved $actual. Review dependency updates before shipping."
