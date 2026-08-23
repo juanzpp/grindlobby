@@ -5,6 +5,10 @@ description = "GrindLobby native desktop client"
 authors = ["GrindLobby"]
 edition = "2021"
 
+[[bin]]
+name = "grindlobby-desktop"
+path = "src/main_gateway.rs"
+
 [features]
 default = []
 lite = []
