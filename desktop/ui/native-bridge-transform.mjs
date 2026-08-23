@@ -11,6 +11,11 @@ export function fixNativeBridge(code){
     'const login=async(identifier,password,remember)=>{let response;try{response=await API("POST","/api/auth/login",{identifier,password,remember})}catch(error){throw new Error(error?.message||"Não foi possível conectar ao GrindLobby.")}if(!response)throw new Error("O cliente desktop não recebeu resposta da API.");if(response.status===401)throw new Error("Usuário/e-mail ou senha inválidos.");if(!response.ok)throw new Error(errorText(response,`Falha de autenticação (HTTP ${response.status}).`));const loaded=await loadDashboard();if(!loaded)throw new Error("Login aceito, mas a sessão não pôde ser carregada.");notify("Bem-vindo ao GrindLobby.")};'
   );
 
+  fixed=fixed.replace(
+    'await API("POST",`/api/lobbies/${lobby.id}/leave`,{}).catch(()=>{});',
+    'await API("POST",`/api/lobbies/${lobby.id}/leave?intent=explicit`,{}).catch(()=>{});'
+  );
+
   return fixed;
 }
 
