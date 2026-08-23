@@ -2,6 +2,7 @@ import {deadTabsTransformPlugin} from "./dead-tabs-transform.mjs";
 import {socialTabsTransformPlugin} from "./social-tabs-transform.mjs";
 import {musicTabTransformPlugin} from "./music-tab-transform.mjs";
 import {lobbyMusicAudioTransformPlugin} from "./lobby-music-audio-transform.mjs";
+import {voiceReliabilityTransformPlugin} from "./voice-reliability-transform.mjs";
 
 export default {
   plugins: [
@@ -9,6 +10,7 @@ export default {
     socialTabsTransformPlugin(),
     musicTabTransformPlugin(),
     lobbyMusicAudioTransformPlugin(),
+    voiceReliabilityTransformPlugin(),
     {
       name: "grindlobby-desktop-css-contract",
       enforce: "pre",
