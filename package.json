@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "npm test",
     "build": "next build",
     "postbuild": "node scripts/prepare-standalone.mjs",
     "lint": "eslint .",
