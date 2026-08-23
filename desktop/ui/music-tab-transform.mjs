@@ -5,6 +5,7 @@ export function musicTabTransformPlugin(){
     transform(code,id){
       if(!id.endsWith("main.jsx"))return null;
       let fixed=code;
+      fixed=fixed.replace('import"./styles.css";','import"./styles.css";\nimport"./music.css";');
       fixed=fixed.replace(
         'const nav=[["home","Início",Home],["lobbies","Lobbies",Gamepad2],["community","Community",Users],["events","Eventos",CalendarDays],["store","Loja",Store],["settings","Configurações",Settings]];',
         'const nav=[["home","Início",Home],["lobbies","Lobbies",Gamepad2],["community","Community",Users],["music","Música",Music2],["events","Eventos",CalendarDays],["store","Loja",Store],["settings","Configurações",Settings]];'
