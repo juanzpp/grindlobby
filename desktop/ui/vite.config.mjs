@@ -3,9 +3,11 @@ import {socialTabsTransformPlugin} from "./social-tabs-transform.mjs";
 import {musicTabTransformPlugin} from "./music-tab-transform.mjs";
 import {lobbyMusicAudioTransformPlugin} from "./lobby-music-audio-transform.mjs";
 import {voiceReliabilityTransformPlugin} from "./voice-reliability-transform.mjs";
+import {nativeBridgeTransformPlugin} from "./native-bridge-transform.mjs";
 
 export default {
   plugins: [
+    nativeBridgeTransformPlugin(),
     deadTabsTransformPlugin(),
     socialTabsTransformPlugin(),
     musicTabTransformPlugin(),
