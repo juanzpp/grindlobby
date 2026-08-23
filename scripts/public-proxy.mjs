@@ -47,6 +47,16 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(port, '0.0.0.0', () => {
+server.listen(port, '0.0.0.0', async () => {
   console.log(`GrindLobby public proxy listening on ${port}`);
+  try {
+    const response = await fetch(new URL('/api/health', upstream), {
+      headers: { 'x-grindlobby-proxy-self-test': '1' },
+      signal: AbortSignal.timeout(15000),
+    });
+    const body = await response.text();
+    console.log(`UPSTREAM_HEALTH status=${response.status} body=${body.slice(0, 300)}`);
+  } catch (error) {
+    console.error('UPSTREAM_HEALTH_FAILED', error);
+  }
 });
