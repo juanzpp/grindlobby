@@ -89,7 +89,7 @@ jobs:
 
       - name: Build bundled desktop frontend
         working-directory: .
-        run: npx --yes vite@7.1.3 build desktop/ui --base ./ --outDir ../dist --emptyOutDir
+        run: npx --yes vite@7.1.3 build desktop/ui --config desktop/ui/vite.config.mjs --base ./ --outDir ../dist --emptyOutDir
 
       - name: Copy GrindLobby brand asset
         working-directory: .
