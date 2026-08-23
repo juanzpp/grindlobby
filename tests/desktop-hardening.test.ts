@@ -51,7 +51,9 @@ describe('desktop production hardening',()=>{
     expect(native).toContain('!path.contains("://")');
     expect(native).toContain('!path.contains("..")');
     expect(native).toContain('.cookie_store(true)');
-    expect(native).toContain('.header("Origin", API_ORIGIN)');
+    expect(native).toContain('.header("Sec-Fetch-Site", "same-origin")');
+    expect(native).toContain('.header("X-GrindLobby-Client", "desktop-native")');
+    expect(native).not.toContain('.header("Origin", API_ORIGIN)');
   });
 
   it('grants only explicit local bridge and window commands to the bundled main window',async()=>{
