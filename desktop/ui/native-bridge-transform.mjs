@@ -12,6 +12,11 @@ export function fixNativeBridge(code){
   );
 
   fixed=fixed.replace(
+    'const logout=async()=>{try{roomRef.current?.disconnect();roomRef.current=null;await API("POST","/api/auth/logout",{})}finally{setCall(null);setSession("guest");setDashboard(null);notify("Sessão encerrada.")}};',
+    'const logout=async()=>{try{const lobby=call?.lobby;roomRef.current?.disconnect();roomRef.current=null;if(lobby?.id)await API("POST",`/api/lobbies/${lobby.id}/leave?intent=explicit`,{}).catch(()=>{});await API("POST","/api/auth/logout",{})}finally{setCall(null);setSession("guest");setDashboard(null);notify("Sessão encerrada.")}};'
+  );
+
+  fixed=fixed.replace(
     'await API("POST",`/api/lobbies/${lobby.id}/leave`,{}).catch(()=>{});',
     'await API("POST",`/api/lobbies/${lobby.id}/leave?intent=explicit`,{}).catch(()=>{});'
   );
