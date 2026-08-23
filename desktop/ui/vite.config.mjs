@@ -16,11 +16,22 @@ const dedicatedMusicSurfacePlugin={
     return fixed===code?null:{code:fixed,map:null};
   }
 };
+const loginWindowSurfacePlugin={
+  name:"grindlobby-login-window-surface",
+  enforce:"pre",
+  transform(code,id){
+    if(!id.endsWith("main.jsx")||code.includes('import"./login-shell-fix.css";'))return null;
+    let fixed=code.replace('import"./pixel-match.css";','import"./pixel-match.css";\nimport"./login-shell-fix.css";');
+    if(fixed===code)fixed=code.replace('import"./styles.css";','import"./styles.css";\nimport"./login-shell-fix.css";');
+    return fixed===code?null:{code:fixed,map:null};
+  }
+};
 
 export default {
   plugins: [
     approvedReferenceUiPlugin,
     dedicatedMusicSurfacePlugin,
+    loginWindowSurfacePlugin,
     nativeBridgeTransformPlugin(),
     deadTabsTransformPlugin(),
     socialTabsTransformPlugin(),
