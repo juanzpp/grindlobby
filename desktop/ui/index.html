@@ -26,6 +26,16 @@
       .musicbar>div:nth-child(2)>b{display:block!important;font-size:11px!important;color:#dfe4ec!important}.musicbar>div:nth-child(2)>small{display:block!important;color:#697384!important;font-size:10px!important;margin-top:2px!important}
       .login-card{width:min(520px,92vw)!important;padding:36px!important;border-radius:18px!important}.login-brand{gap:16px!important}.login-brand b{font-size:16px!important}.login-card h1{font-size:32px!important;margin-top:28px!important}.login-card>p{font-size:12px!important;line-height:1.5!important;margin:9px 0 20px!important}.login-card label{font-size:11px!important;margin-top:14px!important}.login-card input{height:50px!important;margin-top:8px!important;border-radius:10px!important;padding:0 14px!important;font-size:13px!important}.login-card .primary{height:48px!important;margin-top:14px!important;font-size:12px!important}.login-note{font-size:9px!important;margin-top:18px!important}.form-error{font-size:10px!important;padding:11px 13px!important}.portal.small{width:64px!important;height:64px!important;border-radius:18px!important}.portal.small:before{border-radius:14px!important}.portal.small span{font-size:30px!important}
     </style>
+    <script>
+      (() => {
+        const internalInvoke = window.__TAURI_INTERNALS__?.invoke;
+        if (typeof window.__TAURI__?.core?.invoke !== "function" && typeof internalInvoke === "function") {
+          window.__TAURI__ = window.__TAURI__ || {};
+          window.__TAURI__.core = window.__TAURI__.core || {};
+          window.__TAURI__.core.invoke = (command, args) => internalInvoke(command, args);
+        }
+      })();
+    </script>
     <title>GrindLobby</title>
   </head>
   <body>
