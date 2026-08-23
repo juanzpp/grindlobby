@@ -17,8 +17,9 @@ describe('AudioHost lifecycle',()=>{
     expect(source).toContain('if(stream.current){stopMeter();stream.current=null;setActive(false);onStreamChangeRef.current?.(null)}');
   });
 
-  it('uses the latest microphone-test cleanup during unmount',async()=>{
+  it('uses the latest microphone-test cleanup during unmount without resubscribing',async()=>{
     const source=await readFile('components/AudioHost.tsx','utf8');
-    expect(source).toContain('stopMicTestRef.current(false);stopMeter();');
+    expect(source).toContain('const stopMicTestLatest=()=>stopMicTestRef.current(false)');
+    expect(source).toContain('stopMicTestLatest();stopMeter();');
   });
 });
