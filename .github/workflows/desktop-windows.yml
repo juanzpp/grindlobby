@@ -185,3 +185,5 @@ jobs:
           name: GrindLobby-Performance-Windows
           path: desktop/src-tauri/target/release/bundle/nsis/*.exe
           if-no-files-found: error
+
+# Rebuild desktop installers after official 07 logo update.
