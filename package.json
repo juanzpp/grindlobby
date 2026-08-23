@@ -9,7 +9,7 @@
     "postbuild": "node scripts/prepare-standalone.mjs",
     "lint": "eslint .",
     "test": "vitest run",
-    "start": "node scripts/verify-schema.mjs && node .next/standalone/server.js"
+    "start": "node scripts/verify-schema.mjs && node scripts/start-production.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.7.0",
