@@ -1,15 +1,11 @@
-use serde::Serialize;
+use reqwest::{Client, Method};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::sync::Mutex;
 use sysinfo::{get_current_pid, ProcessesToUpdate, System};
-use tauri::{State, WebviewUrl, WebviewWindowBuilder};
-use url::Url;
+use tauri::{State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
-const PRODUCTION_HOST: &str = "grindlobby.onrender.com";
-
-#[cfg(feature = "lite")]
-const PRODUCTION_URL: &str = "https://grindlobby.onrender.com/desktop-lite?desktop=lite";
-#[cfg(not(feature = "lite"))]
-const PRODUCTION_URL: &str = "https://grindlobby.onrender.com/?desktop=1";
+const API_ORIGIN: &str = "https://grindlobby.onrender.com";
 
 #[cfg(feature = "lite")]
 const WINDOW_TITLE: &str = "GrindLobby Performance";
@@ -17,6 +13,23 @@ const WINDOW_TITLE: &str = "GrindLobby Performance";
 const WINDOW_TITLE: &str = "GrindLobby";
 
 struct PerformanceState(Mutex<System>);
+struct ApiState(Client);
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ApiRequest {
+    method: String,
+    path: String,
+    body: Option<Value>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ApiResponse {
+    status: u16,
+    ok: bool,
+    data: Value,
+}
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -40,8 +53,76 @@ struct PerformanceSnapshot {
     disk_written_bytes_delta: u64,
 }
 
-fn is_allowed_navigation(url: &Url) -> bool {
-    url.scheme() == "https" && url.host_str() == Some(PRODUCTION_HOST)
+fn safe_api_path(path: &str) -> bool {
+    path.starts_with("/api/")
+        && !path.contains("://")
+        && !path.contains("..")
+        && !path.contains('\\')
+        && path.len() <= 512
+}
+
+#[tauri::command]
+async fn api_request(state: State<'_, ApiState>, request: ApiRequest) -> Result<ApiResponse, String> {
+    if !safe_api_path(&request.path) {
+        return Err("API path rejected".to_string());
+    }
+
+    let method = match request.method.to_ascii_uppercase().as_str() {
+        "GET" => Method::GET,
+        "POST" => Method::POST,
+        "PATCH" => Method::PATCH,
+        "DELETE" => Method::DELETE,
+        _ => return Err("HTTP method rejected".to_string()),
+    };
+
+    let url = format!("{API_ORIGIN}{}", request.path);
+    let mut builder = state
+        .0
+        .request(method.clone(), url)
+        .header("Accept", "application/json")
+        .header("Origin", API_ORIGIN)
+        .header("Referer", format!("{API_ORIGIN}/"));
+
+    if method != Method::GET {
+        builder = builder.header("Content-Type", "application/json");
+        if let Some(body) = request.body {
+            builder = builder.json(&body);
+        }
+    }
+
+    let response = builder
+        .send()
+        .await
+        .map_err(|error| format!("backend request failed: {error}"))?;
+    let status = response.status().as_u16();
+    let ok = response.status().is_success();
+    let text = response
+        .text()
+        .await
+        .map_err(|error| format!("backend response failed: {error}"))?;
+    let data = serde_json::from_str::<Value>(&text).unwrap_or_else(|_| Value::String(text));
+
+    Ok(ApiResponse { status, ok, data })
+}
+
+#[tauri::command]
+fn window_minimize(window: WebviewWindow) -> Result<(), String> {
+    window.minimize().map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn window_toggle_maximize(window: WebviewWindow) -> Result<(), String> {
+    let maximized = window.is_maximized().map_err(|error| error.to_string())?;
+    if maximized {
+        window.unmaximize().map_err(|error| error.to_string())
+    } else {
+        window.maximize().map_err(|error| error.to_string())
+    }
+}
+
+#[tauri::command]
+fn window_close(window: WebviewWindow) -> Result<(), String> {
+    window.close().map_err(|error| error.to_string())
 }
 
 fn belongs_to_process_tree(system: &System, candidate: sysinfo::Pid, root: sysinfo::Pid) -> bool {
@@ -70,7 +151,10 @@ fn belongs_to_process_tree(system: &System, candidate: sysinfo::Pid, root: sysin
 #[tauri::command]
 fn performance_snapshot(state: State<'_, PerformanceState>) -> Result<PerformanceSnapshot, String> {
     let pid = get_current_pid().map_err(|error| format!("pid unavailable: {error}"))?;
-    let mut system = state.0.lock().map_err(|_| "performance state poisoned".to_string())?;
+    let mut system = state
+        .0
+        .lock()
+        .map_err(|_| "performance state poisoned".to_string())?;
     system.refresh_memory();
     system.refresh_cpu_usage();
     system.refresh_processes(ProcessesToUpdate::All, true);
@@ -97,7 +181,9 @@ fn performance_snapshot(state: State<'_, PerformanceState>) -> Result<Performanc
         }
     }
 
-    let process = system.process(pid).ok_or_else(|| "GrindLobby process unavailable".to_string())?;
+    let process = system
+        .process(pid)
+        .ok_or_else(|| "GrindLobby process unavailable".to_string())?;
     let app_cpu_raw = process.cpu_usage();
     let normalize = |value: f32| (value / logical_cpu_count as f32).clamp(0.0, 100.0);
 
@@ -123,26 +209,38 @@ fn performance_snapshot(state: State<'_, PerformanceState>) -> Result<Performanc
 }
 
 fn main() {
+    let api_client = Client::builder()
+        .cookie_store(true)
+        .user_agent("GrindLobbyDesktop/0.2")
+        .build()
+        .expect("failed to create GrindLobby API client");
+
     tauri::Builder::default()
         .manage(PerformanceState(Mutex::new(System::new_all())))
-        .invoke_handler(tauri::generate_handler![performance_snapshot])
+        .manage(ApiState(api_client))
+        .invoke_handler(tauri::generate_handler![
+            api_request,
+            performance_snapshot,
+            window_minimize,
+            window_toggle_maximize,
+            window_close
+        ])
         .setup(|app| {
-            let url = Url::parse(PRODUCTION_URL).expect("invalid GrindLobby production URL");
-            let builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::External(url))
-                .on_navigation(is_allowed_navigation)
+            let builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
                 .title(WINDOW_TITLE)
+                .decorations(false)
                 .resizable(true)
                 .center();
 
             #[cfg(feature = "lite")]
             let builder = builder
                 .inner_size(1180.0, 760.0)
-                .min_inner_size(860.0, 560.0);
+                .min_inner_size(900.0, 620.0);
 
             #[cfg(not(feature = "lite"))]
             let builder = builder
-                .inner_size(1440.0, 900.0)
-                .min_inner_size(960.0, 640.0);
+                .inner_size(1480.0, 920.0)
+                .min_inner_size(1080.0, 680.0);
 
             builder.build()?;
             Ok(())
