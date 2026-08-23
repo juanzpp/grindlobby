@@ -54,14 +54,16 @@ describe('desktop production hardening',()=>{
     expect(voice).toContain('RoomEvent.Disconnected,()=>{stopHeartbeat();stopBackgroundActivityLock();sync()}');
   });
 
-  it('preserves Performance mode and safe invite return paths through login',async()=>{
+  it('preserves desktop mode and safe invite return paths through login',async()=>{
     const login=await readFile('app/login/page.tsx','utf8');
     const lobby=await readFile('app/lobby/[id]/page.tsx','utf8');
     const invite=await readFile('app/lobby/invite/[token]/page.tsx','utf8');
     expect(login).toContain('next.startsWith("/") && !next.startsWith("//")');
     expect(login).toContain('query.get("desktop") === "lite" ? "/desktop-lite?desktop=lite" : "/"');
     expect(login).toContain('router.replace(destination)');
-    expect(lobby).toContain("redirect(lite?'/login?desktop=lite':'/login')");
+    expect(lobby).toContain("const desktopMode=query.desktop==='lite'?'lite':query.desktop==='1'?'standard':null");
+    expect(lobby).toContain("redirect(desktopMode?`/login?desktop=${desktopMode==='lite'?'lite':'1'}`:'/login')");
+    expect(lobby).toContain('if(desktopMode)return <DesktopLobbyRoom id={id} user={user} mode={desktopMode}/>');
     expect(invite).toContain('router.replace(lite?"/login?desktop=lite":"/login")');
     expect(invite).toContain('router.replace(`/lobby/${body.lobbyId}${suffix}`)');
   });

@@ -15,10 +15,14 @@ describe('authentication media teardown',()=>{
     expect(dock).toContain('disconnectActiveLiveKitVoice(true)');
   });
 
-  it('keeps the Performance client sticky if an old navigation loses its query string',async()=>{
+  it('keeps both desktop clients sticky if an old navigation loses its query string',async()=>{
     const runtime=await readFile('components/DesktopRuntimeMode.tsx','utf8');
+    expect(runtime).toContain('const runtimeKey="grindlobby.desktop.runtime"');
+    expect(runtime).toContain('sessionStorage.setItem(runtimeKey,requested)');
     expect(runtime).toContain('sessionStorage.setItem(liteKey,"1")');
-    expect(runtime).toContain('sessionStorage.getItem(liteKey)==="1"');
+    expect(runtime).toContain('const stored=sessionStorage.getItem(runtimeKey)');
+    expect(runtime).toContain('url.searchParams.set("desktop",mode)');
+    expect(runtime).toContain('window.location.replace(`${url.pathname}${url.search}${url.hash}`)');
     expect(runtime).toContain('window.location.pathname==="/"');
     expect(runtime).toContain('window.location.replace("/desktop-lite?desktop=lite")');
   });
