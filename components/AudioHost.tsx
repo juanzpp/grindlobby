@@ -11,6 +11,12 @@ import {
 
 type Props={enabled:boolean;onStreamChange?:(stream:MediaStream|null)=>void};
 
+function useLatestRef<T>(value:T){
+ const ref=useRef(value);
+ useEffect(()=>{ref.current=value},[value]);
+ return ref;
+}
+
 export default function AudioHost({enabled,onStreamChange}:Props){
  const [open,setOpen]=useState(false),[active,setActive]=useState(false),[muted,setMuted]=useState(false);
  const [input,setInput]=useState(125),[sensitivity,setSensitivity]=useState(38);
@@ -175,13 +181,16 @@ export default function AudioHost({enabled,onStreamChange}:Props){
   }
   setTesting(false);
  }
+ const onStreamChangeRef=useLatestRef(onStreamChange);
+ const startMeterRef=useLatestRef(startMeter);
+ const stopMicTestRef=useLatestRef(stopMicTest);
  useEffect(()=>{
   let disposed=false;
   const initialize=window.setTimeout(()=>{
    if(disposed)return;
    refreshDevices().catch(()=>{});
    const existing=getActiveMicrophoneStream();
-   if(existing){stream.current=existing;setActive(true);updateApplied(existing);startMeter(existing);onStreamChange?.(existing)}
+   if(existing){stream.current=existing;setActive(true);updateApplied(existing);startMeterRef.current(existing);onStreamChangeRef.current?.(existing)}
   },0);
   const onExternalMute=(event:Event)=>{
    const detail=(event as CustomEvent<{muted?:boolean}>).detail;
@@ -198,18 +207,21 @@ export default function AudioHost({enabled,onStreamChange}:Props){
   window.addEventListener("grindlobby:set-mic-muted",onExternalMute);
   window.addEventListener("grindlobby:set-mic-gain",onExternalGain);
   const unsubscribe=subscribeActiveLiveKitRoom(room=>{
-   if(!room){if(stream.current){stopMeter();stream.current=null;setActive(false)};return}
+   if(!room){
+    if(stream.current){stopMeter();stream.current=null;setActive(false);onStreamChangeRef.current?.(null)}
+    return;
+   }
    const live=getActiveMicrophoneStream();
-   if(live&&!stream.current){stream.current=live;setActive(true);updateApplied(live);startMeter(live);onStreamChange?.(live)}
+   if(live&&!stream.current){stream.current=live;setActive(true);updateApplied(live);startMeterRef.current(live);onStreamChangeRef.current?.(live)}
   });
   return()=>{
    disposed=true;window.clearTimeout(initialize);
    unsubscribe();
    window.removeEventListener("grindlobby:set-mic-muted",onExternalMute);
    window.removeEventListener("grindlobby:set-mic-gain",onExternalGain);
-   stopMicTest(false);stopMeter();
+   stopMicTestRef.current(false);stopMeter();
   };
- },[]);
+ },[onStreamChangeRef,startMeterRef,stopMicTestRef]);
  useEffect(()=>{
   if(testAudio.current)testAudio.current.volume=1;
   setSmoothGain(gain.current,input/100);
@@ -237,7 +249,6 @@ export default function AudioHost({enabled,onStreamChange}:Props){
    <div><small>VOICE ENGINE</small><h2>Áudio da sala</h2></div>
    <span className={active?"voice-live":""}><Radio size={12}/>{active?"CONECTADO":"PRONTO"}</span>
   </div>
-
   <div className="voice-compact-row">
    <div className="voice-mini-meter"><i style={{width:`${muted?0:Math.max(2,level)}%`}}/></div>
    <span>{muted?"MIC MUDO":level>sensitivity?"FALANDO":"MIC OK"}</span>
