@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::Mutex;
 use sysinfo::{get_current_pid, ProcessesToUpdate, System};
-use tauri::{State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri::{Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 const API_ORIGIN: &str = "https://grindlobby.onrender.com";
 
@@ -226,9 +226,26 @@ fn main() {
             window_close
         ])
         .setup(|app| {
+            // The native client owns exactly one user-facing webview. If a
+            // stale/config-created webview ever exists at startup, close it
+            // before constructing the canonical `main` window. This prevents
+            // the empty black companion window reported on Windows.
+            for (label, window) in app.webview_windows() {
+                if label != "main" {
+                    let _ = window.close();
+                }
+            }
+
+            if let Some(main) = app.get_webview_window("main") {
+                let _ = main.show();
+                let _ = main.set_focus();
+                return Ok(());
+            }
+
             let builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
                 .title(WINDOW_TITLE)
                 .decorations(false)
+                .visible(true)
                 .resizable(true)
                 .center();
 
