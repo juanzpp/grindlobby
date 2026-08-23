@@ -6,51 +6,15 @@ on:
       - main
     paths:
       - 'desktop/**'
-      - 'components/desktop/**'
-      - 'components/DesktopRuntimeMode.tsx'
-      - 'components/AudioHost.tsx'
-      - 'components/RemoteVoiceAudio.tsx'
-      - 'components/PersistentCallDock.tsx'
-      - 'components/stream/**'
-      - 'lib/webrtc/**'
-      - 'components/feedback/GrindPortalLoading.tsx'
-      - 'app/page.tsx'
-      - 'app/lobby/**'
-      - 'app/community/**'
-      - 'app/competitive/**'
-      - 'app/profile/**'
-      - 'app/settings/**'
-      - 'app/loja/**'
-      - 'app/native-desktop.css'
-      - 'app/native-home.css'
-      - 'app/native-modules.css'
-      - 'app/grind-loading-portal.css'
-      - 'app/layout.tsx'
+      - 'package.json'
+      - 'package-lock.json'
       - 'public/brand/grindlobby-official.png'
       - '.github/workflows/desktop-windows.yml'
   pull_request:
     paths:
       - 'desktop/**'
-      - 'components/desktop/**'
-      - 'components/DesktopRuntimeMode.tsx'
-      - 'components/AudioHost.tsx'
-      - 'components/RemoteVoiceAudio.tsx'
-      - 'components/PersistentCallDock.tsx'
-      - 'components/stream/**'
-      - 'lib/webrtc/**'
-      - 'components/feedback/GrindPortalLoading.tsx'
-      - 'app/page.tsx'
-      - 'app/lobby/**'
-      - 'app/community/**'
-      - 'app/competitive/**'
-      - 'app/profile/**'
-      - 'app/settings/**'
-      - 'app/loja/**'
-      - 'app/native-desktop.css'
-      - 'app/native-home.css'
-      - 'app/native-modules.css'
-      - 'app/grind-loading-portal.css'
-      - 'app/layout.tsx'
+      - 'package.json'
+      - 'package-lock.json'
       - 'public/brand/grindlobby-official.png'
       - '.github/workflows/desktop-windows.yml'
   workflow_dispatch:
@@ -77,6 +41,36 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+
+      - name: Install frontend dependencies
+        working-directory: .
+        run: npm ci
+
+      - name: Build bundled desktop frontend
+        working-directory: .
+        run: npx --yes vite@7.1.3 build desktop/ui --base ./ --outDir ../dist --emptyOutDir
+
+      - name: Copy GrindLobby brand asset
+        working-directory: .
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force 'desktop/dist/brand' | Out-Null
+          Copy-Item 'public/brand/grindlobby-official.png' 'desktop/dist/brand/grindlobby-official.png' -Force
+
+      - name: Validate local desktop bundle contract
+        working-directory: .
+        shell: pwsh
+        run: |
+          if (-not (Test-Path 'desktop/dist/index.html')) { throw 'desktop/dist/index.html missing' }
+          $main = Get-Content 'desktop/src-tauri/src/main.rs' -Raw
+          if ($main -match 'WebviewUrl::External') { throw 'Desktop still depends on external web frontend' }
+          if ($main -notmatch 'WebviewUrl::App') { throw 'Desktop local frontend entrypoint missing' }
+          if ($main -notmatch 'decorations\(false\)') { throw 'Custom titlebar contract missing' }
+          $bundle = Get-ChildItem 'desktop/dist/assets' -File | Get-Content -Raw
+          foreach ($needle in @('Community','Torneios','Mensagens','Criar lobby','setScreenShareEnabled','voice/token')) {
+            if ($bundle -notmatch [regex]::Escape($needle)) { throw "Desktop bundle missing contract: $needle" }
+          }
 
       - name: Resolve Rust dependency lock
         run: cargo generate-lockfile
