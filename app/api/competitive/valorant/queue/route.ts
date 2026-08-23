@@ -13,4 +13,17 @@ export async function POST(request:Request){
  }catch(error){if(error instanceof InvalidRequestError)return noStoreJson({error:error.message},{status:400});if(error instanceof RateLimitExceededError||error instanceof RateLimitUnavailableError)return rateLimitResponse(error);return noStoreJson({error:'Não foi possível entrar na fila.'},{status:500});}
 }
 
-export async function DELETE(request:Request){try{assertTrustedMutation(request);const user=await getCurrentUser(request);if(!user)return noStoreJson({error:'Não autorizado.'},{status:401});const squad=await userSquad(user.id);if(!squad||squad.captain_id!==user.id)return noStoreJson({error:'Sem permissão.'},{status:403});const admin=createAdminClient();await admin.from('valorant_queue_entries').delete().eq('squad_id',squad.id);return noStoreJson({ok:true});}catch(error){if(error instanceof InvalidRequestError)return noStoreJson({error:error.message},{status:400});return noStoreJson({error:'Não foi possível sair da fila.'},{status:500});}}
+export async function DELETE(request:Request){
+ try{
+  assertTrustedMutation(request);
+  const user=await getCurrentUser(request);if(!user)return noStoreJson({error:'Não autorizado.'},{status:401});
+  await enforceRateLimit(request,{scope:'valorant-queue-leave',limit:30,windowSeconds:600,subject:user.id});
+  const squad=await userSquad(user.id);if(!squad||squad.captain_id!==user.id)return noStoreJson({error:'Sem permissão.'},{status:403});
+  const admin=createAdminClient();const {error}=await admin.from('valorant_queue_entries').delete().eq('squad_id',squad.id);if(error)throw error;
+  return noStoreJson({ok:true});
+ }catch(error){
+  if(error instanceof InvalidRequestError)return noStoreJson({error:error.message},{status:400});
+  if(error instanceof RateLimitExceededError||error instanceof RateLimitUnavailableError)return rateLimitResponse(error);
+  return noStoreJson({error:'Não foi possível sair da fila.'},{status:500});
+ }
+}
