@@ -25,4 +25,12 @@ describe('native desktop bridge hardening',()=>{
     expect(transformed).toContain('/leave?intent=explicit');
     expect(transformed).not.toContain('`/api/lobbies/${lobby.id}/leave`,{}).catch(()=>{});');
   });
+
+  it('cleans up an active lobby before logout clears the session',async()=>{
+    const source=await readFile('desktop/ui/src/main.jsx','utf8');
+    const transformed=fixNativeBridge(source);
+    expect(transformed).toContain('const lobby=call?.lobby');
+    expect(transformed).toContain('if(lobby?.id)await API("POST",`/api/lobbies/${lobby.id}/leave?intent=explicit`');
+    expect(transformed.indexOf('/leave?intent=explicit')).toBeLessThan(transformed.indexOf('/api/auth/logout'));
+  });
 });
