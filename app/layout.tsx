@@ -14,7 +14,8 @@ import type {Metadata,Viewport} from "next";
 import PersistentCallDock from "@/components/PersistentCallDock";
 import DesktopRuntimeMode from "@/components/DesktopRuntimeMode";
 import DesktopPerformanceDiagnostics from "@/components/desktop/DesktopPerformanceDiagnostics";
+import SessionPresenceHeartbeat from "@/components/SessionPresenceHeartbeat";
 
 export const metadata:Metadata={title:{default:"GrindLobby",template:"%s · GrindLobby"},description:"Rank, lobbies, voz e transmissão para jogadores competitivos.",manifest:"/manifest.webmanifest"};
 export const viewport:Viewport={themeColor:"#08080d",colorScheme:"dark",width:"device-width",initialScale:1,viewportFit:"cover"};
-export default function RootLayout({children}:{children:React.ReactNode}){return <html lang="pt-BR"><body><DesktopRuntimeMode/>{children}<PersistentCallDock/><DesktopPerformanceDiagnostics/></body></html>}
+export default function RootLayout({children}:{children:React.ReactNode}){return <html lang="pt-BR"><body><DesktopRuntimeMode/><SessionPresenceHeartbeat/>{children}<PersistentCallDock/><DesktopPerformanceDiagnostics/></body></html>}
