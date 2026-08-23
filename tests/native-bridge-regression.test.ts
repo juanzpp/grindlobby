@@ -33,4 +33,12 @@ describe('native desktop bridge hardening',()=>{
     expect(transformed).toContain('if(lobby?.id)await API("POST",`/api/lobbies/${lobby.id}/leave?intent=explicit`');
     expect(transformed.indexOf('/leave?intent=explicit')).toBeLessThan(transformed.indexOf('/api/auth/logout'));
   });
+
+  it('keeps native lobby presence alive while a call is active',async()=>{
+    const source=await readFile('desktop/ui/src/main.jsx','utf8');
+    const transformed=fixNativeBridge(source);
+    expect(transformed).toContain('/heartbeat');
+    expect(transformed).toContain('window.setInterval(beat,15000)');
+    expect(transformed).toContain('[call?.lobby?.id]');
+  });
 });
