@@ -1,6 +1,6 @@
 const url=process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/,"");
 const key=process.env.SUPABASE_SERVICE_ROLE_KEY;
-const expectedVersion="20260822_server_only_privileged_dml";
+const expectedVersion="20260823_friends_direct_messages";
 
 if(!url||!key){
   console.error("[schema-check] missing Supabase server environment variables");
@@ -13,6 +13,7 @@ const required=[
   "communities","community_members","community_environments","community_events","community_invites",
   "valorant_squads","valorant_squad_members","valorant_matches","valorant_match_players",
   "match_team_rooms","strategy_sessions","strategy_objects",
+  "friendships","direct_messages",
 ];
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 
