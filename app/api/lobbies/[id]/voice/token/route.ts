@@ -73,7 +73,7 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
       canSubscribe:true,
       canPublishData:false,
       canUpdateOwnMetadata:false,
-      canPublishSources:[TrackSource.MICROPHONE,TrackSource.SCREEN_SHARE,TrackSource.SCREEN_SHARE_AUDIO],
+      canPublishSources:[TrackSource.MICROPHONE,TrackSource.CAMERA,TrackSource.SCREEN_SHARE,TrackSource.SCREEN_SHARE_AUDIO],
     });
     const jwt=await accessToken.toJwt();
 
