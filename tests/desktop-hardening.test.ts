@@ -13,22 +13,22 @@ describe('desktop production hardening',()=>{
     expect(cargo).toContain('features = ["json", "cookies", "rustls-tls"]');
   });
 
-  it('uses one locked dependency resolution for checks and both installers',async()=>{
+  it('uses one locked dependency resolution for the single Windows installer',async()=>{
     const workflow=await readFile('.github/workflows/desktop-windows.yml','utf8');
     expect(workflow).toContain('cargo generate-lockfile');
     expect(workflow).toContain('cargo check --locked');
-    expect(workflow).toContain('cargo check --locked --features lite');
     expect(workflow).toContain('@tauri-apps/cli@2.11.4 build --bundles nsis -- --locked');
-    expect(workflow).toContain('@tauri-apps/cli@2.11.4 build --bundles nsis --features lite --config tauri.lite.conf.json -- --locked');
     expect(workflow).toContain('name: GrindLobby-Cargo-Lock');
+    expect(workflow).not.toContain('tauri.lite.conf.json');
+    expect(workflow).not.toContain('GrindLobby-Performance-Windows');
   });
 
-  it('builds Windows installers automatically for native changes on main',async()=>{
+  it('builds one Windows installer automatically for native changes on main',async()=>{
     const workflow=await readFile('.github/workflows/desktop-windows.yml','utf8');
     expect(workflow).toContain('push:\n    branches:\n      - main');
     expect(workflow).toContain("- 'desktop/**'");
     expect(workflow).toContain('name: GrindLobby-Windows');
-    expect(workflow).toContain('name: GrindLobby-Performance-Windows');
+    expect(workflow).not.toContain('name: GrindLobby-Performance-Windows');
   });
 
   it('keeps legacy performance IPC read-only and scoped to the official remote origin',async()=>{
