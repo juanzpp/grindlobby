@@ -1,7 +1,8 @@
 import {z} from 'zod';
 import {getCurrentUser} from '@/lib/auth';
 import {createAdminClient} from '@/lib/supabase/admin';
-import {assertTrustedMutation,noStoreJson,readJsonBody} from '@/lib/security/request';
+import {assertTrustedMutation,InvalidRequestError,noStoreJson,readJsonBody} from '@/lib/security/request';
+import {enforceRateLimit,RateLimitExceededError,RateLimitUnavailableError,rateLimitResponse} from '@/lib/security/rate-limit';
 
 const objectSchema=z.object({
   id:z.string().uuid().optional(),
@@ -30,16 +31,28 @@ async function context(matchId:string,userId:string){
 }
 
 export async function GET(request:Request,{params}:{params:Promise<{id:string}>}){
- try{const user=await getCurrentUser(request);if(!user)return noStoreJson({error:'Não autorizado.'},{status:401});const {id}=await params;const ctx=await context(id,user.id);if(!ctx)return noStoreJson({error:'Board não disponível.'},{status:404});const {data:objects,error}=await ctx.admin.from('strategy_objects').select('id,type,data,author_id,version,created_at,updated_at').eq('session_id',ctx.session.id).order('created_at');if(error)throw error;return noStoreJson({session:ctx.session,objects:objects??[],canEdit:ctx.canEdit,isCaptain:ctx.squad.captain_id===user.id});}catch{return noStoreJson({error:'Não foi possível carregar o Grind Board.'},{status:500});}
+ try{
+  const user=await getCurrentUser(request);if(!user)return noStoreJson({error:'Não autorizado.'},{status:401});
+  await enforceRateLimit(request,{scope:'valorant-board-read',limit:300,windowSeconds:60,subject:user.id});
+  const {id}=await params;const ctx=await context(id,user.id);if(!ctx)return noStoreJson({error:'Board não disponível.'},{status:404});
+  const {data:objects,error}=await ctx.admin.from('strategy_objects').select('id,type,data,author_id,version,created_at,updated_at').eq('session_id',ctx.session.id).order('created_at');if(error)throw error;
+  return noStoreJson({session:ctx.session,objects:objects??[],canEdit:ctx.canEdit,isCaptain:ctx.squad.captain_id===user.id});
+ }catch(error){
+  if(error instanceof RateLimitExceededError||error instanceof RateLimitUnavailableError)return rateLimitResponse(error);
+  return noStoreJson({error:'Não foi possível carregar o Grind Board.'},{status:500});
+ }
 }
 
 export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){
  try{
-  assertTrustedMutation(request);const user=await getCurrentUser(request);if(!user)return noStoreJson({error:'Não autorizado.'},{status:401});const {id}=await params;const body=mutationSchema.parse(await readJsonBody(request,64_000));const ctx=await context(id,user.id);if(!ctx)return noStoreJson({error:'Board não disponível.'},{status:404});
+  assertTrustedMutation(request);
+  const user=await getCurrentUser(request);if(!user)return noStoreJson({error:'Não autorizado.'},{status:401});
+  await enforceRateLimit(request,{scope:'valorant-board-write',limit:600,windowSeconds:60,subject:user.id});
+  const {id}=await params;const body=mutationSchema.parse(await readJsonBody(request,64_000));const ctx=await context(id,user.id);if(!ctx)return noStoreJson({error:'Board não disponível.'},{status:404});
   if(body.action==='permissions'){
     if(ctx.squad.captain_id!==user.id)return noStoreJson({error:'Somente o capitão pode alterar permissões.'},{status:403});
     if(body.iglUserId){const {data:igl}=await ctx.admin.from('valorant_match_players').select('user_id').eq('match_id',id).eq('squad_id',ctx.session.squad_id).eq('user_id',body.iglUserId).maybeSingle();if(!igl)return noStoreJson({error:'IGL precisa pertencer ao squad.'},{status:400});}
-    const {data,error}=await ctx.admin.from('strategy_sessions').update({edit_mode:body.editMode,igl_user_id:body.iglUserId??null,version:ctx.session.version+1,updated_at:new Date().toISOString()}).eq('id',ctx.session.id).select('*').single();if(error)throw error;return noStoreJson({session:data});
+    const {data,error}=await ctx.admin.from('strategy_sessions').update({edit_mode:body.editMode,igl_user_id:body.iglUserId??null,version:ctx.session.version+1,updated_at:new Date().toISOString()}).eq('id',ctx.session.id).eq('version',ctx.session.version).select('*').maybeSingle();if(error)throw error;if(!data)return noStoreJson({error:'As permissões foram alteradas em outra sessão. Atualize o board.'},{status:409});return noStoreJson({session:data});
   }
   if(!ctx.canEdit)return noStoreJson({error:'Board em modo somente leitura.'},{status:403});
   if(body.action==='create'){
@@ -51,5 +64,10 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
   if(body.action==='delete'){const {error}=await ctx.admin.from('strategy_objects').delete().eq('id',body.id).eq('session_id',ctx.session.id);if(error)throw error;return noStoreJson({ok:true});}
   if(body.action==='clear'){if(ctx.squad.captain_id!==user.id&&ctx.session.igl_user_id!==user.id)return noStoreJson({error:'Somente capitão/IGL pode limpar o board.'},{status:403});const {error}=await ctx.admin.from('strategy_objects').delete().eq('session_id',ctx.session.id);if(error)throw error;return noStoreJson({ok:true});}
   return noStoreJson({error:'Ação inválida.'},{status:400});
- }catch(error){if(error instanceof z.ZodError)return noStoreJson({error:'Ação do board inválida.'},{status:400});return noStoreJson({error:'Não foi possível atualizar o Grind Board.'},{status:500});}
+ }catch(error){
+  if(error instanceof RateLimitExceededError||error instanceof RateLimitUnavailableError)return rateLimitResponse(error);
+  if(error instanceof InvalidRequestError)return noStoreJson({error:error.message},{status:400});
+  if(error instanceof z.ZodError)return noStoreJson({error:'Ação do board inválida.'},{status:400});
+  return noStoreJson({error:'Não foi possível atualizar o Grind Board.'},{status:500});
+ }
 }
