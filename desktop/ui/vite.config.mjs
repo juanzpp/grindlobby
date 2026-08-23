@@ -4,9 +4,13 @@ import {musicTabTransformPlugin} from "./music-tab-transform.mjs";
 import {lobbyMusicAudioTransformPlugin} from "./lobby-music-audio-transform.mjs";
 import {voiceReliabilityTransformPlugin} from "./voice-reliability-transform.mjs";
 import {nativeBridgeTransformPlugin} from "./native-bridge-transform.mjs";
+import {referenceUiTransformPlugin} from "./reference-ui-transform.mjs";
+
+const approvedReferenceUiPlugin={...referenceUiTransformPlugin(),enforce:"pre"};
 
 export default {
   plugins: [
+    approvedReferenceUiPlugin,
     nativeBridgeTransformPlugin(),
     deadTabsTransformPlugin(),
     socialTabsTransformPlugin(),
