@@ -186,6 +186,7 @@ export default function AudioHost({enabled,onStreamChange}:Props){
  const stopMicTestRef=useLatestRef(stopMicTest);
  useEffect(()=>{
   let disposed=false;
+  const stopMicTestLatest=()=>stopMicTestRef.current(false);
   const initialize=window.setTimeout(()=>{
    if(disposed)return;
    refreshDevices().catch(()=>{});
@@ -219,7 +220,7 @@ export default function AudioHost({enabled,onStreamChange}:Props){
    unsubscribe();
    window.removeEventListener("grindlobby:set-mic-muted",onExternalMute);
    window.removeEventListener("grindlobby:set-mic-gain",onExternalGain);
-   stopMicTestRef.current(false);stopMeter();
+   stopMicTestLatest();stopMeter();
   };
  },[onStreamChangeRef,startMeterRef,stopMicTestRef]);
  useEffect(()=>{
