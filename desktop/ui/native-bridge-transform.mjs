@@ -8,7 +8,7 @@ export function fixNativeBridge(code){
 
   fixed=fixed.replace(
     'useEffect(()=>()=>{roomRef.current?.disconnect()},[]);',
-    'useEffect(()=>()=>{roomRef.current?.disconnect()},[]);useEffect(()=>{const lobbyId=call?.lobby?.id;if(!lobbyId)return;const beat=()=>API("POST",`/api/lobbies/${lobbyId}/heartbeat`,{}).catch(()=>{});void beat();const timer=window.setInterval(beat,15000);return()=>window.clearInterval(timer)},[call?.lobby?.id]);'
+    'useEffect(()=>()=>{roomRef.current?.disconnect()},[]);useEffect(()=>{if(session!=="ready")return;const beat=()=>API("POST","/api/me/presence",{}).catch(()=>{});void beat();const timer=window.setInterval(beat,20000);return()=>window.clearInterval(timer)},[session]);useEffect(()=>{const lobbyId=call?.lobby?.id;if(!lobbyId)return;const beat=()=>API("POST",`/api/lobbies/${lobbyId}/heartbeat`,{}).catch(()=>{});void beat();const timer=window.setInterval(beat,15000);return()=>window.clearInterval(timer)},[call?.lobby?.id]);'
   );
 
   fixed=fixed.replace(
