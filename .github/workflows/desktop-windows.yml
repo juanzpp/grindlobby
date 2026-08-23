@@ -103,13 +103,14 @@ jobs:
         shell: pwsh
         run: |
           if (-not (Test-Path 'desktop/dist/index.html')) { throw 'desktop/dist/index.html missing' }
+          if (-not (Test-Path 'desktop/dist/assets')) { throw 'desktop/dist/assets missing' }
           $main = Get-Content 'desktop/src-tauri/src/main.rs' -Raw
           if ($main -match 'WebviewUrl::External') { throw 'Desktop still depends on external web frontend' }
           if ($main -notmatch 'WebviewUrl::App') { throw 'Desktop local frontend entrypoint missing' }
           if ($main -notmatch 'decorations\(false\)') { throw 'Custom titlebar contract missing' }
-          $bundle = Get-ChildItem 'desktop/dist/assets' -File | Get-Content -Raw
-          foreach ($needle in @('Community','Torneios','Mensagens','Criar lobby','setScreenShareEnabled','voice/token')) {
-            if ($bundle -notmatch [regex]::Escape($needle)) { throw "Desktop bundle missing contract: $needle" }
+          $source = Get-Content 'desktop/ui/src/main.jsx' -Raw -Encoding utf8
+          foreach ($needle in @('function CommunityView','function TournamentsView','function MessagesView','CreateLobbyModal','setScreenShareEnabled','voice/token')) {
+            if ($source -notmatch [regex]::Escape($needle)) { throw "Desktop source missing contract: $needle" }
           }
 
       - name: Resolve Rust dependency lock
