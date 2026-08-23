@@ -29,8 +29,15 @@ describe('friends and direct messages contracts',()=>{
 
   it('keeps the production schema guard in sync with social tables',async()=>{
     const verifier=await readFile('scripts/verify-schema.mjs','utf8');
-    expect(verifier).toContain('20260823_friends_direct_messages');
+    expect(verifier).toContain('20260823_social_server_only_dml');
     expect(verifier).toContain('"friendships","direct_messages"');
+  });
+
+  it('forces social mutations through server APIs at the database boundary',async()=>{
+    const migration=await readFile('supabase/migrations/20260823154800_social_server_only_dml_hardening.sql','utf8');
+    expect(migration).toContain('revoke insert, update, delete on table public.friendships from authenticated');
+    expect(migration).toContain('revoke insert, update, delete on table public.direct_messages from authenticated');
+    expect(migration).toContain('friendships_unordered_pair_uidx');
   });
 
   it('enables real social tabs in the desktop build and voice reliability hardening',async()=>{
