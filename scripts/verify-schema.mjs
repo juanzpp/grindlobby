@@ -40,6 +40,7 @@ try{
   }
 
   console.log(`[schema-check] production schema is compatible (${expectedVersion})`);
+  process.exit(0);
 }catch(error){
   console.error(`[schema-check] ${error instanceof Error?error.message:String(error)}`);
   process.exit(1);
