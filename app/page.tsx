@@ -1,3 +1,4 @@
+import Dashboard from "@/components/Dashboard";
 import DesktopHome from "@/components/desktop/DesktopHome";
 import {getCurrentUser} from "@/lib/auth";
 import {cookies} from "next/headers";
@@ -9,17 +10,19 @@ const desktopViews=new Set<DesktopView>(["home","lobbies","community","friends",
 
 export default async function Home({searchParams}:{searchParams:SearchParams}){
   const query=await searchParams;
+  const standardDesktop=query.desktop==="1";
   const user=await getCurrentUser();
-  if(!user)redirect("/login");
-
+  if(!user)redirect(standardDesktop?"/login?desktop=1":"/login");
   const cookieStore=await cookies();
   const next=cookieStore.get("grindlobby_next")?.value;
   if(next){
     const decoded=decodeURIComponent(next);
-    if(/^\/lobby\/invite\/[A-Za-z0-9_-]{20,128}$/.test(decoded))redirect(decoded);
+    if(/^\/lobby\/invite\/[A-Za-z0-9_-]{20,128}$/.test(decoded))redirect(standardDesktop?`${decoded}?desktop=1`:decoded);
   }
-
-  const requested=typeof query.view==="string"?query.view:"home";
-  const initialView=desktopViews.has(requested as DesktopView)?requested as DesktopView:"home";
-  return <DesktopHome user={user} initialView={initialView}/>;
+  if(standardDesktop){
+    const requested=typeof query.view==="string"?query.view:"home";
+    const initialView=desktopViews.has(requested as DesktopView)?requested as DesktopView:"home";
+    return <DesktopHome user={user} initialView={initialView}/>;
+  }
+  return <div className="web-refresh-scope web-home-v2"><Dashboard user={user}/></div>;
 }
