@@ -12,11 +12,12 @@ import "./desktop-lite.css";
 import "./desktop-diagnostics.css";
 import "./web-refresh.css";
 import "./web-home-v2.css";
+import "./brand-official.css";
 import type {Metadata,Viewport} from "next";
 import PersistentCallDock from "@/components/PersistentCallDock";
 import DesktopRuntimeMode from "@/components/DesktopRuntimeMode";
 import DesktopPerformanceDiagnostics from "@/components/desktop/DesktopPerformanceDiagnostics";
 
-export const metadata:Metadata={title:{default:"GrindLobby",template:"%s · GrindLobby"},description:"Rank, lobbies, voz e transmissão para jogadores competitivos.",manifest:"/manifest.webmanifest"};
+export const metadata:Metadata={title:{default:"GrindLobby",template:"%s · GrindLobby"},description:"Rank, lobbies, voz e transmissão para jogadores competitivos.",manifest:"/manifest.webmanifest",icons:{icon:"/brand/grindlobby-official.png",shortcut:"/brand/grindlobby-official.png",apple:"/brand/grindlobby-official.png"}};
 export const viewport:Viewport={themeColor:"#08080d",colorScheme:"dark",width:"device-width",initialScale:1,viewportFit:"cover"};
 export default function RootLayout({children}:{children:React.ReactNode}){return <html lang="pt-BR"><body><DesktopRuntimeMode/>{children}<PersistentCallDock/><DesktopPerformanceDiagnostics/></body></html>}
