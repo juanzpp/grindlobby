@@ -1,32 +1,38 @@
 import {readFile} from 'node:fs/promises';
 import {describe,expect,it} from 'vitest';
 
-describe('desktop portal loading',()=>{
-  it('keeps the cinematic portal free of visible progress bars and product-name copy',async()=>{
+describe('GrindLobby loading',()=>{
+  it('uses only the official example 07 logo for fullscreen loading',async()=>{
     const component=await readFile('components/feedback/GrindPortalLoading.tsx','utf8');
-    expect(component).toContain('gl-desktop-portal-shell');
-    expect(component).toContain('gl-desktop-energy-scan');
+    expect(component).toContain('/brand/grindlobby-official.png');
+    expect(component).toContain('gl-logo-loader');
+    expect(component).toContain('gl-logo-loader-image');
+    expect(component).not.toContain('gl-desktop-portal-shell');
+    expect(component).not.toContain('gl-gate-scene');
     expect(component).not.toContain('progressbar');
     expect(component).not.toContain('GRINDLOBBY</');
   });
 
-  it('scopes the elaborate portal treatment to the native desktop runtime',async()=>{
-    const css=await readFile('app/grind-loading-portal.css','utf8');
-    expect(css).toContain('.gl-desktop-portal-shell{display:none}');
-    expect(css).toContain('.grind-desktop-runtime .gl-desktop-portal-shell');
-    expect(css).toContain('.grind-desktop-runtime .gl-loader-logo');
-    expect(css).toContain('@keyframes glDesktopIris');
-    expect(css).toContain('@keyframes glDesktopScan');
+  it('keeps the logo animation lightweight',async()=>{
+    const css=await readFile('app/brand-official.css','utf8');
+    expect(css).toContain('.gl-logo-loader');
+    expect(css).toContain('.gl-logo-loader-orbit');
+    expect(css).toContain('@keyframes grind-logo-breathe');
+    expect(css).toContain('@keyframes grind-orbit-spin');
+    expect(css).not.toContain('canvas');
+    expect(css).not.toContain('WebGL');
   });
 
-  it('reduces decorative work for the Performance Windows client',async()=>{
-    const css=await readFile('app/grind-loading-portal.css','utf8');
-    expect(css).toContain('.grind-desktop-lite .gl-desktop-spark{display:none}');
-    expect(css).toContain('.grind-desktop-lite .gl-desktop-orbit.orbit-c{display:none}');
+  it('keeps legacy portal CSS isolated from the active loading component',async()=>{
+    const component=await readFile('components/feedback/GrindPortalLoading.tsx','utf8');
+    expect(component).not.toContain('gl-desktop-energy-scan');
+    expect(component).not.toContain('gl-desktop-spark');
+    expect(component).not.toContain('gl-desktop-iris');
   });
 
-  it('honors reduced-motion preferences',async()=>{
-    const css=await readFile('app/grind-loading-portal.css','utf8');
-    expect(css).toContain('@media(prefers-reduced-motion:reduce)');
+  it('honors reduced-motion preferences for the active logo loader',async()=>{
+    const css=await readFile('app/brand-official.css','utf8');
+    expect(css).toContain('@media (prefers-reduced-motion: reduce)');
+    expect(css).toContain('animation: none');
   });
 });
