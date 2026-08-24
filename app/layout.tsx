@@ -11,6 +11,7 @@ import "./mobile-audit-overrides.css";
 import "./desktop-lite.css";
 import "./desktop-diagnostics.css";
 import "./web-refresh.css";
+import "./web-home-v2.css";
 import type {Metadata,Viewport} from "next";
 import PersistentCallDock from "@/components/PersistentCallDock";
 import DesktopRuntimeMode from "@/components/DesktopRuntimeMode";
