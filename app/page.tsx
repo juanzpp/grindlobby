@@ -24,5 +24,5 @@ export default async function Home({searchParams}:{searchParams:SearchParams}){
     const initialView=desktopViews.has(requested as DesktopView)?requested as DesktopView:"home";
     return <DesktopHome user={user} initialView={initialView}/>;
   }
-  return <Dashboard user={user}/>;
+  return <div className="web-refresh-scope web-home-v2"><Dashboard user={user}/></div>;
 }
