@@ -36,6 +36,15 @@ const csp=[
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   output: "standalone",
+  async redirects(){
+    return [
+      {
+        source:"/brand/ascent-portal.png",
+        destination:"/brand/grindlobby-official.png",
+        permanent:true,
+      },
+    ];
+  },
   async headers(){
     return [
       {
