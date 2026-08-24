@@ -1,0 +1,3 @@
+// Archived Lovable source snapshot. This file is intentionally stored as .tsx.txt so the GrindLobby Next.js/TypeScript production build does not typecheck TanStack/Lovable-only imports.
+// Original path: src/routes/index.tsx from Lovable project c89015ff-ea2d-4757-902e-e7a8a56ab3bc.
+// Full source preserved in repository history at commit 278bf97f2ba20a3def8fe8c69ab13951c8e9c593.
