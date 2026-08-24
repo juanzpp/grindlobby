@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowRight,
   Eye,
@@ -7,7 +7,7 @@ import {
   Info,
   Lock,
   Mail,
-  MailCheck,
+  ShieldCheck,
   UserPlus,
 } from "lucide-react";
 
@@ -18,7 +18,7 @@ import {
   TRANSITIONS,
   type TransitionFx,
 } from "@/components/PortalTransition";
-
+import { setAuthPersistence, supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -41,19 +41,67 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
-  const [rememberEca, setRememberEca] = useState(true);
   const [entering, setEntering] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [fx, setFx] = useState<TransitionFx>("portal");
 
-  const handleEnter = (event: React.FormEvent) => {
-    event.preventDefault();
-    if (entering) return;
-    setEntering(true);
-    window.setTimeout(() => navigate({ to: "/loading" }), 2200);
-  };
+  useEffect(() => {
+    let active = true;
 
+    void supabase.auth.getSession().then(({ data }) => {
+      if (active && data.session) {
+        void navigate({ to: "/loading", replace: true });
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [navigate]);
+
+  const handleEnter = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (submitting || entering) return;
+
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail || !password) {
+      setAuthError("Informe seu e-mail e senha.");
+      return;
+    }
+
+    setAuthError(null);
+    setSubmitting(true);
+    setAuthPersistence(remember);
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email: normalizedEmail,
+      password,
+    });
+
+    if (error) {
+      setSubmitting(false);
+
+      if (error.message.toLowerCase().includes("invalid login credentials")) {
+        setAuthError("E-mail ou senha inválidos.");
+      } else if (error.message.toLowerCase().includes("email not confirmed")) {
+        setAuthError("Confirme seu e-mail antes de entrar.");
+      } else {
+        setAuthError("Não foi possível entrar agora. Tente novamente.");
+      }
+      return;
+    }
+
+    setSubmitting(false);
+    setEntering(true);
+    window.setTimeout(() => {
+      void navigate({ to: "/loading", replace: true });
+    }, 2200);
+  };
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-background">
@@ -63,7 +111,6 @@ function LoginPage() {
           entering ? "animate-push-in origin-[28%_50%]" : ""
         }`}
       >
-
         {/* Hero / portal */}
         <section className="relative flex flex-col items-center">
           <div className="relative w-full max-w-[620px]">
@@ -107,8 +154,9 @@ function LoginPage() {
                   key={t.id}
                   type="button"
                   title={t.hint}
+                  disabled={submitting || entering}
                   onClick={() => setFx(t.id)}
-                  className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-all hover:scale-[1.04] ${
+                  className={`rounded-lg border px-3 py-2 text-xs font-semibold transition-all hover:scale-[1.04] disabled:cursor-not-allowed disabled:opacity-60 ${
                     fx === t.id
                       ? "border-primary/60 bg-primary/20 text-primary-glow shadow-[var(--shadow-glow)]"
                       : "border-border bg-secondary/40 text-muted-foreground hover:text-foreground"
@@ -120,7 +168,6 @@ function LoginPage() {
             </div>
           </div>
         </section>
-
 
         {/* Login card */}
         <section className="panel relative z-10 w-full max-w-[520px] justify-self-center bg-card p-7 sm:p-9">
@@ -153,8 +200,13 @@ function LoginPage() {
                 <input
                   id="email"
                   type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  autoComplete="email"
+                  required
+                  disabled={submitting || entering}
                   placeholder="seu@email.com"
-                  className="h-12 w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                  className="h-12 w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
                 />
               </div>
             </div>
@@ -168,16 +220,26 @@ function LoginPage() {
                 <input
                   id="password"
                   type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  autoComplete="current-password"
+                  required
+                  disabled={submitting || entering}
                   placeholder="••••••••••••"
-                  className="h-12 w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                  className="h-12 w-full bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
                 />
                 <button
                   type="button"
                   aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                  disabled={submitting || entering}
                   onClick={() => setShowPassword((v) => !v)}
-                  className="text-muted-foreground transition-colors hover:text-foreground"
+                  className="text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
                 </button>
               </div>
             </div>
@@ -186,30 +248,40 @@ function LoginPage() {
               <Toggle
                 checked={remember}
                 onChange={() => setRemember((v) => !v)}
-                label="Lembrar senha"
-              />
-              <Toggle
-                checked={rememberEca}
-                onChange={() => setRememberEca((v) => !v)}
-                label="Lembrar ECA digital"
+                label="Manter conectado"
+                disabled={submitting || entering}
               />
             </div>
 
-
-
+            {authError && (
+              <p
+                role="alert"
+                aria-live="polite"
+                className="rounded-lg border border-destructive/35 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+              >
+                {authError}
+              </p>
+            )}
 
             <button
               type="submit"
-              className="btn-primary flex h-14 w-full items-center justify-center gap-3 rounded-xl text-base font-semibold"
+              disabled={submitting || entering}
+              className="btn-primary flex h-14 w-full items-center justify-center gap-3 rounded-xl text-base font-semibold disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {entering ? "Abrindo portal..." : "Entrar"}
+              {submitting
+                ? "Autenticando..."
+                : entering
+                  ? "Abrindo portal..."
+                  : "Entrar"}
               <ArrowRight className="h-5 w-5" />
             </button>
 
             <div className="text-center">
               <button
                 type="button"
-                className="text-sm text-primary-glow underline underline-offset-4"
+                disabled
+                title="Recuperação de senha será ligada ao fluxo de conta"
+                className="text-sm text-primary-glow underline underline-offset-4 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Esqueci minha senha
               </button>
@@ -219,22 +291,16 @@ function LoginPage() {
           <div className="mt-7 border-t border-border pt-6">
             <div className="flex flex-wrap items-center gap-3 rounded-xl">
               <div className="grid h-11 w-11 place-items-center rounded-lg bg-secondary text-primary-glow">
-                <MailCheck className="h-5 w-5" />
+                <ShieldCheck className="h-5 w-5" />
               </div>
               <div className="min-w-[180px] flex-1">
                 <p className="text-sm font-semibold text-foreground">
-                  Confirmação por e-mail obrigatória
+                  Sessão protegida pelo GrindLobby
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Verifique sua caixa de entrada para ativar sua conta.
+                  Sua senha é validada pelo provedor de autenticação e não é salva pelo app.
                 </p>
               </div>
-              <button
-                type="button"
-                className="btn-ghost rounded-lg px-4 py-2.5 text-sm text-primary-glow"
-              >
-                Reenviar confirmação
-              </button>
             </div>
           </div>
 
@@ -258,7 +324,6 @@ function LoginPage() {
 
       {/* Transição cinematográfica até o portal */}
       {entering && <PortalTransition variant={fx} />}
-
     </main>
   );
 }
@@ -267,16 +332,19 @@ function Toggle({
   checked,
   onChange,
   label,
+  disabled = false,
 }: {
   checked: boolean;
   onChange: () => void;
   label: string;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
+      disabled={disabled}
       onClick={onChange}
-      className="flex items-center gap-2 text-muted-foreground transition-colors hover:text-foreground"
+      className="flex items-center gap-2 text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
     >
       <span
         className={`grid h-5 w-5 place-items-center rounded-[5px] border text-[11px] font-bold ${
