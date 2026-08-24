@@ -1,0 +1,16 @@
+/* Official GrindLobby brand lock: example 07 asset is the only global emblem. */
+.lovable-login img[alt="Símbolo Ascent Portal da GrindLobby"],
+.lovable-dashboard-theme .lovable-rank-emblem,
+.lovable-level-hero img[alt="Emblema GrindLobby"],
+img.lovable-brand-emblem[src*="ascent-portal.png"],
+img.lovable-login-mini-logo[src*="ascent-portal.png"] {
+  content: url("/brand/grindlobby-official.png");
+  object-fit: contain;
+  object-position: center;
+}
+
+.gl-logo-official img,
+.lovable-brand-emblem,
+.lovable-login-mini-logo {
+  object-fit: contain;
+}
