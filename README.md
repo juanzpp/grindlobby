@@ -1,27 +1,24 @@
-# GrindLobby v2
+# Pixel Perfect Replica
 
-Versão 2: autenticação própria + SQLite local + sessões HTTP-only + dashboard protegido.
+faça um site extremante igual a isso
 
-## Rodar
+This project was built with [Lovable](https://lovable.dev).
 
-1. Copie `.env.example` para `.env.local` e defina `SESSION_SECRET`.
-2. `npm install`
-3. `npm run dev`
-4. Abra `http://localhost:3000`
+## Build with Lovable
 
-## O que foi implementado
+Continue developing this project in the [Lovable editor](https://lovable.dev/projects/6df5c80b-d9f1-417c-bda4-2a268217f2ca).
 
-- Cadastro
-- Login por username/email
-- Hash de senha com bcrypt
-- Sessão persistente em SQLite
-- Cookie HTTP-only
-- Logout
-- Endpoint `/api/me`
-- Banco próprio em `data/grindlobby.db`
-- Seed inicial de jogos
-- Dashboard protegido por autenticação
+- **Ship faster**: describe what you want to build and Lovable handles the code.
+- **Stay in sync**: every change made in Lovable is committed straight to this repository.
+- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
 
-## Próxima etapa
+## Development
 
-Implementar repositórios de jogos/ranks e lobbies persistentes; depois WebSocket para presença/chat e signaling WebRTC.
+Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+
+```sh
+git clone <this-repository-url>
+cd <repository-name>
+npm i
+npm run dev
+```

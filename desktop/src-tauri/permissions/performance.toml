@@ -1,6 +1,0 @@
-"$schema" = "schemas/schema.json"
-
-[[permission]]
-identifier = "allow-performance-snapshot"
-description = "Allows the GrindLobby Performance client to read CPU, memory and process-tree diagnostics from its own desktop process."
-commands.allow = ["performance_snapshot"]
