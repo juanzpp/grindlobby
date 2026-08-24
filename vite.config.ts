@@ -12,9 +12,9 @@ export default defineConfig({
     // nitro/vite builds from this
     server: { entry: "server" },
   },
-  vite: {
-    preview: {
-      allowedHosts: ["grindlobby.onrender.com"],
-    },
+  // Render is a Node.js web service, so emit a real Node server instead of
+  // Lovable's default Cloudflare-targeted output.
+  nitro: {
+    preset: "node-server",
   },
 });
