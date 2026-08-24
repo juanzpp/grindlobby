@@ -23,6 +23,7 @@ Imported for controlled consolidation into GrindLobby. These sources are archive
 - Official brand asset remains `/brand/grindlobby-official.png` (example 07). Hand-built Lovable SVG logos are reference-only and must not become production branding.
 - Generic `src/components/ui/**` shadcn files, `node_modules`, lockfiles, generated route trees and platform boilerplate are intentionally not duplicated across snapshots.
 - No `.env`, tokens or secrets are imported.
+- Archived source files use non-compilable extensions such as `.tsx.txt` so Next/TypeScript does not include them in production typechecking.
 - The old loading prototypes from Arena Hub (67) and Future Bloom are archived only; they must not be enabled automatically.
 
 ## Recommended source precedence
