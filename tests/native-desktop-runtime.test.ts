@@ -13,7 +13,7 @@ describe('native desktop client',()=>{
     const source=await readFile('app/page.tsx','utf8');
     expect(source).toContain('const standardDesktop=query.desktop==="1"');
     expect(source).toContain('return <DesktopHome user={user} initialView={initialView}/>');
-    expect(source).toContain('return <Dashboard user={user}/>');
+    expect(source).toContain('return <div className="web-refresh-scope web-home-v2"><Dashboard user={user}/></div>');
   });
 
   it('persists desktop mode so internal navigation cannot silently fall back to web UI',async()=>{
