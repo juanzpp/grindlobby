@@ -19,7 +19,7 @@ export default function AuthShell({children,eyebrow,title,description,portalStat
     <p className="lovable-login-copy">Compita. Evolua. Conquiste.<br/>O próximo nível começa aqui.</p>
    </section>
    <section className="lovable-login-card auth-card">
-    <header className="lovable-login-card-head"><Image className="lovable-login-mini-logo" src="/brand/ascent-portal.png" alt="" width={128} height={128} sizes="96px"/><p className="font-display text-xl tracking-[.3em] text-foreground">GRINDLOBBY</p></header>
+    <header className="lovable-login-card-head"><Image className="lovable-login-mini-logo object-contain" src="/brand/grindlobby-official.png" alt="Logo GrindLobby" width={128} height={128} sizes="96px"/><p className="font-display text-xl tracking-[.3em] text-foreground">GRINDLOBBY</p></header>
     <small className="auth-eyebrow">{eyebrow}</small><h1>{title}</h1><p className="auth-description">{description}</p>{children}
    </section>
   </div>
