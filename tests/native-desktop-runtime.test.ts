@@ -9,11 +9,11 @@ describe('native desktop client',()=>{
     expect(source).toContain('return <LobbyRoom id={id} user={user}/>');
   });
 
-  it('routes the standard Tauri root to a dedicated native home',async()=>{
+  it('uses the dedicated desktop home as the primary authenticated root',async()=>{
     const source=await readFile('app/page.tsx','utf8');
-    expect(source).toContain('const standardDesktop=query.desktop==="1"');
     expect(source).toContain('return <DesktopHome user={user} initialView={initialView}/>');
-    expect(source).toContain('return <div className="web-refresh-scope web-home-v2"><Dashboard user={user}/></div>');
+    expect(source).not.toContain('<Dashboard user={user}/>');
+    expect(source).not.toContain('web-home-v2');
   });
 
   it('persists desktop mode so internal navigation cannot silently fall back to web UI',async()=>{
