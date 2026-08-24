@@ -14,3 +14,69 @@ img.lovable-login-mini-logo[src*="ascent-portal.png"] {
 .lovable-login-mini-logo {
   object-fit: contain;
 }
+
+.gl-logo-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  background: #05060a;
+}
+
+.gl-logo-loader.is-overlay {
+  background: rgb(5 6 10 / 92%);
+}
+
+.gl-logo-loader-mark {
+  position: relative;
+  width: 190px;
+  height: 190px;
+  display: grid;
+  place-items: center;
+}
+
+.gl-logo-loader-image {
+  width: 150px;
+  height: 150px;
+  object-fit: contain;
+  animation: grind-logo-breathe 1.8s ease-in-out infinite;
+  filter: drop-shadow(0 0 22px rgb(139 92 246 / 34%));
+}
+
+.gl-logo-loader-halo {
+  position: absolute;
+  inset: 27px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgb(126 87 194 / 16%), transparent 68%);
+  animation: grind-halo-pulse 1.8s ease-in-out infinite;
+}
+
+.gl-logo-loader-orbit {
+  position: absolute;
+  inset: 12px;
+  border: 1px solid rgb(151 110 255 / 18%);
+  border-top-color: rgb(171 132 255 / 72%);
+  border-radius: 999px;
+  animation: grind-orbit-spin 3.8s linear infinite;
+}
+
+@keyframes grind-logo-breathe {
+  0%,100% { transform: scale(.96); opacity: .9; }
+  50% { transform: scale(1.035); opacity: 1; }
+}
+
+@keyframes grind-halo-pulse {
+  0%,100% { transform: scale(.92); opacity: .45; }
+  50% { transform: scale(1.08); opacity: .9; }
+}
+
+@keyframes grind-orbit-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gl-logo-loader-image,
+  .gl-logo-loader-halo,
+  .gl-logo-loader-orbit { animation: none; }
+}
