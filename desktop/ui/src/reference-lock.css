@@ -1,0 +1,178 @@
+/*
+ * Approved reference lock — loaded last.
+ * Purpose: keep legacy/mockup CSS from changing the desktop shell that was
+ * selected in the reference screens. Functional surfaces may add content, but
+ * they must not change these global proportions.
+ */
+
+:root{
+  --ref-sidebar:178px;
+  --ref-titlebar:46px;
+  --ref-topbar:58px;
+  --ref-bg:#07090d;
+  --ref-panel:#0c0f15;
+  --ref-line:#202530;
+  --ref-purple:#8c39f3;
+}
+
+.app-shell{
+  height:100vh!important;
+  display:grid!important;
+  grid-template-columns:var(--ref-sidebar) minmax(0,1fr)!important;
+  grid-template-rows:var(--ref-titlebar) var(--ref-topbar) minmax(0,1fr)!important;
+  background:radial-gradient(circle at 52% -12%,rgba(113,34,204,.09),transparent 31%),var(--ref-bg)!important;
+}
+
+.titlebar{
+  grid-column:1/3!important;
+  grid-row:1!important;
+  height:var(--ref-titlebar)!important;
+  min-height:var(--ref-titlebar)!important;
+  background:#07090d!important;
+  border-bottom:1px solid #171b22!important;
+  grid-template-columns:var(--ref-sidebar) 1fr 144px!important;
+}
+.title-name{padding-left:12px!important;gap:7px!important}
+.title-name .mini-logo{width:20px!important;height:20px!important;border-radius:5px!important}
+.title-name b{font-size:10px!important;font-weight:700!important}
+.title-name em,.title-center{display:none!important}
+.window-controls{height:100%!important}
+
+.sidebar{
+  grid-column:1!important;
+  grid-row:2/4!important;
+  width:auto!important;
+  min-width:0!important;
+  padding:10px 9px 0!important;
+  border-right:1px solid #171b22!important;
+  background:linear-gradient(180deg,#080b10,#07090d)!important;
+  overflow:hidden!important;
+}
+.brand{
+  order:0!important;
+  height:42px!important;
+  min-height:42px!important;
+  padding:0 7px!important;
+  gap:8px!important;
+}
+.brand img{width:29px!important;height:29px!important;object-fit:contain!important}
+.brand b{font-size:11px!important;letter-spacing:.015em!important;font-style:normal!important}
+.sidebar nav{
+  order:10!important;
+  display:grid!important;
+  gap:3px!important;
+  margin-top:7px!important;
+  overflow:auto!important;
+  padding-right:1px!important;
+}
+.sidebar nav::-webkit-scrollbar{width:3px!important}
+.sidebar nav::-webkit-scrollbar-thumb{background:#232733!important}
+.sidebar nav button{
+  height:37px!important;
+  min-height:37px!important;
+  padding:0 9px!important;
+  border-radius:7px!important;
+  grid-template-columns:22px minmax(0,1fr) auto!important;
+  gap:5px!important;
+  font-size:9px!important;
+  color:#888f9c!important;
+}
+.sidebar nav button svg{width:14px!important;height:14px!important}
+.sidebar nav button.active{
+  color:#fff!important;
+  border-color:rgba(139,57,241,.25)!important;
+  background:linear-gradient(90deg,rgba(104,35,185,.40),rgba(62,27,111,.10))!important;
+  box-shadow:inset 2px 0 var(--ref-purple)!important;
+}
+.sidebar-spacer,.xp,.pro-card,.logout{display:none!important}
+.profile-card{
+  order:90!important;
+  margin:auto -9px 0!important;
+  min-height:61px!important;
+  padding:9px 12px!important;
+  grid-template-columns:35px minmax(0,1fr)!important;
+  gap:8px!important;
+  border:0!important;
+  border-top:1px solid #171b22!important;
+  border-radius:0!important;
+  background:#080a0f!important;
+}
+.profile-card .avatar{width:34px!important;height:34px!important}
+.profile-card b{font-size:8px!important}
+.profile-card small{font-size:6px!important;margin-top:2px!important}
+.profile-card em{display:none!important}
+
+.topbar{
+  display:flex!important;
+  grid-column:2!important;
+  grid-row:2!important;
+  min-width:0!important;
+  height:var(--ref-topbar)!important;
+  padding:0 18px!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  border-bottom:1px solid #171c24!important;
+  background:rgba(8,11,16,.96)!important;
+}
+.search-box{
+  width:min(440px,48vw)!important;
+  height:34px!important;
+  border-radius:7px!important;
+  border-color:#1d222c!important;
+  background:#0b0e14!important;
+}
+.search-box span{font-size:8px!important}
+.search-box kbd{font-size:7px!important}
+.top-actions{display:flex!important;gap:6px!important}
+.top-actions>button{width:31px!important;height:31px!important;border-radius:7px!important;background:#0b0e14!important;border-color:#1d222c!important}
+.top-actions .avatar{width:29px!important;height:29px!important}
+
+.content{
+  grid-column:2!important;
+  grid-row:3!important;
+  min-width:0!important;
+  min-height:0!important;
+  overflow:auto!important;
+  background:radial-gradient(circle at 72% 0,rgba(108,31,194,.035),transparent 30%),#080a0f!important;
+}
+.musicbar{display:none!important}
+
+/* Final Home was designed to occupy the full content width. An older reference
+ * grid left a phantom 280px rail after the rail component was removed. */
+.final-home-v2{display:block!important;width:100%!important;min-height:100%!important;padding:18px 20px 24px!important}
+.final-home-v2 .approved-home-main{width:100%!important;max-width:none!important;grid-column:1/-1!important}
+.final-home-v2 .approved-home-hero{height:184px!important;border-radius:10px!important}
+.final-home-v2 .approved-home-hero img{width:170px!important;height:170px!important}
+.final-home-v2 .approved-home-hero h1{font-size:25px!important}
+.final-home-v2 .approved-home-stats{gap:7px!important;margin:9px 0 13px!important}
+.final-home-v2 .approved-highlights{margin:6px 0 13px!important}
+.final-home-v2 .section-title{height:37px!important;padding-bottom:7px!important}
+.final-home-v2 .final-top-elos{margin:5px 0 9px!important}
+.final-home-v2 .approved-home-lower{gap:9px!important}
+
+/* Keep the approved Community composition instead of the later mockup hero. */
+.final-community-v2{min-height:100%!important;padding:14px 16px 18px!important}
+.final-community-v2>.page-head{display:flex!important;margin-bottom:9px!important}
+.final-community-layout{min-height:calc(100vh - 184px)!important}
+
+/* Reference density: compact, crisp, no oversized cards. */
+.page,.mx-page{max-width:none!important}
+.page{padding:16px 18px 22px!important}
+.page-head{margin-bottom:10px!important}
+.page-head h1{font-size:20px!important}
+.page-head p{font-size:8px!important}
+
+/* Login instruction is intentionally narrow: only guarantee that the chosen
+ * GL mark itself is centered. Do not alter the form, copy, controls or layout. */
+.portal-login-mark img{
+  position:absolute!important;
+  left:50%!important;
+  top:50%!important;
+  transform:translate(-50%,-50%)!important;
+}
+
+@media(max-width:1120px){
+  :root{--ref-sidebar:164px}
+  .sidebar nav button{font-size:8px!important}
+  .final-home-v2 .final-top-elos{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+}
