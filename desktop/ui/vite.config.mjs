@@ -1,3 +1,5 @@
+import {cpSync,existsSync,mkdirSync} from "node:fs";
+import {resolve} from "node:path";
 import {socialTabsTransformPlugin} from "./social-tabs-transform.mjs";
 import {musicTabTransformPlugin} from "./music-tab-transform.mjs";
 import {lobbyMusicAudioTransformPlugin} from "./lobby-music-audio-transform.mjs";
@@ -34,6 +36,16 @@ const loginWindowSurfacePlugin={
     return fixed===code?null:{code:fixed,map:null};
   }
 };
+const desktopBrandAssetsPlugin={
+  name:"grindlobby-desktop-brand-assets",
+  closeBundle(){
+    const source=resolve(process.cwd(),"../../public/brand");
+    const target=resolve(process.cwd(),"dist/brand");
+    if(!existsSync(source))return;
+    mkdirSync(target,{recursive:true});
+    cpSync(source,target,{recursive:true,force:true});
+  }
+};
 
 export default {
   plugins: [
@@ -46,27 +58,34 @@ export default {
     lobbyMusicAudioTransformPlugin(),
     voiceReliabilityTransformPlugin(),
     {
-      name: "grindlobby-desktop-css-contract",
-      enforce: "pre",
-      transform(code, id) {
-        if (!id.endsWith("styles.css")) return null;
-        const fixed = code
-          .replaceAll(".musicbar>div:nth-child(2)b{", ".musicbar>div:nth-child(2)>b{")
-          .replaceAll(".musicbar>div:nth-child(2)small{", ".musicbar>div:nth-child(2)>small{");
-        return { code: fixed, map: null };
+      name:"grindlobby-desktop-css-contract",
+      enforce:"pre",
+      transform(code,id){
+        if(!id.endsWith("styles.css"))return null;
+        const fixed=code
+          .replaceAll(".musicbar>div:nth-child(2)b{",".musicbar>div:nth-child(2)>b{")
+          .replaceAll(".musicbar>div:nth-child(2)small{",".musicbar>div:nth-child(2)>small{");
+        return {code:fixed,map:null};
       }
     },
-    finalApprovedV2TransformPlugin(),
-    finalProfileStoreTransformPlugin(),
-    finalFunctionalWiringPlugin(),
-    finalSettingsTransformPlugin(),
-    finalCssWiringPlugin(),
-    finalApprovedSymbolsPlugin(),
+
+    // Legacy/mockup transforms run first. They can provide functionality and
+    // secondary surfaces, but they are not allowed to overwrite the final
+    // visual contract selected from the approved references.
     mockupExactCoreTransformPlugin(),
     mockupExactSocialTransformPlugin(),
-    mockupExactSafetyTransformPlugin()
+    mockupExactSafetyTransformPlugin(),
+
+    // The approved visual/functionality passes intentionally run last.
+    finalApprovedV2TransformPlugin(),
+    finalProfileStoreTransformPlugin(),
+    finalSettingsTransformPlugin(),
+    finalFunctionalWiringPlugin(),
+    finalCssWiringPlugin(),
+    finalApprovedSymbolsPlugin(),
+    desktopBrandAssetsPlugin
   ],
-  build: {
-    chunkSizeWarningLimit: 1000
+  build:{
+    chunkSizeWarningLimit:1000
   }
 };
