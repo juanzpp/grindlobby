@@ -1,5 +1,3 @@
-import {cpSync,existsSync,mkdirSync} from "node:fs";
-import {resolve} from "node:path";
 import {socialTabsTransformPlugin} from "./social-tabs-transform.mjs";
 import {musicTabTransformPlugin} from "./music-tab-transform.mjs";
 import {lobbyMusicAudioTransformPlugin} from "./lobby-music-audio-transform.mjs";
@@ -16,6 +14,9 @@ import {mockupExactCoreTransformPlugin} from "./mockup-exact-core-transform.mjs"
 import {mockupExactSocialTransformPlugin} from "./mockup-exact-social-transform.mjs";
 import {mockupExactSafetyTransformPlugin} from "./mockup-exact-safety-transform.mjs";
 import {referenceLockTransformPlugin} from "./reference-lock-transform.mjs";
+import {referenceExactCoreTransformPlugin} from "./reference-exact-core-transform.mjs";
+import {referenceExactSocialTransformPlugin} from "./reference-exact-social-transform.mjs";
+import {referenceExactCssWiringPlugin} from "./reference-exact-css-wiring.mjs";
 
 const approvedReferenceUiPlugin={...referenceUiTransformPlugin(),enforce:"pre"};
 const dedicatedMusicSurfacePlugin={
@@ -37,19 +38,9 @@ const loginWindowSurfacePlugin={
     return fixed===code?null:{code:fixed,map:null};
   }
 };
-const desktopBrandAssetsPlugin={
-  name:"grindlobby-desktop-brand-assets",
-  closeBundle(){
-    const source=resolve(process.cwd(),"../../public/brand");
-    const target=resolve(process.cwd(),"dist/brand");
-    if(!existsSync(source))return;
-    mkdirSync(target,{recursive:true});
-    cpSync(source,target,{recursive:true,force:true});
-  }
-};
 
 export default {
-  plugins: [
+  plugins:[
     approvedReferenceUiPlugin,
     dedicatedMusicSurfacePlugin,
     loginWindowSurfacePlugin,
@@ -70,24 +61,23 @@ export default {
       }
     },
 
-    // Legacy/mockup transforms run first. They can provide functionality and
-    // secondary surfaces, but they are not allowed to overwrite the final
-    // visual contract selected from the approved references.
+    // Compatibility/functionality transforms first.
     mockupExactCoreTransformPlugin(),
     mockupExactSocialTransformPlugin(),
     mockupExactSafetyTransformPlugin(),
-
-    // The approved visual/functionality passes intentionally run last.
     finalApprovedV2TransformPlugin(),
     finalProfileStoreTransformPlugin(),
     finalSettingsTransformPlugin(),
     finalFunctionalWiringPlugin(),
     finalCssWiringPlugin(),
     finalApprovedSymbolsPlugin(),
+
+    // The user's approved images are the final visual authority. Nothing is
+    // allowed to rewrite these surfaces afterwards.
     referenceLockTransformPlugin(),
-    desktopBrandAssetsPlugin
+    referenceExactCoreTransformPlugin(),
+    referenceExactSocialTransformPlugin(),
+    referenceExactCssWiringPlugin()
   ],
-  build:{
-    chunkSizeWarningLimit:1000
-  }
+  build:{chunkSizeWarningLimit:1000}
 };
