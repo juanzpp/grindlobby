@@ -1,0 +1,32 @@
+/* GrindLobby mobile adaptation layer */
+html,body{max-width:100%;overflow-x:hidden}body{min-height:100dvh;-webkit-text-size-adjust:100%;touch-action:manipulation}img,video,canvas{max-width:100%}button,a,input,select,textarea{touch-action:manipulation}button,a{min-height:42px}input,select,textarea{max-width:100%}
+.mobile-dock{display:none}
+@media (max-width:767px){
+  body{padding-bottom:calc(76px + env(safe-area-inset-bottom));}
+  body:has(.grind-room-page){padding-bottom:0}
+  .mobile-dock{position:fixed;left:10px;right:10px;bottom:calc(8px + env(safe-area-inset-bottom));z-index:90;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;padding:6px;border:1px solid rgba(255,255,255,.09);border-radius:18px;background:rgba(8,10,17,.93);box-shadow:0 18px 50px rgba(0,0,0,.55);backdrop-filter:blur(18px)}
+  .mobile-dock a{display:flex;min-width:0;min-height:52px;align-items:center;justify-content:center;border-radius:13px;padding:6px 2px;color:rgba(255,255,255,.52);font-size:10px;font-weight:600;text-align:center;text-decoration:none}
+  .mobile-dock a[data-active="true"]{background:rgba(139,92,246,.18);color:#d8b4fe;box-shadow:inset 0 0 0 1px rgba(168,85,247,.25)}
+  .panel{border-radius:16px!important}
+  main{max-width:100%!important;min-width:0!important}
+  h1{font-size:clamp(1.55rem,7vw,2rem)!important;line-height:1.08!important}
+  h2{line-height:1.15!important}
+  input,select,textarea{font-size:16px!important}
+  .overflow-x-auto{-webkit-overflow-scrolling:touch;scrollbar-width:none}.overflow-x-auto::-webkit-scrollbar{display:none}
+  [class*="max-w-[1580px]"]{padding-left:12px!important;padding-right:12px!important}
+  [class*="max-w-7xl"]{padding-left:12px!important;padding-right:12px!important}
+  [class*="grid-cols-[1.65fr_1fr]"],[class*="grid-cols-[1.7fr_1fr]"],[class*="grid-cols-[92px_1fr_330px]"]{grid-template-columns:minmax(0,1fr)!important}
+  .fixed.inset-0>section,.fixed.inset-0>.panel{width:calc(100vw - 16px)!important;max-width:none!important;max-height:calc(100dvh - 16px)!important;margin:8px!important;border-radius:18px!important}
+  .fixed.inset-0{padding:0!important;align-items:center!important}
+  .fixed.inset-0 section>header,.fixed.inset-0 section>footer{padding-left:14px!important;padding-right:14px!important}
+  .fixed.inset-0 section>div{padding-left:12px!important;padding-right:12px!important}
+  video{max-height:58dvh!important}
+}
+@media (max-width:520px){
+  .btn-primary,.btn-ghost{box-shadow:none}
+  [class*="p-5"]{padding:14px}
+  [class*="p-6"]{padding:14px}
+  [class*="px-5"]{padding-left:14px;padding-right:14px}
+  [class*="gap-4"]{gap:12px}
+  .label-caps{font-size:10px}
+}
