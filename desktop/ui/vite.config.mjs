@@ -1,4 +1,3 @@
-import {deadTabsTransformPlugin} from "./dead-tabs-transform.mjs";
 import {socialTabsTransformPlugin} from "./social-tabs-transform.mjs";
 import {musicTabTransformPlugin} from "./music-tab-transform.mjs";
 import {lobbyMusicAudioTransformPlugin} from "./lobby-music-audio-transform.mjs";
@@ -35,7 +34,6 @@ export default {
     dedicatedMusicSurfacePlugin,
     loginWindowSurfacePlugin,
     nativeBridgeTransformPlugin(),
-    deadTabsTransformPlugin(),
     socialTabsTransformPlugin(),
     musicTabTransformPlugin(),
     lobbyMusicAudioTransformPlugin(),
