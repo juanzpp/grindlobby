@@ -5,6 +5,8 @@ import {lobbyMusicAudioTransformPlugin} from "./lobby-music-audio-transform.mjs"
 import {voiceReliabilityTransformPlugin} from "./voice-reliability-transform.mjs";
 import {nativeBridgeTransformPlugin} from "./native-bridge-transform.mjs";
 import {referenceUiTransformPlugin} from "./reference-ui-transform.mjs";
+import {finalApprovedV2TransformPlugin} from "./final-approved-v2-transform.mjs";
+import {finalApprovedSymbolsPlugin} from "./final-approved-symbols.mjs";
 
 const approvedReferenceUiPlugin={...referenceUiTransformPlugin(),enforce:"pre"};
 const dedicatedMusicSurfacePlugin={
@@ -48,7 +50,9 @@ export default {
           .replaceAll(".musicbar>div:nth-child(2)small{", ".musicbar>div:nth-child(2)>small{");
         return { code: fixed, map: null };
       }
-    }
+    },
+    finalApprovedV2TransformPlugin(),
+    finalApprovedSymbolsPlugin()
   ],
   build: {
     chunkSizeWarningLimit: 1000
