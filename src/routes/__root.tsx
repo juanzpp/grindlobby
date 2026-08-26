@@ -47,10 +47,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     ],
     links: [
       { rel: "stylesheet", href: appCss },
+      { rel: "stylesheet", href: "/brand-fix.css?v=2" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,600;0,700;1,700&family=Inter:wght@400;500;600;700&display=swap" },
-      { rel: "icon", type: "image/svg+xml", href: "/grindlobby-logo-clean.svg" },
+      { rel: "icon", type: "image/png", href: "/grindlobby-logo.png" },
     ],
   }),
   shellComponent: RootShell,
