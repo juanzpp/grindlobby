@@ -12,6 +12,7 @@ import {finalCssWiringPlugin} from "./final-css-wiring.mjs";
 import {finalApprovedSymbolsPlugin} from "./final-approved-symbols.mjs";
 import {mockupExactCoreTransformPlugin} from "./mockup-exact-core-transform.mjs";
 import {mockupExactSocialTransformPlugin} from "./mockup-exact-social-transform.mjs";
+import {mockupExactSafetyTransformPlugin} from "./mockup-exact-safety-transform.mjs";
 
 const approvedReferenceUiPlugin={...referenceUiTransformPlugin(),enforce:"pre"};
 const dedicatedMusicSurfacePlugin={
@@ -62,7 +63,8 @@ export default {
     finalCssWiringPlugin(),
     finalApprovedSymbolsPlugin(),
     mockupExactCoreTransformPlugin(),
-    mockupExactSocialTransformPlugin()
+    mockupExactSocialTransformPlugin(),
+    mockupExactSafetyTransformPlugin()
   ],
   build: {
     chunkSizeWarningLimit: 1000
