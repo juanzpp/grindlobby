@@ -17,9 +17,8 @@ import {referenceLockTransformPlugin} from "./reference-lock-transform.mjs";
 import {referenceExactCoreTransformPlugin} from "./reference-exact-core-transform.mjs";
 import {referenceExactSocialTransformPlugin} from "./reference-exact-social-transform.mjs";
 import {referenceExactCssWiringPlugin} from "./reference-exact-css-wiring.mjs";
-import {debugFinalSourcePlugin} from "./debug-final-source.mjs";
 
-const approvedReferenceUiPlugin={...referenceUiTransformPlugin(),enforce:"pre"};
+const pre=factory=>({...factory(),enforce:"pre"});
 const dedicatedMusicSurfacePlugin={
   name:"grindlobby-dedicated-music-surface",
   enforce:"pre",
@@ -39,42 +38,49 @@ const loginWindowSurfacePlugin={
     return fixed===code?null:{code:fixed,map:null};
   }
 };
+const desktopCssContract={
+  name:"grindlobby-desktop-css-contract",
+  enforce:"pre",
+  transform(code,id){
+    if(!id.endsWith("styles.css"))return null;
+    const fixed=code
+      .replaceAll(".musicbar>div:nth-child(2)b{",".musicbar>div:nth-child(2)>b{")
+      .replaceAll(".musicbar>div:nth-child(2)small{",".musicbar>div:nth-child(2)>small{");
+    return {code:fixed,map:null};
+  }
+};
 
 export default {
   plugins:[
-    approvedReferenceUiPlugin,
+    pre(referenceUiTransformPlugin),
     dedicatedMusicSurfacePlugin,
     loginWindowSurfacePlugin,
-    nativeBridgeTransformPlugin(),
-    socialTabsTransformPlugin(),
-    musicTabTransformPlugin(),
-    lobbyMusicAudioTransformPlugin(),
-    voiceReliabilityTransformPlugin(),
-    {
-      name:"grindlobby-desktop-css-contract",
-      enforce:"pre",
-      transform(code,id){
-        if(!id.endsWith("styles.css"))return null;
-        const fixed=code
-          .replaceAll(".musicbar>div:nth-child(2)b{",".musicbar>div:nth-child(2)>b{")
-          .replaceAll(".musicbar>div:nth-child(2)small{",".musicbar>div:nth-child(2)>small{");
-        return {code:fixed,map:null};
-      }
-    },
-    mockupExactCoreTransformPlugin(),
-    mockupExactSocialTransformPlugin(),
-    mockupExactSafetyTransformPlugin(),
-    finalApprovedV2TransformPlugin(),
-    finalProfileStoreTransformPlugin(),
-    finalSettingsTransformPlugin(),
-    finalFunctionalWiringPlugin(),
-    finalCssWiringPlugin(),
-    finalApprovedSymbolsPlugin(),
-    referenceLockTransformPlugin(),
-    referenceExactCoreTransformPlugin(),
-    referenceExactSocialTransformPlugin(),
-    referenceExactCssWiringPlugin(),
-    debugFinalSourcePlugin()
+    pre(nativeBridgeTransformPlugin),
+    pre(socialTabsTransformPlugin),
+    pre(musicTabTransformPlugin),
+    pre(lobbyMusicAudioTransformPlugin),
+    pre(voiceReliabilityTransformPlugin),
+    desktopCssContract,
+
+    // Compatibility and functionality are composed first while the file is
+    // still JSX source. This prevents late plugins from injecting raw JSX into
+    // code that Vite/esbuild has already converted to React.createElement.
+    pre(mockupExactCoreTransformPlugin),
+    pre(mockupExactSocialTransformPlugin),
+    pre(mockupExactSafetyTransformPlugin),
+    pre(finalApprovedV2TransformPlugin),
+    pre(finalProfileStoreTransformPlugin),
+    pre(finalSettingsTransformPlugin),
+    pre(finalFunctionalWiringPlugin),
+    pre(finalCssWiringPlugin),
+    pre(finalApprovedSymbolsPlugin),
+
+    // Approved references are the final authority inside the pre-transform
+    // phase. After these run, Vite can compile JSX exactly once.
+    pre(referenceLockTransformPlugin),
+    pre(referenceExactCoreTransformPlugin),
+    pre(referenceExactSocialTransformPlugin),
+    pre(referenceExactCssWiringPlugin)
   ],
   build:{chunkSizeWarningLimit:1000}
 };
