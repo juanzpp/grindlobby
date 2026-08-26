@@ -1,9 +1,9 @@
 use reqwest::{Client, Method};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::sync::Mutex;
+use std::{fs, path::Path, sync::Mutex};
 use sysinfo::{get_current_pid, ProcessesToUpdate, System};
-use tauri::{Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 const API_ORIGIN: &str = "https://grindlobby.onrender.com";
 
@@ -51,6 +51,15 @@ struct PerformanceSnapshot {
     process_uptime_seconds: u64,
     disk_read_bytes_delta: u64,
     disk_written_bytes_delta: u64,
+}
+
+#[derive(Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CleanupReport {
+    files_removed: u64,
+    directories_removed: u64,
+    bytes_freed: u64,
+    skipped_entries: u64,
 }
 
 fn safe_api_path(path: &str) -> bool {
@@ -123,6 +132,53 @@ fn window_toggle_maximize(window: WebviewWindow) -> Result<(), String> {
 #[tauri::command]
 fn window_close(window: WebviewWindow) -> Result<(), String> {
     window.close().map_err(|error| error.to_string())
+}
+
+fn clear_cache_directory(path: &Path, report: &mut CleanupReport) {
+    let Ok(entries) = fs::read_dir(path) else {
+        return;
+    };
+
+    for entry in entries.flatten() {
+        let entry_path = entry.path();
+        let Ok(metadata) = fs::symlink_metadata(&entry_path) else {
+            report.skipped_entries = report.skipped_entries.saturating_add(1);
+            continue;
+        };
+
+        if metadata.file_type().is_symlink() || metadata.is_file() {
+            let size = metadata.len();
+            match fs::remove_file(&entry_path) {
+                Ok(()) => {
+                    report.files_removed = report.files_removed.saturating_add(1);
+                    report.bytes_freed = report.bytes_freed.saturating_add(size);
+                }
+                Err(_) => report.skipped_entries = report.skipped_entries.saturating_add(1),
+            }
+            continue;
+        }
+
+        if metadata.is_dir() {
+            clear_cache_directory(&entry_path, report);
+            match fs::remove_dir(&entry_path) {
+                Ok(()) => report.directories_removed = report.directories_removed.saturating_add(1),
+                Err(_) => report.skipped_entries = report.skipped_entries.saturating_add(1),
+            }
+        }
+    }
+}
+
+#[tauri::command]
+fn optimize_client(app: AppHandle) -> Result<CleanupReport, String> {
+    let cache_dir = app
+        .path()
+        .app_cache_dir()
+        .map_err(|error| format!("cache directory unavailable: {error}"))?;
+
+    fs::create_dir_all(&cache_dir).map_err(|error| format!("cache directory unavailable: {error}"))?;
+    let mut report = CleanupReport::default();
+    clear_cache_directory(&cache_dir, &mut report);
+    Ok(report)
 }
 
 fn belongs_to_process_tree(system: &System, candidate: sysinfo::Pid, root: sysinfo::Pid) -> bool {
@@ -221,6 +277,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             api_request,
             performance_snapshot,
+            optimize_client,
             window_minimize,
             window_toggle_maximize,
             window_close
