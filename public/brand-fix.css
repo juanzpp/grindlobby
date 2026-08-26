@@ -1,0 +1,17 @@
+/* GrindLobby brand compatibility layer.
+   The original GL artwork is a dark-background PNG. On the dark UI we render it
+   with screen blending so black pixels disappear visually while purple/white
+   artwork stays intact. This avoids SVG filter inconsistencies between browsers. */
+img[src*="grindlobby-logo.png"] {
+  background: transparent !important;
+  mix-blend-mode: screen;
+  isolation: auto;
+}
+
+/* The old loading effect used the PNG alpha as a mask. Because the source image
+   contains an opaque dark square, that mask becomes rectangular. Keep the
+   portal/halo animation but suppress only those two masked overlay layers. */
+.gl-energy,
+.gl-edge {
+  display: none !important;
+}
