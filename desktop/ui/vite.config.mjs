@@ -17,6 +17,7 @@ import {referenceLockTransformPlugin} from "./reference-lock-transform.mjs";
 import {referenceExactCoreTransformPlugin} from "./reference-exact-core-transform.mjs";
 import {referenceExactSocialTransformPlugin} from "./reference-exact-social-transform.mjs";
 import {referenceExactCssWiringPlugin} from "./reference-exact-css-wiring.mjs";
+import {debugFinalSourcePlugin} from "./debug-final-source.mjs";
 
 const approvedReferenceUiPlugin={...referenceUiTransformPlugin(),enforce:"pre"};
 const dedicatedMusicSurfacePlugin={
@@ -60,8 +61,6 @@ export default {
         return {code:fixed,map:null};
       }
     },
-
-    // Compatibility/functionality transforms first.
     mockupExactCoreTransformPlugin(),
     mockupExactSocialTransformPlugin(),
     mockupExactSafetyTransformPlugin(),
@@ -71,13 +70,11 @@ export default {
     finalFunctionalWiringPlugin(),
     finalCssWiringPlugin(),
     finalApprovedSymbolsPlugin(),
-
-    // The user's approved images are the final visual authority. Nothing is
-    // allowed to rewrite these surfaces afterwards.
     referenceLockTransformPlugin(),
     referenceExactCoreTransformPlugin(),
     referenceExactSocialTransformPlugin(),
-    referenceExactCssWiringPlugin()
+    referenceExactCssWiringPlugin(),
+    debugFinalSourcePlugin()
   ],
   build:{chunkSizeWarningLimit:1000}
 };
