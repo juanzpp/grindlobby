@@ -5,6 +5,9 @@ import {voiceReliabilityTransformPlugin} from "./voice-reliability-transform.mjs
 import {nativeBridgeTransformPlugin} from "./native-bridge-transform.mjs";
 import {referenceUiTransformPlugin} from "./reference-ui-transform.mjs";
 import {finalApprovedV2TransformPlugin} from "./final-approved-v2-transform.mjs";
+import {finalProfileStoreTransformPlugin} from "./final-profile-store-transform.mjs";
+import {finalFunctionalWiringPlugin} from "./final-functional-wiring.mjs";
+import {finalCssWiringPlugin} from "./final-css-wiring.mjs";
 import {finalApprovedSymbolsPlugin} from "./final-approved-symbols.mjs";
 
 const approvedReferenceUiPlugin={...referenceUiTransformPlugin(),enforce:"pre"};
@@ -50,6 +53,9 @@ export default {
       }
     },
     finalApprovedV2TransformPlugin(),
+    finalProfileStoreTransformPlugin(),
+    finalFunctionalWiringPlugin(),
+    finalCssWiringPlugin(),
     finalApprovedSymbolsPlugin()
   ],
   build: {
