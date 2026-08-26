@@ -17,6 +17,7 @@ import {referenceLockTransformPlugin} from "./reference-lock-transform.mjs";
 import {referenceExactCoreTransformPlugin} from "./reference-exact-core-transform.mjs";
 import {referenceExactSocialTransformPlugin} from "./reference-exact-social-transform.mjs";
 import {referenceExactCssWiringPlugin} from "./reference-exact-css-wiring.mjs";
+import {referenceFinalSafetyTransformPlugin} from "./reference-final-safety-transform.mjs";
 
 const pre=factory=>({...factory(),enforce:"pre"});
 const dedicatedMusicSurfacePlugin={
@@ -61,10 +62,6 @@ export default {
     pre(lobbyMusicAudioTransformPlugin),
     pre(voiceReliabilityTransformPlugin),
     desktopCssContract,
-
-    // Compatibility and functionality are composed first while the file is
-    // still JSX source. This prevents late plugins from injecting raw JSX into
-    // code that Vite/esbuild has already converted to React.createElement.
     pre(mockupExactCoreTransformPlugin),
     pre(mockupExactSocialTransformPlugin),
     pre(mockupExactSafetyTransformPlugin),
@@ -74,12 +71,10 @@ export default {
     pre(finalFunctionalWiringPlugin),
     pre(finalCssWiringPlugin),
     pre(finalApprovedSymbolsPlugin),
-
-    // Approved references are the final authority inside the pre-transform
-    // phase. After these run, Vite can compile JSX exactly once.
     pre(referenceLockTransformPlugin),
     pre(referenceExactCoreTransformPlugin),
     pre(referenceExactSocialTransformPlugin),
+    pre(referenceFinalSafetyTransformPlugin),
     pre(referenceExactCssWiringPlugin)
   ],
   build:{chunkSizeWarningLimit:1000}
