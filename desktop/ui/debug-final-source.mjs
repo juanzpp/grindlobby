@@ -4,10 +4,14 @@ export function debugFinalSourcePlugin(){
     enforce:"post",
     transform(code,id){
       if(!id.endsWith("main.jsx"))return null;
-      const lines=code.split(/\r?\n/);
-      console.log("=== GRIND FINAL MAIN 45-65 ===");
-      lines.slice(44,65).forEach((line,index)=>console.log(String(index+45).padStart(3,"0")+": "+line));
-      console.log("=== END GRIND FINAL MAIN ===");
+      const tokens=["function HomeView","function Activity","function ActiveCall","function OnlineFriends","function LobbiesView","function CommunityView","function FriendsView","function MessagesView","function TournamentsView","function EventsView","function StoreView","function ProfileView","function SettingsView"];
+      console.log("=== GRIND FINAL COMPONENT TRACE ===");
+      for(const token of tokens){
+        const at=code.indexOf(token);
+        console.log(token+" @ "+at);
+        if(at>=0)console.log(code.slice(Math.max(0,at-220),Math.min(code.length,at+520)).replace(/\n/g,"\\n"));
+      }
+      console.log("=== END GRIND FINAL COMPONENT TRACE ===");
       return null;
     }
   };
