@@ -46,7 +46,6 @@ import { TopElos } from "@/components/TopElos";
 import { PlayerProvider, usePlayer, findItem } from "@/lib/player-store";
 import { getTier } from "@/lib/levels";
 
-
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
@@ -69,11 +68,11 @@ export const Route = createFileRoute("/")({
 
 const navItems = [
   { icon: LayoutGrid, label: "Dashboard", active: true, to: "/" as const },
-  { icon: Users, label: "Lobbies", to: "/" as const },
-  { icon: Trophy, label: "Rank", to: "/" as const },
+  { icon: Users, label: "Lobbies", to: "/lobbies" as const },
+  { icon: Trophy, label: "Rank", to: "/rank" as const },
   { icon: Store, label: "Loja", to: "/loja" as const },
-  { icon: Star, label: "Pro", to: "/loja" as const },
-  { icon: Settings, label: "Configurações", to: "/" as const },
+  { icon: Star, label: "Pro", to: "/pro" as const },
+  { icon: Settings, label: "Configurações", to: "/configuracoes" as const },
 ];
 
 const activity = [
@@ -162,7 +161,6 @@ function DashboardInner() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <div className="flex min-h-screen">
-        {/* Sidebar */}
         <aside className="hidden w-64 shrink-0 flex-col justify-between border-r border-border bg-card/60 px-5 py-6 lg:flex">
           <div>
             <div className="flex flex-col items-center gap-3 pb-8">
@@ -196,12 +194,12 @@ function DashboardInner() {
             </nav>
 
             <div className="mt-6 space-y-2">
-              <button className="btn-primary flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold">
+              <Link to="/lobbies" className="btn-primary flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold">
                 <Plus className="h-4 w-4" /> Criar lobby
-              </button>
-              <button className="btn-ghost flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium">
+              </Link>
+              <Link to="/lobbies" className="btn-ghost flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium">
                 <UserPlus className="h-4 w-4" /> Convidar amigos
-              </button>
+              </Link>
             </div>
 
             <div className="mt-8">
@@ -246,20 +244,15 @@ function DashboardInner() {
             </div>
             <Settings className="h-4 w-4 text-muted-foreground" />
           </button>
-
         </aside>
 
-        {/* Main */}
         <main className="min-w-0 flex-1 space-y-4 p-4 md:p-6">
-          {/* Topbar */}
           <header className="panel flex flex-wrap items-center justify-between gap-3 px-5 py-3">
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <Crown className="h-4 w-4 text-primary-glow" />
               <span className="font-semibold">Admin ativo</span>
               <span className="text-muted-foreground">•</span>
-              <span className="font-semibold text-primary-glow">
-                PRO liberado gratuitamente
-              </span>
+              <span className="font-semibold text-primary-glow">PRO liberado gratuitamente</span>
               <span className="mx-1 hidden h-4 w-px bg-border sm:block" />
               <span className="text-muted-foreground">juannsiilvah@gmail.com</span>
             </div>
@@ -267,25 +260,17 @@ function DashboardInner() {
               <Gift className="h-5 w-5" />
               <span className="relative">
                 <Bell className="h-5 w-5" />
-                <span className="absolute -right-1.5 -top-1.5 grid h-4 w-4 place-items-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
-                  2
-                </span>
+                <span className="absolute -right-1.5 -top-1.5 grid h-4 w-4 place-items-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">2</span>
               </span>
               <SignalHigh className="h-5 w-5 text-success" />
             </div>
           </header>
 
           <EventTicker />
-
-          {/* Top elos do servidor */}
           <TopElos />
-
-          {/* Level / progresso */}
           <LevelHero onOpenProfile={() => setProfileOpen(true)} />
 
-
           <div className="grid gap-4 xl:grid-cols-[1.7fr_1fr]">
-            {/* Lobby */}
             <section className="panel p-5">
               <p className="label-caps">Lobby atual</p>
               <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
@@ -295,36 +280,16 @@ function DashboardInner() {
                     <Pencil className="h-4 w-4 text-primary-glow" />
                   </div>
                   <div className="mt-2 flex flex-wrap gap-2 text-xs">
-                    <span className="flex items-center gap-1.5 rounded-md border border-border bg-panel px-2 py-1">
-                      <Globe className="h-3.5 w-3.5" /> Pública
-                    </span>
-                    <span className="flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/15 px-2 py-1">
-                      <Trophy className="h-3.5 w-3.5 text-warning" /> Competitiva
-                    </span>
-                    <span className="flex items-center gap-1.5 rounded-md border border-border bg-panel px-2 py-1">
-                      <Sparkle className="h-3.5 w-3.5 text-primary-glow" /> EA FC 27
-                    </span>
+                    <span className="flex items-center gap-1.5 rounded-md border border-border bg-panel px-2 py-1"><Globe className="h-3.5 w-3.5" /> Pública</span>
+                    <span className="flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/15 px-2 py-1"><Trophy className="h-3.5 w-3.5 text-warning" /> Competitiva</span>
+                    <span className="flex items-center gap-1.5 rounded-md border border-border bg-panel px-2 py-1"><Sparkle className="h-3.5 w-3.5 text-primary-glow" /> EA FC 27</span>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <Avatar name="juan" size={34} />
-                    <div className="text-xs">
-                      <p className="text-muted-foreground">Host</p>
-                      <p className="flex items-center gap-1 font-semibold">
-                        juan <Crown className="h-3.5 w-3.5 text-warning" />
-                      </p>
-                    </div>
-                  </div>
-                  <p className="flex items-center gap-2 text-sm">
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-semibold">5</span>
-                    <span className="text-muted-foreground">/ 8</span>
-                  </p>
-                  <button className="btn-ghost flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium">
-                    <UserPlus className="h-4 w-4" /> Convidar
-                  </button>
+                  <div className="flex items-center gap-2"><Avatar name="juan" size={34} /><div className="text-xs"><p className="text-muted-foreground">Host</p><p className="flex items-center gap-1 font-semibold">juan <Crown className="h-3.5 w-3.5 text-warning" /></p></div></div>
+                  <p className="flex items-center gap-2 text-sm"><Users className="h-4 w-4 text-muted-foreground" /><span className="font-semibold">5</span><span className="text-muted-foreground">/ 8</span></p>
+                  <Link to="/lobbies" className="btn-ghost flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium"><UserPlus className="h-4 w-4" /> Convidar</Link>
                   <MoreVertical className="h-4 w-4 text-muted-foreground" />
                 </div>
               </div>
@@ -333,97 +298,28 @@ function DashboardInner() {
                 <p className="label-caps px-1">Membros (5/8)</p>
                 <ul className="mt-2 divide-y divide-border">
                   {members.map((m) => (
-                    <li
-                      key={m.handle}
-                      className="flex items-center gap-3 px-1 py-2.5 text-sm"
-                    >
-                      <span className="relative">
-                        <Avatar name={m.name} size={32} />
-                        <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-panel bg-success" />
-                      </span>
-                      <div className="min-w-0">
-                        <p className="flex items-center gap-1.5 font-semibold">
-                          {m.name}
-                          {m.host && <Crown className="h-3.5 w-3.5 text-warning" />}
-                        </p>
-                        <p className="text-xs text-muted-foreground">{m.handle}</p>
-                      </div>
-                      <div className="ml-auto flex items-center gap-3">
-                        {m.muted ? (
-                          <MicOff className="h-4 w-4 text-destructive" />
-                        ) : (
-                          <Mic className="h-4 w-4 text-muted-foreground" />
-                        )}
-                        <Waveform bars={14} active={!m.muted} />
-                        {m.host ? (
-                          <span className="rounded-md border border-primary/40 bg-primary/20 px-2 py-1 text-[10px] font-bold tracking-wide">
-                            HOST
-                          </span>
-                        ) : (
-                          <span className="label-caps">Membro</span>
-                        )}
-                        <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                      </div>
+                    <li key={m.handle} className="flex items-center gap-3 px-1 py-2.5 text-sm">
+                      <span className="relative"><Avatar name={m.name} size={32} /><span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-panel bg-success" /></span>
+                      <div className="min-w-0"><p className="flex items-center gap-1.5 font-semibold">{m.name}{m.host && <Crown className="h-3.5 w-3.5 text-warning" />}</p><p className="text-xs text-muted-foreground">{m.handle}</p></div>
+                      <div className="ml-auto flex items-center gap-3">{m.muted ? <MicOff className="h-4 w-4 text-destructive" /> : <Mic className="h-4 w-4 text-muted-foreground" />}<Waveform bars={14} active={!m.muted} />{m.host ? <span className="rounded-md border border-primary/40 bg-primary/20 px-2 py-1 text-[10px] font-bold tracking-wide">HOST</span> : <span className="label-caps">Membro</span>}<MoreVertical className="h-4 w-4 text-muted-foreground" /></div>
                     </li>
                   ))}
                 </ul>
               </div>
 
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                <button className="btn-ghost flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium">
-                  <LogOut className="h-4 w-4" /> Sair do lobby
-                </button>
-                <button className="btn-ghost flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium">
-                  <Settings className="h-4 w-4" /> Gerenciar lobby
-                </button>
+                <Link to="/lobbies" className="btn-ghost flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium"><LogOut className="h-4 w-4" /> Sair do lobby</Link>
+                <Link to="/lobbies" className="btn-ghost flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium"><Settings className="h-4 w-4" /> Gerenciar lobby</Link>
               </div>
             </section>
 
-            {/* Right column */}
             <div className="space-y-4">
               <section className="panel p-5">
-                <div className="flex items-center justify-between">
-                  <p className="label-caps">Controles de áudio</p>
-                  <Activity className="h-4 w-4 text-primary-glow" />
-                </div>
-
+                <div className="flex items-center justify-between"><p className="label-caps">Controles de áudio</p><Activity className="h-4 w-4 text-primary-glow" /></div>
                 <div className="mt-4 space-y-4">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Microfone</p>
-                    <div className="mt-2 flex items-center gap-3">
-                      <button className="flex flex-1 items-center justify-between rounded-lg border border-border bg-panel px-3 py-2.5 text-sm">
-                        HyperX QuadCast
-                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                      </button>
-                      <Waveform />
-                      <button className="grid h-10 w-10 place-items-center rounded-lg border border-border bg-panel">
-                        <Mic className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="text-sm text-muted-foreground">Saída de áudio</p>
-                    <div className="mt-2 flex items-center gap-3">
-                      <button className="flex flex-1 items-center justify-between rounded-lg border border-border bg-panel px-3 py-2.5 text-sm">
-                        HyperX Cloud II
-                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                      </button>
-                      <Waveform />
-                      <button className="grid h-10 w-10 place-items-center rounded-lg border border-border bg-panel">
-                        <Volume2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <button className="flex items-center justify-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-3 py-3 text-sm font-medium">
-                      <Monitor className="h-4 w-4" /> Compartilhar tela
-                    </button>
-                    <button className="btn-primary flex items-center justify-center gap-2 rounded-lg px-3 py-3 text-sm font-semibold">
-                      <MonitorUp className="h-4 w-4" /> Abrir tela
-                    </button>
-                  </div>
+                  <div><p className="text-sm text-muted-foreground">Microfone</p><div className="mt-2 flex items-center gap-3"><Link to="/configuracoes" className="flex flex-1 items-center justify-between rounded-lg border border-border bg-panel px-3 py-2.5 text-sm">Configurar microfone<ChevronDown className="h-4 w-4 text-muted-foreground" /></Link><Waveform /><Link to="/configuracoes" className="grid h-10 w-10 place-items-center rounded-lg border border-border bg-panel"><Mic className="h-4 w-4" /></Link></div></div>
+                  <div><p className="text-sm text-muted-foreground">Saída de áudio</p><div className="mt-2 flex items-center gap-3"><Link to="/configuracoes" className="flex flex-1 items-center justify-between rounded-lg border border-border bg-panel px-3 py-2.5 text-sm">Configurar saída<ChevronDown className="h-4 w-4 text-muted-foreground" /></Link><Waveform /><Link to="/configuracoes" className="grid h-10 w-10 place-items-center rounded-lg border border-border bg-panel"><Volume2 className="h-4 w-4" /></Link></div></div>
+                  <div className="grid gap-3 sm:grid-cols-2"><Link to="/configuracoes" className="flex items-center justify-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-3 py-3 text-sm font-medium"><Monitor className="h-4 w-4" /> Compartilhar tela</Link><Link to="/configuracoes" className="btn-primary flex items-center justify-center gap-2 rounded-lg px-3 py-3 text-sm font-semibold"><MonitorUp className="h-4 w-4" /> Abrir tela</Link></div>
                 </div>
               </section>
 
@@ -432,71 +328,24 @@ function DashboardInner() {
               <section className="panel p-5">
                 <p className="label-caps">Status do sistema</p>
                 <ul className="mt-3 space-y-2.5 text-sm">
-                  <li className="flex items-center justify-between">
-                    <span className="flex items-center gap-2 text-muted-foreground">
-                      <Video className="h-4 w-4" /> Qualidade da transmissão
-                    </span>
-                    <span className="font-medium">1080p60</span>
-                  </li>
-                  <li className="flex items-center justify-between">
-                    <span className="flex items-center gap-2 text-muted-foreground">
-                      <Wifi className="h-4 w-4" /> Conexão
-                    </span>
-                    <span className="font-medium text-success">Excelente</span>
-                  </li>
-                  <li className="flex items-center justify-between">
-                    <span className="flex items-center gap-2 text-muted-foreground">
-                      <Server className="h-4 w-4" /> Servidores
-                    </span>
-                    <span className="font-medium text-success">Online</span>
-                  </li>
+                  <li className="flex items-center justify-between"><span className="flex items-center gap-2 text-muted-foreground"><Video className="h-4 w-4" /> Qualidade da transmissão</span><span className="font-medium">1080p60</span></li>
+                  <li className="flex items-center justify-between"><span className="flex items-center gap-2 text-muted-foreground"><Wifi className="h-4 w-4" /> Conexão</span><span className="font-medium text-success">Excelente</span></li>
+                  <li className="flex items-center justify-between"><span className="flex items-center gap-2 text-muted-foreground"><Server className="h-4 w-4" /> Servidores</span><span className="font-medium text-success">Online</span></li>
                 </ul>
               </section>
             </div>
           </div>
 
           <div className="grid gap-4 xl:grid-cols-[1.7fr_1fr]">
-            <div className="space-y-4">
-              <MusicBot />
-              <StoreSection />
-            </div>
-
-
-            {/* Events */}
+            <div className="space-y-4"><MusicBot /><StoreSection /></div>
             <section className="panel p-5">
-              <div className="flex items-center justify-between">
-                <p className="label-caps">Próximos eventos</p>
-                <button className="flex items-center gap-1 text-sm text-primary-glow">
-                  Ver calendário <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
+              <div className="flex items-center justify-between"><p className="label-caps">Próximos eventos</p><Link to="/rank" className="flex items-center gap-1 text-sm text-primary-glow">Ver ranking <ChevronRight className="h-4 w-4" /></Link></div>
               <ul className="mt-4 space-y-3">
                 {events.map((e) => (
                   <li key={e.title} className="flex items-center gap-3">
-                    <div className="grid h-12 w-12 shrink-0 place-items-center rounded-lg border border-primary/40 bg-primary/15">
-                      <span className="font-display text-lg font-bold leading-none">
-                        {e.day}
-                      </span>
-                      <span className="text-[10px] tracking-wide text-muted-foreground">
-                        {e.month}
-                      </span>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold">{e.title}</p>
-                      <p className="flex items-center gap-1.5 truncate text-xs text-muted-foreground">
-                        <Trophy className="h-3.5 w-3.5 text-warning" /> {e.sub}
-                      </p>
-                    </div>
-                    <button
-                      disabled={e.soon}
-                      className={`rounded-lg px-3 py-2 text-xs font-semibold ${
-                        e.soon
-                          ? "cursor-not-allowed border border-border bg-secondary text-muted-foreground"
-                          : "border border-primary/40 bg-primary/15 text-foreground"
-                      }`}
-                    >
-                      {e.cta}
-                    </button>
+                    <div className="grid h-12 w-12 shrink-0 place-items-center rounded-lg border border-primary/40 bg-primary/15"><span className="font-display text-lg font-bold leading-none">{e.day}</span><span className="text-[10px] tracking-wide text-muted-foreground">{e.month}</span></div>
+                    <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{e.title}</p><p className="flex items-center gap-1.5 truncate text-xs text-muted-foreground"><Trophy className="h-3.5 w-3.5 text-warning" /> {e.sub}</p></div>
+                    <button disabled={e.soon} className={`rounded-lg px-3 py-2 text-xs font-semibold ${e.soon ? "cursor-not-allowed border border-border bg-secondary text-muted-foreground" : "border border-primary/40 bg-primary/15 text-foreground"}`}>{e.cta}</button>
                   </li>
                 ))}
               </ul>
