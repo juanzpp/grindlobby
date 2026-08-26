@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - desktop/final-approved-v2
     paths:
       - 'desktop/**'
       - 'components/desktop/**'
