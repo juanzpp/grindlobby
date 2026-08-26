@@ -7,6 +7,7 @@ import {referenceUiTransformPlugin} from "./reference-ui-transform.mjs";
 import {finalApprovedV2TransformPlugin} from "./final-approved-v2-transform.mjs";
 import {finalProfileStoreTransformPlugin} from "./final-profile-store-transform.mjs";
 import {finalFunctionalWiringPlugin} from "./final-functional-wiring.mjs";
+import {finalSettingsTransformPlugin} from "./final-settings-transform.mjs";
 import {finalCssWiringPlugin} from "./final-css-wiring.mjs";
 import {finalApprovedSymbolsPlugin} from "./final-approved-symbols.mjs";
 
@@ -55,6 +56,7 @@ export default {
     finalApprovedV2TransformPlugin(),
     finalProfileStoreTransformPlugin(),
     finalFunctionalWiringPlugin(),
+    finalSettingsTransformPlugin(),
     finalCssWiringPlugin(),
     finalApprovedSymbolsPlugin()
   ],
