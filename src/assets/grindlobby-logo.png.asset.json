@@ -2,10 +2,10 @@
   "version": 1,
   "asset_id": "grindlobby-official-gl-orbital",
   "project_id": "grindlobby",
-  "url": "/grindlobby-logo.png",
-  "r2_key": "public/grindlobby-logo.png",
-  "original_filename": "grindlobby-logo.png",
-  "size": 4708,
-  "content_type": "image/png",
-  "created_at": "2026-08-25T00:00:00Z"
+  "url": "/grindlobby-logo-clean.svg",
+  "r2_key": "public/grindlobby-logo-clean.svg",
+  "original_filename": "grindlobby-logo-clean.svg",
+  "size": 0,
+  "content_type": "image/svg+xml",
+  "created_at": "2026-08-26T00:00:00Z"
 }
