@@ -1,185 +1,20 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
-
-import { MAX_LEVEL, xpForLevel } from "@/lib/levels";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { supabase } from "@/lib/supabase";
 import { STORE_ITEMS, type StoreItem } from "@/lib/store-items";
 
-export type PlayerProfile = {
-  nickname: string;
-  handle: string;
-  email: string;
-  bio: string;
-  status: "online" | "ausente" | "ocupado" | "invisivel";
-  region: string;
-  game: string;
-  level: number;
-  xp: number;
-  coins: number;
-  owned: string[];
-  /** foto de perfil enviada do dispositivo (data URL) */
-  avatarUrl: string;
-  /** banner personalizado enviado do dispositivo (data URL) */
-  bannerUrl: string;
-  accent: string;
-  equipped: {
-    border: string;
-    title: string;
-    banner: string;
-  };
-  privateProfile: boolean;
-  allowInvites: boolean;
-};
-
-
-const STORAGE_KEY = "grindlobby.player.v1";
-
-const DEFAULT_PLAYER: PlayerProfile = {
-  nickname: "juan",
-  handle: "juanzin",
-  email: "juannsiilvah@gmail.com",
-  bio: "Começando do zero. Meta: level 40.",
-  status: "online",
-  region: "BR-Sul",
-  game: "EA FC 27",
-  level: 0,
-  xp: 0,
-  coins: 1200,
-  owned: ["border-none", "title-none", "banner-none"],
-  avatarUrl: "",
-  bannerUrl: "",
-  accent: "oklch(0.58 0.24 300)",
-
-  equipped: { border: "border-none", title: "title-none", banner: "banner-none" },
-  privateProfile: false,
-  allowInvites: true,
-};
-
-type PlayerContextValue = {
-  player: PlayerProfile;
-  update: (patch: Partial<PlayerProfile>) => void;
-  addXp: (amount: number) => void;
-  buy: (item: StoreItem) => { ok: boolean; reason?: string };
-  equip: (item: StoreItem) => void;
-  reset: () => void;
-};
-
-const PlayerContext = createContext<PlayerContextValue | null>(null);
-
-function slotKey(kind: StoreItem["kind"]): keyof PlayerProfile["equipped"] | null {
-  if (kind === "border") return "border";
-  if (kind === "title") return "title";
-  if (kind === "banner") return "banner";
-  return null;
-}
-
-export function PlayerProvider({ children }: { children: ReactNode }) {
-  const [player, setPlayer] = useState<PlayerProfile>(DEFAULT_PLAYER);
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setPlayer({ ...DEFAULT_PLAYER, ...(JSON.parse(raw) as PlayerProfile) });
-    } catch {
-      /* ignore corrupted storage */
-    }
-  }, []);
-
-  const persist = useCallback((next: PlayerProfile) => {
-    setPlayer(next);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    } catch {
-      /* storage unavailable */
-    }
-  }, []);
-
-  const update = useCallback(
-    (patch: Partial<PlayerProfile>) => {
-      setPlayer((prev) => {
-        const next = { ...prev, ...patch };
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-        } catch {
-          /* storage unavailable */
-        }
-        return next;
-      });
-    },
-    [],
-  );
-
-  const addXp = useCallback((amount: number) => {
-    setPlayer((prev) => {
-      let level = prev.level;
-      let xp = prev.xp + amount;
-      let coins = prev.coins;
-      while (level < MAX_LEVEL && xp >= xpForLevel(level)) {
-        xp -= xpForLevel(level);
-        level += 1;
-        coins += 150;
-      }
-      if (level >= MAX_LEVEL) xp = 0;
-      const next = { ...prev, level, xp, coins };
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      } catch {
-        /* storage unavailable */
-      }
-      return next;
-    });
-  }, []);
-
-  const buy = useCallback(
-    (item: StoreItem) => {
-      if (player.owned.includes(item.id)) return { ok: false, reason: "Já é seu" };
-      if (player.level < item.minLevel)
-        return { ok: false, reason: `Requer level ${item.minLevel}` };
-      if (player.coins < item.price) return { ok: false, reason: "Moedas insuficientes" };
-      const owned = [...player.owned, item.id];
-      const slot = slotKey(item.kind);
-      persist({
-        ...player,
-        coins: player.coins - item.price,
-        owned,
-        equipped: slot ? { ...player.equipped, [slot]: item.id } : player.equipped,
-      });
-      return { ok: true };
-    },
-    [persist, player],
-  );
-
-  const equip = useCallback(
-    (item: StoreItem) => {
-      const slot = slotKey(item.kind);
-      if (!slot || !player.owned.includes(item.id)) return;
-      persist({ ...player, equipped: { ...player.equipped, [slot]: item.id } });
-    },
-    [persist, player],
-  );
-
-  const reset = useCallback(() => persist(DEFAULT_PLAYER), [persist]);
-
-  const value = useMemo(
-    () => ({ player, update, addXp, buy, equip, reset }),
-    [player, update, addXp, buy, equip, reset],
-  );
-
-  return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>;
-}
-
-export function usePlayer() {
-  const ctx = useContext(PlayerContext);
-  if (!ctx) throw new Error("usePlayer deve ser usado dentro de PlayerProvider");
-  return ctx;
-}
-
-export function findItem(id: string): StoreItem | undefined {
-  return STORE_ITEMS.find((i) => i.id === id);
-}
+export type PlayerProfile={nickname:string;handle:string;email:string;bio:string;status:"online"|"ausente"|"ocupado"|"invisivel";region:string;game:string;level:number;xp:number;coins:number;competitivePoints:number;matchesPlayed:number;matchesWon:number;owned:string[];avatarUrl:string;bannerUrl:string;accent:string;equipped:{border:string;title:string;banner:string};privateProfile:boolean;allowInvites:boolean};
+const DEFAULT:PlayerProfile={nickname:"jogador",handle:"jogador",email:"",bio:"",status:"online",region:"BR-Sul",game:"EA FC 27",level:0,xp:0,coins:0,competitivePoints:0,matchesPlayed:0,matchesWon:0,owned:["border-none","title-none","banner-none"],avatarUrl:"",bannerUrl:"",accent:"oklch(0.58 0.24 300)",equipped:{border:"border-none",title:"title-none",banner:"banner-none"},privateProfile:false,allowInvites:true};
+type Ctx={player:PlayerProfile;loading:boolean;refresh:()=>Promise<void>;update:(p:Partial<PlayerProfile>)=>Promise<void>;buy:(i:StoreItem)=>Promise<{ok:boolean;reason?:string}>;equip:(i:StoreItem)=>Promise<void>;reset:()=>void};
+const PlayerContext=createContext<Ctx|null>(null);
+function parseOwned(v:unknown){if(Array.isArray(v))return v.filter(x=>typeof x==="string") as string[];if(v&&typeof v==="object"&&Array.isArray((v as any).items))return (v as any).items;return["border-none","title-none","banner-none"]}
+function parseEquipped(v:unknown){const x=(v&&typeof v==="object"?v:{}) as any;return{border:x.border||"border-none",title:x.title||"title-none",banner:x.banner||"banner-none"}}
+function slot(kind:StoreItem["kind"]){return kind==="border"?"border":kind==="title"?"title":kind==="banner"?"banner":null}
+export function PlayerProvider({children}:{children:ReactNode}){const[player,setPlayer]=useState(DEFAULT);const[loading,setLoading]=useState(true);
+ const refresh=useCallback(async()=>{setLoading(true);const{data:{user}}=await supabase.auth.getUser();if(!user){setPlayer(DEFAULT);setLoading(false);return}const[{data:p},{data:pref}]=await Promise.all([supabase.from("profiles").select("*").eq("id",user.id).maybeSingle(),supabase.from("user_preferences").select("*").eq("user_id",user.id).maybeSingle()]);if(p)setPlayer({...DEFAULT,nickname:p.display_name||p.username||DEFAULT.nickname,handle:p.username||DEFAULT.handle,email:p.email||user.email||"",bio:p.bio||"",status:(p.status||"online") as PlayerProfile["status"],region:p.region||DEFAULT.region,game:p.favorite_game||DEFAULT.game,level:p.account_level||0,xp:Number(p.account_xp||0)%1000,competitivePoints:Number(p.competitive_points||0),matchesPlayed:p.matches_played||0,matchesWon:p.matches_won||0,owned:parseOwned(p.cosmetic_owned),avatarUrl:p.avatar||"",bannerUrl:p.profile_banner||"",equipped:parseEquipped(p.cosmetic_equipped),privateProfile:pref?.show_online===false,allowInvites:pref?.allow_friend_requests!==false});setLoading(false)},[]);
+ useEffect(()=>{void refresh();const ch=supabase.channel("profile-dashboard-sync").on("postgres_changes",{event:"UPDATE",schema:"public",table:"profiles"},()=>void refresh()).subscribe();return()=>{void supabase.removeChannel(ch)}},[refresh]);
+ const update=useCallback(async(patch:Partial<PlayerProfile>)=>{const{data:{user}}=await supabase.auth.getUser();if(!user)return;const profile:any={};if(patch.nickname!==undefined)profile.display_name=patch.nickname;if(patch.handle!==undefined)profile.username=patch.handle;if(patch.bio!==undefined)profile.bio=patch.bio;if(patch.status!==undefined)profile.status=patch.status;if(patch.region!==undefined)profile.region=patch.region;if(patch.game!==undefined)profile.favorite_game=patch.game;if(patch.avatarUrl!==undefined)profile.avatar=patch.avatarUrl;if(patch.bannerUrl!==undefined)profile.profile_banner=patch.bannerUrl;if(patch.owned!==undefined)profile.cosmetic_owned=patch.owned;if(patch.equipped!==undefined)profile.cosmetic_equipped=patch.equipped;if(Object.keys(profile).length)await supabase.from("profiles").update(profile).eq("id",user.id);if(patch.privateProfile!==undefined||patch.allowInvites!==undefined)await supabase.from("user_preferences").upsert({user_id:user.id,show_online:patch.privateProfile===undefined?!player.privateProfile:!patch.privateProfile,allow_friend_requests:patch.allowInvites??player.allowInvites},{onConflict:"user_id"});await refresh()},[player,refresh]);
+ const buy=useCallback(async(item:StoreItem)=>{if(player.owned.includes(item.id))return{ok:false,reason:"Já é seu"};if(player.level<item.minLevel)return{ok:false,reason:`Requer level ${item.minLevel}`};if(item.price>0)return{ok:false,reason:"Compras com moedas ainda não possuem carteira server-side"};await update({owned:[...player.owned,item.id]});return{ok:true}},[player,update]);
+ const equip=useCallback(async(item:StoreItem)=>{const k=slot(item.kind);if(!k||!player.owned.includes(item.id))return;await update({equipped:{...player.equipped,[k]:item.id}})},[player,update]);
+ const reset=()=>{};const value=useMemo(()=>({player,loading,refresh,update,buy,equip,reset}),[player,loading,refresh,update,buy,equip]);return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>}
+export function usePlayer(){const c=useContext(PlayerContext);if(!c)throw new Error("usePlayer deve ser usado dentro de PlayerProvider");return c}
+export function findItem(id:string){return STORE_ITEMS.find(i=>i.id===id)}
