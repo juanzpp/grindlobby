@@ -1,0 +1,62 @@
+name: Desktop PR Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "desktop-shell/**"
+      - "src/**"
+      - "public/**"
+      - "src-tauri/**"
+      - "package.json"
+      - "bun.lock"
+      - "vite.desktop.config.ts"
+      - ".github/workflows/desktop-pr-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install frontend dependencies
+        run: bun install
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Generate GrindLobby native icons
+        run: bunx @tauri-apps/cli@2.11.0 icon public/grindlobby-logo.png
+
+      - name: Build GrindLobby desktop
+        run: bunx @tauri-apps/cli@2.11.0 build --bundles nsis
+
+      - name: Upload compiled desktop UI
+        uses: actions/upload-artifact@v4
+        with:
+          name: GrindLobby-Desktop-UI
+          path: .output/public/**
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: GrindLobby-Windows-Installer
+          path: src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error
+          retention-days: 14
