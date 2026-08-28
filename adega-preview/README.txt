@@ -1,0 +1,1 @@
+Temporary isolated Adega CRM preview source for Render. Not production GrindLobby code.
