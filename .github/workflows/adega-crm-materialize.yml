@@ -1,0 +1,92 @@
+name: Adega CRM - Normalize Source
+
+on:
+  push:
+    branches:
+      - refactor/adega-crm-normalized-v130
+    paths:
+      - 'adega-crm-bootstrap/**'
+      - '.github/workflows/adega-crm-materialize.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: refactor/adega-crm-normalized-v130
+          fetch-depth: 0
+
+      - name: Materialize normalized source
+        run: python adega-crm-bootstrap/materialize.py
+
+      - name: Add privacy tests
+        shell: bash
+        run: |
+          cat >> adega-crm/backend/tests/test_app.py <<'PY'
+
+          def test_customer_pii_is_not_persisted(client):
+              p=client.get('/api/products?storefront=true').json()[0]
+              r=client.post('/api/storefront/orders',json={
+                  'channel':'storefront','payment_method':'pix','items':[{'product_id':p['id'],'qty':1}],
+                  'discount':0,'customer_name':'Nome Privado','customer_phone':'11988887777','external_id':'delivery'
+              })
+              assert r.status_code==200
+              with main.db() as conn:
+                  assert conn.execute('SELECT COUNT(*) c FROM customers').fetchone()['c']==0
+                  order=conn.execute('SELECT customer_id, external_id FROM orders WHERE id=?',(r.json()['id'],)).fetchone()
+                  assert order['customer_id'] is None
+                  assert order['external_id']=='delivery'
+                  dump=' '.join(str(x) for row in conn.execute('SELECT action,entity,entity_id,detail FROM audit_log').fetchall() for x in row if x is not None)
+                  assert 'Nome Privado' not in dump
+                  assert '11988887777' not in dump
+
+          def test_nominal_customer_registration_disabled(client):
+              r=client.post('/api/customers',json={'name':'Pessoa','phone':'11999999999'})
+              assert r.status_code==410
+          PY
+
+      - name: Backend tests
+        env:
+          ADEGA_ADMIN_PASSWORD: 'CI-only-Password@2026'
+          ADEGA_ADMIN_PIN: '998877'
+          ADEGA_ADMIN_EMAIL: 'ci-admin@invalid.local'
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r adega-crm/backend/requirements.txt
+          cd adega-crm/backend
+          python -m py_compile app/main.py app/auth.py
+          pytest -q
+
+      - name: Privacy gate
+        run: |
+          test ! -n "$(find adega-crm -type f \( -name '*.db' -o -name '*.sqlite' -o -name '*.sqlite3' \) -print -quit)"
+          ! grep -RIn --exclude-dir=tests 'INSERT INTO customers' adega-crm/backend
+          ! grep -RIn 'customer_name:customer.name,customer_phone:customer.phone' adega-crm/frontend
+          ! grep -RInE '(CPF|RG|data de nascimento)' adega-crm/backend/app --include='*.py'
+
+      - name: Frontend typecheck and build
+        env:
+          NEXT_PUBLIC_API_URL: 'http://127.0.0.1:8000'
+        run: |
+          cd adega-crm/frontend
+          npm install --no-audit --no-fund
+          npm run typecheck
+          npm run build
+
+      - name: Commit normalized source
+        run: |
+          git config user.name 'adega-crm-ci'
+          git config user.email 'adega-crm-ci@users.noreply.github.com'
+          git add adega-crm
+          if git diff --cached --quiet; then
+            echo 'Normalized source already up to date.'
+            exit 0
+          fi
+          git commit -m 'refactor: materialize normalized Adega CRM source'
+          git push origin HEAD:refactor/adega-crm-normalized-v130
