@@ -5,7 +5,9 @@ import {catalogMatch} from '@/lib/beverageCatalog';
 type Props={name:string; category?:string; className?:string; image?:string};
 export default function ProductArt({name,category='',className='',image}:Props){
   const s=`${name} ${category}`.toLowerCase();
-  const photo=image||catalogMatch(name)?.image;
+  const catalogPhoto=catalogMatch(name)?.image;
+  const suppliedPng=image&&/\.png(?:\?|$)/i.test(image)?image:'';
+  const photo=catalogPhoto?.startsWith('/')?catalogPhoto:suppliedPng;
   if(photo){
     return <div className={`real-product ${className}`}><img src={photo} alt={name} loading="lazy"/></div>;
   }

@@ -12,7 +12,7 @@ import {
 import ProductArt from './ProductArt';
 import { api, money } from '@/lib/api';
 
-type Product={id:number;name:string;category:string;sku?:string;cost:number;price:number;stock:number;min_stock:number;storefront:number};
+type Product={id:number;name:string;category:string;sku?:string;cost:number;price:number;stock:number;min_stock:number;storefront:number;volume_ml?:number;image_url?:string};
 type SettingsData={store_name:string;whatsapp:string;pix_key:string;delivery_fee:number;minimum_order:number;store_open:boolean};
 type CartItem=Product&{qty:number};
 
@@ -58,7 +58,7 @@ export default function Storefront(){
       .add({targets:'.hero-bottle-real',opacity:[0,1],translateY:[52,0],rotate:[-2.3,0],scale:[.86,1],duration:1250},'-=980')
       .add({targets:'.hero-offer-orb',opacity:[0,1],scale:[.65,1],rotate:[-12,0],duration:760},'-=720')
       .add({targets:'.category-ribbon button',opacity:[0,1],translateY:[12,0],delay:anime.stagger(45),duration:460},'-=280');
-    anime({targets:'.hero-bottle-float',translateY:[0,-10],rotate:[-.2,.3],direction:'alternate',loop:true,duration:3400,easing:'easeInOutSine'});
+    anime({targets:'.hero-bottle-float',translateY:[0,-9],rotateY:[-7,7],rotateZ:[-.45,.45],direction:'alternate',loop:true,duration:3900,easing:'easeInOutSine'});
     anime({targets:'.hero-aura',scale:[.90,1.14],opacity:[.24,.64],direction:'alternate',loop:true,duration:2800,easing:'easeInOutSine'});
     anime({targets:'.hero-ring',rotate:360,duration:19000,loop:true,easing:'linear'});
     anime({targets:'.hero-sweep',translateX:['-160%','190%'],opacity:[0,.52,0],duration:3600,delay:900,loop:true,easing:'easeInOutQuad'});
@@ -176,7 +176,7 @@ export default function Storefront(){
           <div className="hero-buy-row"><button onClick={e=>red&&add(red,1,e.currentTarget)}><ShoppingCart/>ADICIONAR AO CARRINHO</button><div><strong>{money(red?.price||0)}</strong><del>{money(oldPrice)}</del><em>-15%</em></div></div>
           <div className="hero-trust"><span><ShieldCheck/>100% Original</span><span><Truck/>Entrega Rápida</span><span><Package/>{red?.stock||0} em estoque</span></div>
         </div>
-        <div className="hero-parallax-product"><div className="hero-product-next hero-bottle-float"><div className="hero-bottle-shadow"/><img className="hero-bottle-real" src="https://toppng.com/public/uploads/preview/johnnie-walker-red-label-johnnie-walker-red-label-1-l-bottle-1156317189086tlxxleuj.png" alt="Johnnie Walker Red Label"/></div></div>
+        <div className="hero-parallax-product"><div className="hero-product-next hero-bottle-float"><div className="hero-bottle-shadow"/><img className="hero-bottle-real" src="/assets/products/red-label.png" alt="Johnnie Walker Red Label"/></div></div>
         <div className="hero-offer-orb"><small>OFERTA</small><strong>ESPECIAL</strong><span>15% OFF</span></div>
         <div className="hero-script"><span>Tradição</span><span>Qualidade</span><span>Sabor</span></div>
         <div className="hero-live-badge"><CheckCircle2/><span><b>Loja aberta</b><small>entrega média 35 min</small></span></div>
@@ -192,7 +192,7 @@ export default function Storefront(){
         <div className="store-product-grid">{filtered.slice(0,12).map((p,i)=><article onPointerMove={tilt} onPointerLeave={untilt} className={`store-product-card premium-product-card ${isRed(p)?'featured':''}`} key={p.id}>
           <div className="card-spotlight"/><span className="discount-chip">-{10+(i%4)*3}%</span>{i===0&&<span className="best-chip"><Star/>MAIS VENDIDO</span>}
           <button className={`fav ${favorites.has(p.id)?'active':''}`} onClick={()=>toggleFav(p.id)}><Heart fill={favorites.has(p.id)?'currentColor':'none'}/></button>
-          <button className="product-visual" onClick={()=>setSelected(p)}><div className="product-floor-glow"/><ProductArt name={p.name} category={p.category}/></button>
+          <button className="product-visual" onClick={()=>setSelected(p)}><div className="product-floor-glow"/><ProductArt name={p.name} category={p.category} image={p.image_url}/></button>
           <div className="product-info"><small>{p.category}</small><h3>{p.name}</h3><div className="stars"><Star fill="currentColor"/><Star fill="currentColor"/><Star fill="currentColor"/><Star fill="currentColor"/><Star fill="currentColor"/><span>4,9</span></div><del>{money(p.price*1.12)}</del><strong>{money(p.price)}</strong><button onClick={e=>add(p,1,e.currentTarget)}><ShoppingCart/>Adicionar</button></div>
         </article>)}</div>{!filtered.length&&<div className="store-empty">Nenhum produto encontrado.</div>}
       </section>
@@ -203,7 +203,7 @@ export default function Storefront(){
     <div className={`cart-overlay ${cartOpen?'open':''}`} onClick={()=>setCartOpen(false)}/>
     <aside className={`store-cart-drawer ${cartOpen?'open':''}`}>
       <div className="drawer-head"><div><ShoppingCart/><span><small>SEU PEDIDO</small><h2>Meu Carrinho</h2></span></div><button onClick={()=>setCartOpen(false)}><X/></button></div>
-      <div className="drawer-items">{cart.length?cart.map(i=><div className="drawer-item" key={i.id}><div className="drawer-art"><ProductArt name={i.name} category={i.category}/></div><div><b>{i.name}</b><small>{money(i.price)} cada</small><div className="drawer-qty"><button onClick={()=>change(i.id,-1)}><Minus/></button><span>{i.qty}</span><button onClick={()=>change(i.id,1)}><Plus/></button></div></div><strong>{money(i.price*i.qty)}</strong><button className="drawer-delete" onClick={()=>setCart(c=>c.filter(x=>x.id!==i.id))}><Trash2/></button></div>):<div className="drawer-empty"><ShoppingCart/><h3>Seu carrinho está vazio</h3><p>Adicione seus rótulos favoritos.</p></div>}</div>
+      <div className="drawer-items">{cart.length?cart.map(i=><div className="drawer-item" key={i.id}><div className="drawer-art"><ProductArt name={i.name} category={i.category} image={i.image_url}/></div><div><b>{i.name}</b><small>{money(i.price)} cada</small><div className="drawer-qty"><button onClick={()=>change(i.id,-1)}><Minus/></button><span>{i.qty}</span><button onClick={()=>change(i.id,1)}><Plus/></button></div></div><strong>{money(i.price*i.qty)}</strong><button className="drawer-delete" onClick={()=>setCart(c=>c.filter(x=>x.id!==i.id))}><Trash2/></button></div>):<div className="drawer-empty"><ShoppingCart/><h3>Seu carrinho está vazio</h3><p>Adicione seus rótulos favoritos.</p></div>}</div>
       <div className="fulfillment"><button className={fulfillment==='delivery'?'active':''} onClick={()=>setFulfillment('delivery')}><Truck/><span>Entrega<small>30–45 min</small></span></button><button className={fulfillment==='pickup'?'active':''} onClick={()=>setFulfillment('pickup')}><Store/><span>Retirada<small>10–15 min</small></span></button></div>
       <div className="drawer-form"><label>Nome<input value={customer.name} onChange={e=>setCustomer({...customer,name:e.target.value})} placeholder="Seu nome"/></label><label>WhatsApp<input value={customer.phone} onChange={e=>setCustomer({...customer,phone:e.target.value})} placeholder="(11) 99999-9999"/></label>{fulfillment==='delivery'&&<label>Endereço<input value={customer.address} onChange={e=>setCustomer({...customer,address:e.target.value})} placeholder="Rua, número e bairro"/></label>}<label>Cupom<div className="coupon-input"><input value={coupon} onChange={e=>setCoupon(e.target.value)} placeholder="Digite seu cupom"/><button onClick={applyCoupon}>Aplicar</button></div></label></div>
       <div className="drawer-summary"><div><span>Subtotal</span><b>{money(subtotal)}</b></div><div><span>Taxa de entrega</span><b>{money(fee)}</b></div><div className="discount"><span>Desconto</span><b>− {money(discount)}</b></div><div className="grand"><span>Total</span><strong>{money(total)}</strong></div></div>

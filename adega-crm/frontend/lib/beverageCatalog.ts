@@ -1,17 +1,17 @@
-export type BeverageCatalogItem={name:string;category:string;volumeMl:number;sku:string;image:string};
+export type BeverageCatalogItem={name:string;category:string;volumeMl:number;sku:string;image:string;barcode?:string};
 
 const photo=(id:string)=>`https://images.unsplash.com/${id}?auto=format&fit=crop&w=420&h=620&q=88`;
 
 export const beverageCatalog:BeverageCatalogItem[]=[
-  {name:"Johnnie Walker Red Label",category:"Whisky",volumeMl:1000,sku:"JWRED1L",image:"https://toppng.com/public/uploads/preview/johnnie-walker-red-label-johnnie-walker-red-label-1-l-bottle-1156317189086tlxxleuj.png"},
+  {name:"Johnnie Walker Red Label",category:"Whisky",volumeMl:1000,sku:"JWRED1L",barcode:"5000267014203",image:"/assets/products/red-label.png"},
   {name:"Jack Daniel's Old No. 7",category:"Whisky",volumeMl:1000,sku:"JD1L",image:photo("photo-1527281400683-1aae777175f8")},
   {name:"Chivas Regal 12 anos",category:"Whisky",volumeMl:1000,sku:"CHIVAS1L",image:photo("photo-1569529465841-dfecdab7503b")},
   {name:"Absolut Original",category:"Vodka",volumeMl:750,sku:"ABS750",image:photo("photo-1608885898957-a5598a5ae1d1")},
-  {name:"Smirnoff Nº 21",category:"Vodka",volumeMl:998,sku:"SMI998",image:photo("photo-1615887023516-9b47d38427e9")},
+  {name:"Smirnoff Nº 21",category:"Vodka",volumeMl:998,sku:"SMI998",barcode:"7893218000470",image:"/assets/products/smirnoff.png"},
   {name:"Tanqueray London Dry",category:"Gin",volumeMl:750,sku:"TANQ750",image:photo("photo-1606767341197-b56c0c7373c9")},
   {name:"Bombay Sapphire",category:"Gin",volumeMl:750,sku:"BOMB750",image:photo("photo-1584916201218-f4242ceb4809")},
   {name:"Campari",category:"Destilados",volumeMl:750,sku:"CAMP750",image:photo("photo-1551538827-9c037cb4f32a")},
-  {name:"Heineken Long Neck",category:"Cervejas",volumeMl:330,sku:"HEI330",image:photo("photo-1515003197210-e0cd71810b5f")},
+  {name:"Heineken Long Neck",category:"Cervejas",volumeMl:330,sku:"HEI330",barcode:"7896045503412",image:"/assets/products/heineken.png"},
   {name:"Budweiser Long Neck",category:"Cervejas",volumeMl:330,sku:"BUD330",image:photo("photo-1608270586620-248524c67de9")},
   {name:"Corona Extra",category:"Cervejas",volumeMl:330,sku:"COR330",image:photo("photo-1505075106905-fb052892c116")},
   {name:"Skol Pilsen",category:"Cervejas",volumeMl:350,sku:"SK350",image:photo("photo-1535958636474-b021ee887b13")},
