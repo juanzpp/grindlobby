@@ -3,7 +3,9 @@
   "version": "1.2.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/materialize-login-assets.mjs",
     "dev": "next dev -H 0.0.0.0 -p 3000",
+    "prebuild": "node scripts/materialize-login-assets.mjs",
     "build": "next build",
     "start": "next start -H 0.0.0.0 -p 3000",
     "typecheck": "tsc --noEmit"
