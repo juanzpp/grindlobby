@@ -30,6 +30,11 @@ jobs:
         run: |
           mkdir -p adega-crm/backend/tests
           cat > adega-crm/backend/tests/test_privacy_zero_retention.py <<'PY'
+          from pathlib import Path
+          import sys
+
+          sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
           from fastapi.testclient import TestClient
           from app import main
 
