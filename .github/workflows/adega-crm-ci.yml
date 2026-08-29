@@ -11,6 +11,10 @@ on:
     paths:
       - 'adega-crm/**'
       - '.github/workflows/adega-crm-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   backend:
@@ -25,18 +29,23 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r adega-crm/backend/requirements.txt
-      - run: cd adega-crm/backend && python -m py_compile app/main.py app/auth.py && pytest -q
+      - name: Compile and test backend
+        run: |
+          cd adega-crm/backend
+          python -m py_compile app/main.py app/auth.py
+          pytest -q
 
   privacy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Zero-retention checks
+      - name: Zero-retention and secret checks
         run: |
-          test ! -n "$(find adega-crm -type f \( -name '*.db' -o -name '*.sqlite' -o -name '*.sqlite3' \) -print -quit)"
+          test ! -n "$(find adega-crm -type f \( -name '*.db' -o -name '*.sqlite' -o -name '*.sqlite3' -o -name '.env' \) -print -quit)"
           ! grep -RIn --exclude-dir=tests 'INSERT INTO customers' adega-crm/backend
           ! grep -RIn 'customer_name:customer.name,customer_phone:customer.phone' adega-crm/frontend
           ! grep -RInE '(customer\.address.*JSON|customer_phone.*conn\.execute|customer_name.*conn\.execute)' adega-crm
+          ! grep -RInE '(Adega@2026|260826)' adega-crm/backend/app --include='*.py'
 
   frontend:
     runs-on: ubuntu-latest
