@@ -1,10 +1,13 @@
 'use client';
 
-type Props={name:string; category?:string; className?:string};
-export default function ProductArt({name,category='',className=''}:Props){
+import {catalogMatch} from '@/lib/beverageCatalog';
+
+type Props={name:string; category?:string; className?:string; image?:string};
+export default function ProductArt({name,category='',className='',image}:Props){
   const s=`${name} ${category}`.toLowerCase();
-  if(/johnnie\s+walker.*red\s+label|red\s+label/.test(s)){
-    return <div className={`real-product ${className}`}><img src="https://toppng.com/public/uploads/preview/johnnie-walker-red-label-johnnie-walker-red-label-1-l-bottle-1156317189086tlxxleuj.png" alt={name}/></div>;
+  const photo=image||catalogMatch(name)?.image;
+  if(photo){
+    return <div className={`real-product ${className}`}><img src={photo} alt={name} loading="lazy"/></div>;
   }
   let kind='beer';
   if(/whisky|jack|chivas/.test(s)) kind='whisky';

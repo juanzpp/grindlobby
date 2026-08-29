@@ -48,8 +48,12 @@ export default function LoginApp() {
   const [newPassword, setNewPassword] = useState('');
   const [passkeyInfo, setPasskeyInfo] = useState('');
   const [supportWhatsapp, setSupportWhatsapp] = useState('');
+  const [transitioning, setTransitioning] = useState(false);
+  const [loadProgress, setLoadProgress] = useState(0);
 
   const selectedOrg = useMemo(() => orgs.find(o => o.slug === org), [orgs, org]);
+  const previewingLoader = process.env.NODE_ENV === 'development' && search.get('preview-loader') === '1';
+  const showPostLoginLoader = transitioning || previewingLoader;
 
   useEffect(() => {
     Promise.allSettled([
@@ -80,6 +84,32 @@ export default function LoginApp() {
     }
   }, [router, search]);
 
+  useEffect(() => {
+    if (!showPostLoginLoader) return;
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const progress = { value: 0 };
+    const duration = reduced ? 700 : 3200;
+    const progressAnimation = anime({
+      targets: progress,
+      value: 100,
+      round: 1,
+      duration,
+      easing: reduced ? 'linear' : 'easeInOutQuart',
+      update: () => setLoadProgress(progress.value),
+    });
+    const sceneAnimation = reduced ? null : anime.timeline({ loop: false })
+      .add({ targets: '.post-login-content', opacity: [0, 1], translateY: [18, 0], duration: 650, easing: 'easeOutExpo' })
+      .add({ targets: '.post-login-bottle', rotate: [-4, 1.5], translateY: [-4, 3], duration: 1250, direction: 'alternate', loop: 2, easing: 'easeInOutSine' }, 150)
+      .add({ targets: '.post-login-bottle-liquid', translateX: [-12, 14], translateY: [3, -4], skewX: [-7, 8], duration: 760, direction: 'alternate', loop: 4, easing: 'easeInOutSine' }, 180)
+      .add({ targets: '.post-login-loader', opacity: [1, 0], duration: 420, easing: 'easeInQuad' }, duration - 220);
+    const destinationTimer = transitioning ? window.setTimeout(() => router.replace('/gestor'), duration + 80) : null;
+    return () => {
+      progressAnimation.pause();
+      sceneAnimation?.pause();
+      if (destinationTimer) window.clearTimeout(destinationTimer);
+    };
+  }, [showPostLoginLoader, transitioning, router]);
+
   function clearFeedback() { setError(''); setMessage(''); }
 
   async function doLogin(e: FormEvent) {
@@ -89,7 +119,7 @@ export default function LoginApp() {
       if (remember) localStorage.setItem('adega_login_email', email); else localStorage.removeItem('adega_login_email');
       localStorage.setItem('adega_org', org);
       setMessage('Acesso autorizado. Abrindo o gestor…');
-      anime({ targets: '.login-live-card', opacity: [1, 0], scale: [1, .985], duration: 420, easing: 'easeInQuad', complete: () => router.replace('/gestor') });
+      setTransitioning(true);
     } catch (err: any) { setError(err.message || 'Não foi possível entrar'); }
     finally { setLoading(false); }
   }
@@ -123,7 +153,7 @@ export default function LoginApp() {
     e.preventDefault(); clearFeedback(); setLoading(true);
     try {
       await api('/api/auth/pin', { method: 'POST', body: JSON.stringify({ email, pin, remember, organization_slug: org }) });
-      setPin(''); setModal(null); router.replace('/gestor');
+      setPin(''); setModal(null); setTransitioning(true);
     } catch (err: any) { setError(err.message); }
     finally { setLoading(false); }
   }
@@ -156,7 +186,7 @@ export default function LoginApp() {
       if (remember) localStorage.setItem('adega_login_email', email); else localStorage.removeItem('adega_login_email');
       localStorage.setItem('adega_org', org);
       setPasskeyInfo('Identidade confirmada. Abrindo o gestor…');
-      anime({ targets: '.login-live-card', opacity: [1, 0], scale: [1, .985], duration: 360, easing: 'easeInQuad', complete: () => router.replace('/gestor') });
+      setTransitioning(true);
     } catch (err: any) {
       const msg = err?.name === 'NotAllowedError' ? 'A autenticação foi cancelada ou expirou.' : (err?.message || 'Não foi possível autenticar com a passkey.');
       setPasskeyInfo(msg);
@@ -170,6 +200,11 @@ export default function LoginApp() {
   return (
     <div ref={rootRef} className="login-screen">
       <div className="login-blueprint-bg" />
+      <div className="login-ambient-light" aria-hidden="true">
+        <span className="left-lamp" />
+        <span className="wall-sign" />
+        <span className="counter-glow" />
+      </div>
       <div className="login-vignette" />
       <i className="login-energy-line one" /><i className="login-energy-line two" />
 
@@ -178,9 +213,9 @@ export default function LoginApp() {
         <div className="login-brand login-animate"><BottleMark /><strong>ADEGA</strong><b>CRM</b><span>SUA ADEGA, SEMPRE POR PERTO.</span></div>
 
         <label className="login-field-label login-animate">E-mail</label>
-        <div className="login-field login-animate"><Mail size={17}/><input autoComplete="username" inputMode="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="seu@email.com" aria-label="E-mail" /></div>
+        <div className="login-field login-animate"><Mail size={17}/><input type="email" autoComplete="username" inputMode="email" value={email} onInput={e=>setEmail(e.currentTarget.value)} placeholder="seu@email.com" aria-label="E-mail" /></div>
         <label className="login-field-label login-animate">Senha</label>
-        <div className="login-field login-animate"><LockKeyhole size={18}/><input autoComplete="current-password" type={showPassword?'text':'password'} value={password} onChange={e=>setPassword(e.target.value)} placeholder="••••••••" aria-label="Senha"/><button type="button" className="eye-button" onClick={()=>setShowPassword(v=>!v)} aria-label={showPassword?'Ocultar senha':'Mostrar senha'}>{showPassword?<EyeOff size={18}/>:<Eye size={18}/>}</button></div>
+        <div className="login-field login-animate"><LockKeyhole size={18}/><input autoComplete="current-password" type={showPassword?'text':'password'} value={password} onInput={e=>setPassword(e.currentTarget.value)} placeholder="••••••••" aria-label="Senha"/><button type="button" className="eye-button" onClick={()=>setShowPassword(v=>!v)} aria-label={showPassword?'Ocultar senha':'Mostrar senha'}>{showPassword?<EyeOff size={18}/>:<Eye size={18}/>}</button></div>
 
         <div className="login-options login-animate"><label><input type="checkbox" checked={remember} onChange={e=>setRemember(e.target.checked)}/><span><Check size={12}/></span>Lembrar meu acesso</label><button type="button" onClick={()=>{clearFeedback();setModal('forgot')}}>Esqueceu sua senha?</button></div>
 
@@ -200,6 +235,20 @@ export default function LoginApp() {
 
       <div className="login-system-live"><i className={online===false?'bad':''}/><div><strong>{online===false?'Sistema indisponível':'Sistema online'}</strong><span>{online===false?'API não respondeu':'Todos os serviços operando'}</span></div><Signal className={online===false?'bad':''}/></div>
       <div className="login-footer-live"><span>versão {version}</span><i/><button onClick={()=>{if(supportWhatsapp) window.open(`https://wa.me/${supportWhatsapp}`,'_blank','noopener,noreferrer'); else setMessage('Configure o WhatsApp de suporte em Configurações.')}}>Suporte</button></div>
+
+      {showPostLoginLoader&&<section className="post-login-loader" role="status" aria-live="polite" aria-label={`Preparando seu ambiente, ${loadProgress}%`}>
+        <div className="post-login-scene" />
+        <div className="post-login-veil" />
+        <div className="post-login-content">
+          <div className="post-login-pour" aria-hidden="true">
+            <img className="post-login-bottle" src="/assets/whisky-loader-v1.png" alt="" />
+            <i className="post-login-bottle-liquid" />
+            <i className="post-login-drops"><b/><b/><b/></i>
+          </div>
+          <div className="post-login-track" aria-hidden="true"><i className={loadProgress > .5 ? 'is-flowing' : ''} style={{width:`${loadProgress}%`}}><b/><span/></i></div>
+          <div className="post-login-copy"><span>Sincronizando seu ambiente de gestão…</span></div>
+        </div>
+      </section>}
 
       {modal&&<div className="login-modal-layer" role="dialog" aria-modal="true"><div className="login-modal-backdrop" onClick={()=>setModal(null)}/><section className="login-modal">
         <button className="modal-x" onClick={()=>setModal(null)}><X/></button>

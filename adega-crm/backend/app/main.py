@@ -59,6 +59,8 @@ def init_db() -> None:
               min_stock INTEGER NOT NULL DEFAULT 5,
               active INTEGER NOT NULL DEFAULT 1,
               storefront INTEGER NOT NULL DEFAULT 1,
+              volume_ml INTEGER,
+              image_url TEXT,
               created_at TEXT NOT NULL
             );
 
@@ -145,6 +147,12 @@ def init_db() -> None:
             );
             """
         )
+
+        product_columns = {row["name"] for row in conn.execute("PRAGMA table_info(products)").fetchall()}
+        if "volume_ml" not in product_columns:
+            conn.execute("ALTER TABLE products ADD COLUMN volume_ml INTEGER")
+        if "image_url" not in product_columns:
+            conn.execute("ALTER TABLE products ADD COLUMN image_url TEXT")
 
         count = conn.execute("SELECT COUNT(*) c FROM products").fetchone()["c"]
         if count == 0:
@@ -297,6 +305,8 @@ class ProductIn(BaseModel):
     stock: int = Field(default=0, ge=0)
     min_stock: int = Field(default=5, ge=0)
     storefront: bool = True
+    volume_ml: int | None = Field(default=None, gt=0, le=10000)
+    image_url: str | None = Field(default=None, max_length=1000)
 
 
 class StockAdjust(BaseModel):
@@ -444,8 +454,8 @@ async def create_product(payload: ProductIn):
     with db() as conn:
         try:
             cur = conn.execute(
-                "INSERT INTO products(name,category,sku,barcode,cost,price,stock,min_stock,storefront,created_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
-                (payload.name, payload.category, payload.sku or None, payload.barcode or None, payload.cost, payload.price, payload.stock, payload.min_stock, int(payload.storefront), now_iso()),
+                "INSERT INTO products(name,category,sku,barcode,cost,price,stock,min_stock,storefront,volume_ml,image_url,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                (payload.name, payload.category, payload.sku or None, payload.barcode or None, payload.cost, payload.price, payload.stock, payload.min_stock, int(payload.storefront), payload.volume_ml, payload.image_url, now_iso()),
             )
         except sqlite3.IntegrityError as exc:
             raise HTTPException(409, "SKU já cadastrado") from exc
