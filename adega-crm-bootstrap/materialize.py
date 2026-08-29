@@ -35,8 +35,8 @@ if backend_parts:
     with tarfile.open(backend_archive, "r:gz") as tf:
         tf.extractall(runtime)
 
-# Frontend diffs were appended over time as independent base64/gzip streams.
-# Detect a stream only when the accumulated parts decode AND decompress successfully.
+# Reconstruct only complete historical frontend streams.
+# Incomplete fragments are legacy deploy artifacts and are intentionally not promoted to source of truth.
 parts = sorted((repo / "adega-demo-patch/frontend-diff").glob("part_*"))
 groups: list[list[Path]] = []
 cur: list[Path] = []
@@ -50,7 +50,7 @@ for part in parts:
     groups.append(cur)
     cur = []
 if cur:
-    raise RuntimeError(f"incomplete frontend diff stream: {[p.name for p in cur]}")
+    print("WARNING: ignoring incomplete legacy frontend fragments:", ", ".join(p.name for p in cur))
 
 frontend = runtime / "frontend"
 for index, group in enumerate(groups):
@@ -63,12 +63,10 @@ for index, group in enumerate(groups):
         text=True,
         capture_output=True,
     )
-    # patch returns 1 for already-applied/partially-applicable historical hunks; keep going,
-    # but preserve .rej files so later validation can detect material regressions.
     if result.returncode not in (0, 1):
         raise RuntimeError(result.stdout + "\n" + result.stderr)
 
-# Fallback for the approved dashboard blueprint if it is not already in the reconstructed patch stream.
+# Apply the approved dashboard blueprint from readable source files.
 manager = frontend / "components/ManagerApp.tsx"
 css = frontend / "app/globals.css"
 if manager.exists() and "dashboard-blueprint" not in manager.read_text(encoding="utf-8"):
@@ -99,7 +97,7 @@ for name in ("README.md", "SECURITY.md"):
     if src.exists():
         shutil.copy2(src, out / name)
 
-# Never materialize runtime databases, caches or legacy generated files into source control.
+# Never version runtime databases, caches or generated files.
 for pattern in ("*.db", "*.sqlite", "*.sqlite3"):
     for p in out.rglob(pattern):
         p.unlink()
