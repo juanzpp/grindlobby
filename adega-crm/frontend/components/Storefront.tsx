@@ -1,0 +1,218 @@
+'use client';
+
+import { useEffect, useMemo, useRef, useState } from 'react';
+import anime from 'animejs';
+import {
+  Search, ShoppingCart, Heart, UserRound, Home, Grid2X2, Tag, Flame, Package,
+  Wine, Beer, Zap, ChevronRight, ChevronLeft, MapPin, Truck, ShieldCheck,
+  X, Plus, Minus, Trash2, Menu, BadgePercent, Star,
+  Headphones, LockKeyhole, Bike, Store, ArrowRight, SlidersHorizontal,
+  Sparkles, CheckCircle2, Clock3, Gift, ChevronDown
+} from 'lucide-react';
+import ProductArt from './ProductArt';
+import { api, money } from '@/lib/api';
+
+type Product={id:number;name:string;category:string;sku?:string;cost:number;price:number;stock:number;min_stock:number;storefront:number};
+type SettingsData={store_name:string;whatsapp:string;pix_key:string;delivery_fee:number;minimum_order:number;store_open:boolean};
+type CartItem=Product&{qty:number};
+
+const isRed=(p?:Product)=>/johnnie\s+walker.*red\s+label|red\s+label/i.test(p?.name||'');
+const catIcon=(c:string)=>{const s=c.toLowerCase();if(s.includes('cervej'))return Beer;if(s.includes('energ'))return Zap;return Wine};
+
+function prefersReduced(){return typeof window!=='undefined'&&window.matchMedia('(prefers-reduced-motion: reduce)').matches}
+
+export default function Storefront(){
+  const [products,setProducts]=useState<Product[]>([]);
+  const [settings,setSettings]=useState<SettingsData|null>(null);
+  const [query,setQuery]=useState('');
+  const [category,setCategory]=useState('');
+  const [sort,setSort]=useState('featured');
+  const [cart,setCart]=useState<CartItem[]>([]);
+  const [cartOpen,setCartOpen]=useState(false);
+  const [menuOpen,setMenuOpen]=useState(false);
+  const [selected,setSelected]=useState<Product|null>(null);
+  const [favorites,setFavorites]=useState<Set<number>>(new Set());
+  const [fulfillment,setFulfillment]=useState<'delivery'|'pickup'>('delivery');
+  const [coupon,setCoupon]=useState('');
+  const [discount,setDiscount]=useState(0);
+  const [customer,setCustomer]=useState({name:'',phone:'',address:''});
+  const [toast,setToast]=useState('');
+  const appRef=useRef<HTMLDivElement|null>(null);
+  const heroRef=useRef<HTMLElement|null>(null);
+  const showToast=(t:string)=>{setToast(t);setTimeout(()=>setToast(''),2500)};
+
+  useEffect(()=>{
+    Promise.all([api<Product[]>('/api/products?storefront=true'),api<SettingsData>('/api/settings')])
+      .then(([p,s])=>{setProducts(p);setSettings(s)}).catch(e=>showToast(e.message));
+    const f=localStorage.getItem('adega-next-favorites');
+    if(f) try{setFavorites(new Set(JSON.parse(f)))}catch{}
+  },[]);
+  useEffect(()=>{localStorage.setItem('adega-next-favorites',JSON.stringify([...favorites]))},[favorites]);
+
+  useEffect(()=>{
+    if(prefersReduced())return;
+    const tl=anime.timeline({easing:'easeOutExpo'});
+    tl.add({targets:'.hero-kicker,.hero-brand',opacity:[0,1],translateY:[12,0],duration:600,delay:anime.stagger(85)})
+      .add({targets:'.hero-title span,.hero-title strong',opacity:[0,1],translateY:[42,0],scale:[.94,1],duration:900,delay:anime.stagger(90)},'-=360')
+      .add({targets:'.hero-desc,.hero-buy-row,.hero-trust',opacity:[0,1],translateY:[18,0],duration:650,delay:anime.stagger(90)},'-=560')
+      .add({targets:'.hero-bottle-real',opacity:[0,1],translateY:[52,0],rotate:[-2.3,0],scale:[.86,1],duration:1250},'-=980')
+      .add({targets:'.hero-offer-orb',opacity:[0,1],scale:[.65,1],rotate:[-12,0],duration:760},'-=720')
+      .add({targets:'.category-ribbon button',opacity:[0,1],translateY:[12,0],delay:anime.stagger(45),duration:460},'-=280');
+    anime({targets:'.hero-bottle-float',translateY:[0,-10],rotate:[-.2,.3],direction:'alternate',loop:true,duration:3400,easing:'easeInOutSine'});
+    anime({targets:'.hero-aura',scale:[.90,1.14],opacity:[.24,.64],direction:'alternate',loop:true,duration:2800,easing:'easeInOutSine'});
+    anime({targets:'.hero-ring',rotate:360,duration:19000,loop:true,easing:'linear'});
+    anime({targets:'.hero-sweep',translateX:['-160%','190%'],opacity:[0,.52,0],duration:3600,delay:900,loop:true,easing:'easeInOutQuad'});
+    anime({targets:'.spark-dot',translateY:()=>anime.random(-50,-135),translateX:()=>anime.random(-36,38),opacity:[0,.95,0],scale:[.3,1.4],delay:anime.stagger(92),duration:()=>anime.random(2300,4500),loop:true,easing:'easeOutQuad'});
+    anime({targets:'.hero-liquid-orb',scale:[.92,1.08],rotate:[-4,4],direction:'alternate',loop:true,duration:4500,easing:'easeInOutSine'});
+  },[products.length]);
+
+  useEffect(()=>{
+    if(!cartOpen||prefersReduced())return;
+    anime.remove('.store-cart-drawer');
+    anime({targets:'.store-cart-drawer',translateX:[42,0],opacity:[.75,1],duration:460,easing:'easeOutExpo'});
+    anime({targets:'.drawer-item',opacity:[0,1],translateX:[18,0],delay:anime.stagger(55),duration:380,easing:'easeOutCubic'});
+  },[cartOpen]);
+
+  useEffect(()=>{
+    if(!selected||prefersReduced())return;
+    anime({targets:'.product-modal-box',opacity:[0,1],scale:[.94,1],translateY:[16,0],duration:500,easing:'easeOutExpo'});
+    anime({targets:'.modal-product-visual .real-product,.modal-product-visual .bottle-art',opacity:[0,1],translateY:[24,0],rotate:[-2,0],duration:700,delay:80,easing:'easeOutExpo'});
+  },[selected]);
+
+  const red=products.find(isRed)||products[0];
+  const categories=useMemo(()=>[...new Set(products.map(p=>p.category))],[products]);
+  const filtered=useMemo(()=>{
+    let l=products.filter(p=>(!query||`${p.name} ${p.category}`.toLowerCase().includes(query.toLowerCase()))&&(!category||p.category===category));
+    if(sort==='priceAsc')l=[...l].sort((a,b)=>a.price-b.price);
+    if(sort==='priceDesc')l=[...l].sort((a,b)=>b.price-a.price);
+    if(sort==='name')l=[...l].sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
+    return l;
+  },[products,query,category,sort]);
+
+  const animateFly=(source?:HTMLElement|null)=>{
+    if(prefersReduced()||!source)return;
+    const target=document.querySelector('.header-cart') as HTMLElement|null;
+    if(!target)return;
+    const a=source.getBoundingClientRect(),b=target.getBoundingClientRect();
+    const orb=document.createElement('div');
+    orb.className='cart-fly-orb';
+    orb.innerHTML='<span>+</span>';
+    Object.assign(orb.style,{left:`${a.left+a.width/2-14}px`,top:`${a.top+a.height/2-14}px`});
+    document.body.appendChild(orb);
+    anime({targets:orb,translateX:(b.left+b.width/2)-(a.left+a.width/2),translateY:(b.top+b.height/2)-(a.top+a.height/2),scale:[1,.45],rotate:[0,260],opacity:[1,.9,0],duration:720,easing:'easeInOutCubic',complete:()=>orb.remove()});
+    anime({targets:'.header-cart',scale:[1,1.055,1],boxShadow:['0 0 0 rgba(239,188,75,0)','0 0 34px rgba(239,188,75,.42)','0 0 0 rgba(239,188,75,0)'],duration:680,easing:'easeOutQuad'});
+  };
+
+  const add=(p:Product,qty=1,source?:HTMLElement|null)=>{
+    if(p.stock<=0)return showToast('Produto sem estoque');
+    setCart(c=>{const x=c.find(i=>i.id===p.id);if(x)return c.map(i=>i.id===p.id?{...i,qty:Math.min(p.stock,i.qty+qty)}:i);return [...c,{...p,qty:Math.min(p.stock,qty)}]});
+    showToast(`${p.name} adicionado`);
+    animateFly(source);
+    if(!prefersReduced())anime({targets:'.cart-badge',scale:[1,1.55,1],duration:480,easing:'easeOutBack'});
+  };
+
+  const change=(id:number,d:number)=>setCart(c=>c.map(i=>i.id===id?{...i,qty:Math.max(0,Math.min(i.stock,i.qty+d))}:i).filter(i=>i.qty>0));
+  const count=cart.reduce((a,b)=>a+b.qty,0),subtotal=cart.reduce((a,b)=>a+b.qty*b.price,0),fee=fulfillment==='delivery'?Number(settings?.delivery_fee||0):0,total=Math.max(0,subtotal+fee-discount);
+  const applyCoupon=()=>{if(coupon.trim().toUpperCase()==='ADEGA10'){const d=subtotal*.1;setDiscount(d);showToast('Cupom ADEGA10 aplicado')}else{setDiscount(0);showToast('Cupom inválido')}};
+  const checkout=async()=>{
+    if(!cart.length)return;
+    if(!customer.name.trim())return showToast('Informe seu nome');
+    if(total<Number(settings?.minimum_order||0))return showToast(`Pedido mínimo: ${money(settings?.minimum_order||0)}`);
+    try{
+      const r=await api<any>('/api/storefront/orders',{method:'POST',body:JSON.stringify({channel:'storefront',payment_method:'pix',items:cart.map(i=>({product_id:i.id,qty:i.qty})),discount,external_id:fulfillment})});
+      if(fulfillment==='delivery'&&settings?.whatsapp){const msg=`Pedido #${r.id}%0ACliente: ${encodeURIComponent(customer.name)}%0ATelefone: ${encodeURIComponent(customer.phone)}%0AEntrega: ${encodeURIComponent(customer.address)}`;window.open(`https://wa.me/${String(settings.whatsapp).replace(/\D/g,'')}?text=${msg}`,'_blank','noopener,noreferrer')}
+      setCustomer({name:'',phone:'',address:''});setCart([]);setDiscount(0);setCartOpen(false);setProducts(await api<Product[]>('/api/products?storefront=true'));showToast(`Pedido #${r.id} confirmado — dados pessoais não foram armazenados`);
+    }catch(e:any){showToast(e.message)}
+  };
+  const toggleFav=(id:number)=>setFavorites(f=>{const n=new Set(f);n.has(id)?n.delete(id):n.add(id);return n});
+  const oldPrice=red?red.price*1.18:0;
+
+  const onAppPointer=(e:React.PointerEvent<HTMLDivElement>)=>{
+    const el=appRef.current;if(!el)return;
+    const r=el.getBoundingClientRect();el.style.setProperty('--pointer-x',`${e.clientX-r.left}px`);el.style.setProperty('--pointer-y',`${e.clientY-r.top}px`);
+  };
+  const onHeroPointer=(e:React.PointerEvent<HTMLElement>)=>{
+    if(prefersReduced()||window.innerWidth<900)return;
+    const r=e.currentTarget.getBoundingClientRect();const nx=(e.clientX-r.left)/r.width-.5,ny=(e.clientY-r.top)/r.height-.5;
+    e.currentTarget.style.setProperty('--hero-x',`${nx*16}px`);e.currentTarget.style.setProperty('--hero-y',`${ny*10}px`);e.currentTarget.style.setProperty('--hero-rx',`${ny*-2.2}deg`);e.currentTarget.style.setProperty('--hero-ry',`${nx*3}deg`);
+  };
+  const resetHero=(e:React.PointerEvent<HTMLElement>)=>{e.currentTarget.style.setProperty('--hero-x','0px');e.currentTarget.style.setProperty('--hero-y','0px');e.currentTarget.style.setProperty('--hero-rx','0deg');e.currentTarget.style.setProperty('--hero-ry','0deg')};
+  const tilt=(e:React.PointerEvent<HTMLElement>)=>{if(prefersReduced()||window.innerWidth<900)return;const r=e.currentTarget.getBoundingClientRect(),x=(e.clientX-r.left)/r.width,y=(e.clientY-r.top)/r.height;e.currentTarget.style.setProperty('--card-x',`${x*100}%`);e.currentTarget.style.setProperty('--card-y',`${y*100}%`);e.currentTarget.style.setProperty('--card-rx',`${(y-.5)*-5}deg`);e.currentTarget.style.setProperty('--card-ry',`${(x-.5)*7}deg`)};
+  const untilt=(e:React.PointerEvent<HTMLElement>)=>{e.currentTarget.style.setProperty('--card-rx','0deg');e.currentTarget.style.setProperty('--card-ry','0deg')};
+
+  return <div ref={appRef} onPointerMove={onAppPointer} className="storefront-app storefront-cinematic">
+    <div className="store-noise"/><div className="store-pointer-glow"/>
+    <aside className={`store-left-rail ${menuOpen?'open':''}`}>
+      <button className="rail-close" onClick={()=>setMenuOpen(false)}><X/></button>
+      <div className="lux-logo"><div className="logo-crown">♛</div><strong>ADEGA</strong><span>DRINKS & BEBIDAS</span></div>
+      <div className="delivery-box"><MapPin/><div><small>Entregar em:</small><b>R. das Palmeiras, 123</b><span>Centro · São Paulo, SP</span></div><ChevronRight/></div>
+      <nav className="rail-nav"><button className="active"><Home/>Início</button><button onClick={()=>document.getElementById('categories')?.scrollIntoView({behavior:'smooth'})}><Grid2X2/>Categorias</button><button onClick={()=>document.getElementById('products')?.scrollIntoView({behavior:'smooth'})}><Tag/>Ofertas<i/></button><button onClick={()=>document.getElementById('products')?.scrollIntoView({behavior:'smooth'})}><Flame/>Mais vendidos</button><button><Package/>Combos</button>{categories.slice(0,6).map(c=>{const I=catIcon(c);return <button key={c} onClick={()=>{setCategory(c);document.getElementById('products')?.scrollIntoView({behavior:'smooth'})}}><I/>{c}</button>})}</nav>
+      <div className="coupon-card"><BadgePercent/><b>Desconto na 1ª compra</b><span>Use o cupom:</span><strong>ADEGA10</strong></div>
+      <div className="express-card"><Bike/><div><b>Entrega Rápida</b><span>em até 45 min</span></div></div>
+      <div className="rail-foot"><span>Adega Drinks © 2026</span><small>Todos os direitos reservados.</small></div>
+    </aside>
+    <div className={`rail-backdrop ${menuOpen?'show':''}`} onClick={()=>setMenuOpen(false)}/>
+
+    <main className="store-stage">
+      <header className="store-header">
+        <button className="store-menu" onClick={()=>setMenuOpen(true)}><Menu/></button>
+        <div className="store-mobile-brand"><b>ADEGA</b><span>CRM</span></div>
+        <div className="store-search"><Search/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Busque por produtos, marcas..."/><kbd>⌘ K</kbd></div>
+        <nav className="header-nav"><a className="active">Início</a><a onClick={()=>document.getElementById('categories')?.scrollIntoView({behavior:'smooth'})}>Categorias</a><a onClick={()=>document.getElementById('products')?.scrollIntoView({behavior:'smooth'})}>Ofertas</a><a>Favoritos</a><a>Pedidos</a></nav>
+        <button className="header-icon"><Heart/></button><button className="header-icon user"><UserRound/></button>
+        <button className="header-cart" onClick={()=>setCartOpen(true)}><ShoppingCart/><div><b>Meu Carrinho</b><span>{count} {count===1?'item':'itens'}</span></div><em className="cart-badge">{count}</em></button>
+      </header>
+
+      <section ref={heroRef} onPointerMove={onHeroPointer} onPointerLeave={resetHero} className="store-hero-next premium-hero">
+        <div className="hero-bg">
+          <div className="hero-liquid-orb orb-one"/><div className="hero-liquid-orb orb-two"/><div className="hero-red-flow"/><div className="hero-aura"/><div className="hero-ring"/><div className="hero-sweep"/>
+          {Array.from({length:24}).map((_,i)=><i key={i} className="spark-dot" style={{left:`${48+(i*17)%50}%`,top:`${8+(i*23)%82}%`}}/> )}
+        </div>
+        <div className="hero-copy-next">
+          <span className="hero-kicker"><Sparkles/> O CLÁSSICO QUE NUNCA SAI DE MODA</span>
+          <small className="hero-brand">JOHNNIE WALKER</small>
+          <h1 className="hero-title"><strong>RED LABEL</strong><span>Keep Walking</span></h1>
+          <p className="hero-desc">Sabor marcante, equilíbrio perfeito e tradição em cada gole. Um ícone para celebrar seus melhores momentos.</p>
+          <div className="hero-buy-row"><button onClick={e=>red&&add(red,1,e.currentTarget)}><ShoppingCart/>ADICIONAR AO CARRINHO</button><div><strong>{money(red?.price||0)}</strong><del>{money(oldPrice)}</del><em>-15%</em></div></div>
+          <div className="hero-trust"><span><ShieldCheck/>100% Original</span><span><Truck/>Entrega Rápida</span><span><Package/>{red?.stock||0} em estoque</span></div>
+        </div>
+        <div className="hero-parallax-product"><div className="hero-product-next hero-bottle-float"><div className="hero-bottle-shadow"/><img className="hero-bottle-real" src="https://toppng.com/public/uploads/preview/johnnie-walker-red-label-johnnie-walker-red-label-1-l-bottle-1156317189086tlxxleuj.png" alt="Johnnie Walker Red Label"/></div></div>
+        <div className="hero-offer-orb"><small>OFERTA</small><strong>ESPECIAL</strong><span>15% OFF</span></div>
+        <div className="hero-script"><span>Tradição</span><span>Qualidade</span><span>Sabor</span></div>
+        <div className="hero-live-badge"><CheckCircle2/><span><b>Loja aberta</b><small>entrega média 35 min</small></span></div>
+        <button className="hero-arrow left"><ChevronLeft/></button><button className="hero-arrow right"><ChevronRight/></button><div className="hero-pagination"><button className="active"/><button/><button/><button/><span>01 / 04</span></div>
+      </section>
+
+      <section id="categories" className="category-ribbon">{categories.slice(0,7).map((c,i)=>{const I=catIcon(c);return <button key={c} className={category===c?'active':''} onClick={()=>{setCategory(category===c?'':c);document.getElementById('products')?.scrollIntoView({behavior:'smooth'})}}><div className={`category-mini-art cat-${i}`}><I/></div><span><b>{c}</b><small>Ver ofertas</small></span><ChevronRight className="category-arrow"/></button>})}</section>
+
+      <section className="store-promo-band"><div><Gift/><span><small>HOJE NA ADEGA</small><b>Combos selecionados com até 20% OFF</b></span></div><div><Clock3/><span><small>ENTREGA EXPRESSA</small><b>Receba em até 45 minutos</b></span></div><button onClick={()=>document.getElementById('products')?.scrollIntoView({behavior:'smooth'})}>Ver promoções <ArrowRight/></button></section>
+
+      <section id="products" className="store-products-next">
+        <div className="products-title"><div><span><Flame/>Mais Vendidos</span><p>Os favoritos da adega com ofertas para você.</p></div><div className="product-controls"><div className="quick-tabs"><button className={!category?'active':''} onClick={()=>setCategory('')}>Todos</button>{categories.slice(0,4).map(c=><button key={c} className={category===c?'active':''} onClick={()=>setCategory(c)}>{c}</button>)}</div><button className="filter-mobile"><SlidersHorizontal/></button><label className="sort-select"><select value={sort} onChange={e=>setSort(e.target.value)}><option value="featured">Destaques</option><option value="priceAsc">Menor preço</option><option value="priceDesc">Maior preço</option><option value="name">Nome A-Z</option></select><ChevronDown/></label></div></div>
+        <div className="store-product-grid">{filtered.slice(0,12).map((p,i)=><article onPointerMove={tilt} onPointerLeave={untilt} className={`store-product-card premium-product-card ${isRed(p)?'featured':''}`} key={p.id}>
+          <div className="card-spotlight"/><span className="discount-chip">-{10+(i%4)*3}%</span>{i===0&&<span className="best-chip"><Star/>MAIS VENDIDO</span>}
+          <button className={`fav ${favorites.has(p.id)?'active':''}`} onClick={()=>toggleFav(p.id)}><Heart fill={favorites.has(p.id)?'currentColor':'none'}/></button>
+          <button className="product-visual" onClick={()=>setSelected(p)}><div className="product-floor-glow"/><ProductArt name={p.name} category={p.category}/></button>
+          <div className="product-info"><small>{p.category}</small><h3>{p.name}</h3><div className="stars"><Star fill="currentColor"/><Star fill="currentColor"/><Star fill="currentColor"/><Star fill="currentColor"/><Star fill="currentColor"/><span>4,9</span></div><del>{money(p.price*1.12)}</del><strong>{money(p.price)}</strong><button onClick={e=>add(p,1,e.currentTarget)}><ShoppingCart/>Adicionar</button></div>
+        </article>)}</div>{!filtered.length&&<div className="store-empty">Nenhum produto encontrado.</div>}
+      </section>
+
+      <section className="store-value-strip"><div><ShieldCheck/><span><b>Produtos originais</b><small>Qualidade garantida</small></span></div><div><BadgePercent/><span><b>Preços exclusivos</b><small>Ofertas toda semana</small></span></div><div><Truck/><span><b>Entrega rápida</b><small>Em até 45 minutos</small></span></div><div><LockKeyhole/><span><b>Pagamento seguro</b><small>Ambiente protegido</small></span></div><div><Headphones/><span><b>Atendimento premium</b><small>Fale com a gente</small></span></div></section>
+    </main>
+
+    <div className={`cart-overlay ${cartOpen?'open':''}`} onClick={()=>setCartOpen(false)}/>
+    <aside className={`store-cart-drawer ${cartOpen?'open':''}`}>
+      <div className="drawer-head"><div><ShoppingCart/><span><small>SEU PEDIDO</small><h2>Meu Carrinho</h2></span></div><button onClick={()=>setCartOpen(false)}><X/></button></div>
+      <div className="drawer-items">{cart.length?cart.map(i=><div className="drawer-item" key={i.id}><div className="drawer-art"><ProductArt name={i.name} category={i.category}/></div><div><b>{i.name}</b><small>{money(i.price)} cada</small><div className="drawer-qty"><button onClick={()=>change(i.id,-1)}><Minus/></button><span>{i.qty}</span><button onClick={()=>change(i.id,1)}><Plus/></button></div></div><strong>{money(i.price*i.qty)}</strong><button className="drawer-delete" onClick={()=>setCart(c=>c.filter(x=>x.id!==i.id))}><Trash2/></button></div>):<div className="drawer-empty"><ShoppingCart/><h3>Seu carrinho está vazio</h3><p>Adicione seus rótulos favoritos.</p></div>}</div>
+      <div className="fulfillment"><button className={fulfillment==='delivery'?'active':''} onClick={()=>setFulfillment('delivery')}><Truck/><span>Entrega<small>30–45 min</small></span></button><button className={fulfillment==='pickup'?'active':''} onClick={()=>setFulfillment('pickup')}><Store/><span>Retirada<small>10–15 min</small></span></button></div>
+      <div className="drawer-form"><label>Nome<input value={customer.name} onChange={e=>setCustomer({...customer,name:e.target.value})} placeholder="Seu nome"/></label><label>WhatsApp<input value={customer.phone} onChange={e=>setCustomer({...customer,phone:e.target.value})} placeholder="(11) 99999-9999"/></label>{fulfillment==='delivery'&&<label>Endereço<input value={customer.address} onChange={e=>setCustomer({...customer,address:e.target.value})} placeholder="Rua, número e bairro"/></label>}<label>Cupom<div className="coupon-input"><input value={coupon} onChange={e=>setCoupon(e.target.value)} placeholder="Digite seu cupom"/><button onClick={applyCoupon}>Aplicar</button></div></label></div>
+      <div className="drawer-summary"><div><span>Subtotal</span><b>{money(subtotal)}</b></div><div><span>Taxa de entrega</span><b>{money(fee)}</b></div><div className="discount"><span>Desconto</span><b>− {money(discount)}</b></div><div className="grand"><span>Total</span><strong>{money(total)}</strong></div></div>
+      <button className="checkout-next" disabled={!cart.length} onClick={checkout}>FINALIZAR COMPRA <ArrowRight/></button><div className="secure-check"><ShieldCheck/><span><b>Compra segura</b><small>Pedido integrado ao Adega CRM</small></span></div>
+    </aside>
+
+    {selected&&<div className="product-modal-next"><div className="product-modal-overlay" onClick={()=>setSelected(null)}/><div className="product-modal-box"><button className="modal-x" onClick={()=>setSelected(null)}><X/></button><div className="modal-product-visual"><div className="modal-aura"/><ProductArt name={selected.name} category={selected.category}/></div><div className="modal-product-info"><small>{selected.category} · SKU {selected.sku||'—'}</small><h2>{selected.name}</h2><div className="modal-rating"><Star fill="currentColor"/><Star fill="currentColor"/><Star fill="currentColor"/><Star fill="currentColor"/><Star fill="currentColor"/><span>4,9 · produto disponível</span></div><del>{money(selected.price*1.12)}</del><strong>{money(selected.price)}</strong><p>Estoque sincronizado em tempo real com o gestor. Escolha entrega ou retirada e finalize seu pedido com segurança.</p><div className="modal-features"><span><Package/><b>{selected.stock} un.</b><small>Em estoque</small></span><span><Truck/><b>30–45 min</b><small>Entrega média</small></span><span><ShieldCheck/><b>Original</b><small>Procedência</small></span></div><button onClick={e=>{add(selected,1,e.currentTarget);setSelected(null)}}><ShoppingCart/>ADICIONAR AO CARRINHO</button></div></div></div>}
+
+    <nav className="mobile-store-bottom"><button className="active"><Home/><span>Início</span></button><button onClick={()=>document.getElementById('products')?.scrollIntoView({behavior:'smooth'})}><Tag/><span>Ofertas</span></button><button className="mobile-cart-main" onClick={()=>setCartOpen(true)}><ShoppingCart/><em>{count}</em></button><button><Package/><span>Pedidos</span></button><button onClick={()=>setMenuOpen(true)}><Menu/><span>Mais</span></button></nav>
+    <div className={`toast-next ${toast?'show':''}`}>{toast}</div>
+  </div>
+}
