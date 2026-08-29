@@ -1,0 +1,91 @@
+/* Desktop/PC login locked to the approved 1536x864 blueprint.
+   Mobile/tablet rules remain in globals.css and are intentionally untouched. */
+@media (min-width:1101px){
+  .login-screen{overflow:hidden;background:#050403;min-width:1101px}
+
+  /* Keep the reference registered to the viewport instead of using cover.
+     This prevents the central card from scaling/cropping independently on wide monitors. */
+  .login-blueprint-bg{
+    background-image:url('/assets/login-blueprint.jpg')!important;
+    background-size:100% 100%!important;
+    background-position:50% 50%!important;
+    background-repeat:no-repeat!important;
+    filter:brightness(.985) saturate(1.02) contrast(1.015)!important;
+    transform:none!important
+  }
+  .login-vignette{
+    background:radial-gradient(circle at 50% 47%,transparent 0 28%,rgba(0,0,0,.025) 48%,rgba(0,0,0,.20) 100%),linear-gradient(180deg,rgba(0,0,0,.01),rgba(0,0,0,.07))!important
+  }
+
+  /* Exact registration of the functional card over the card contained in the blueprint. */
+  .login-live-card{
+    left:50vw!important;
+    top:53.25vh!important;
+    transform:translate(-50%,-50%)!important;
+    width:29.70vw!important;
+    height:88.55vh!important;
+    min-height:0!important;
+    max-height:none!important;
+    padding:clamp(18px,2.9vh,28px) 3.05vw clamp(18px,2.55vh,25px)!important;
+    border-radius:1.05vw!important;
+    border:1px solid rgba(228,169,68,.73)!important;
+    background:linear-gradient(150deg,rgba(19,17,14,.945),rgba(8,8,8,.968) 54%,rgba(13,12,10,.955))!important;
+    box-shadow:0 0 0 1px rgba(255,218,141,.055) inset,0 26px 76px rgba(0,0,0,.50),0 0 32px rgba(181,104,16,.07)!important;
+    backdrop-filter:blur(8px) saturate(.98)!important;
+    -webkit-backdrop-filter:blur(8px) saturate(.98)!important
+  }
+  .login-live-card:before{background:linear-gradient(112deg,rgba(255,220,150,.05),transparent 25%,transparent 73%,rgba(221,148,44,.03))!important}
+
+  .login-corner-light{background:#ffd06b!important;box-shadow:0 0 7px #ffd06b,0 0 17px rgba(255,188,68,.94),0 0 36px rgba(255,163,29,.40)!important}
+  .login-corner-light.top{left:54.8%!important;top:-2px!important;width:8px!important;height:3px!important}
+  .login-corner-light.left{left:-2px!important;top:28.4%!important;width:3px!important;height:9px!important}
+  .login-corner-light.right{right:-2px!important;top:29.1%!important;width:3px!important;height:9px!important}
+
+  .login-brand{height:21.8vh!important;padding-top:0!important}
+  .login-bottle-mark{width:3.55vw!important;height:4.35vw!important;max-width:61px;max-height:75px;min-width:48px;min-height:59px;stroke:#f0b647!important;stroke-width:2.35!important;filter:drop-shadow(0 0 5px rgba(238,170,54,.5)) drop-shadow(0 0 13px rgba(221,126,21,.17))!important}
+  .login-bottle-mark .orbit{stroke-width:1.45!important;opacity:.88!important}
+  .login-brand strong{margin-top:1px!important;font-size:2.48vw!important;line-height:1!important;letter-spacing:.035em!important;font-weight:500!important}
+  .login-brand b{margin-top:2px!important;font-size:1.69vw!important;line-height:1.02!important;color:#dfa13a!important;font-weight:600!important}
+  .login-brand span{margin-top:1.1vh!important;width:78%!important;padding-top:1.05vh!important;border-top-color:rgba(211,167,88,.26)!important;font-size:.70vw!important;letter-spacing:.085em!important;color:#e9ded0!important}
+
+  .login-field-label{font-size:.73vw!important;margin-bottom:.72vh!important}
+  .login-field-label:nth-of-type(2){margin-top:1.42vh!important}
+  .login-field{height:5.05vh!important;min-height:40px!important;border-radius:5px!important;padding:0 .92vw!important;gap:.78vw!important;border-color:rgba(255,255,255,.18)!important;background:linear-gradient(180deg,rgba(27,27,27,.86),rgba(16,16,16,.94))!important}
+  .login-field input{font-size:.80vw!important}
+  .login-options{margin-top:1.35vh!important;font-size:.67vw!important}
+  .login-options button{font-size:.67vw!important;color:#dda23c!important}
+
+  .login-enter{height:5.85vh!important;min-height:44px!important;margin-top:1.35vh!important;border-radius:6px!important;border-color:rgba(255,220,143,.88)!important;background:linear-gradient(98deg,#d78d25 0%,#f1b84b 47%,#dfa039 71%,#d88e26 100%)!important;color:#171008!important;font-size:.91vw!important;letter-spacing:.17em!important;box-shadow:0 0 0 1px rgba(255,241,205,.14) inset,0 0 20px rgba(231,153,35,.30),0 9px 24px rgba(0,0,0,.31)!important}
+  .login-enter svg{right:1.05vw!important;width:1.18vw!important}
+  .login-divider{height:4.45vh!important;font-size:.64vw!important}
+  .login-alt-grid{gap:.80vw!important}
+  .login-alt-grid button{height:9.75vh!important;min-height:72px!important;border-radius:6px!important;font-size:.64vw!important;line-height:1.28!important;gap:.75vh!important}
+  .login-alt-grid button svg{width:1.72vw!important;height:1.72vw!important}
+  .login-company{height:5.15vh!important;min-height:41px!important;margin-top:1.45vh!important;border-radius:5px!important;font-size:.72vw!important}
+  .login-secure{padding-top:1.45vh!important;row-gap:.5vh!important}
+  .login-secure strong{font-size:.72vw!important}.login-secure span{font-size:.60vw!important}
+
+  .login-system-live{right:3.25vw!important;bottom:3.25vh!important;width:17.8vw!important;min-width:245px!important;max-width:315px!important;height:7.45vh!important;min-height:64px!important;max-height:80px!important;border-radius:7px!important;padding:0 1.05vw!important;grid-template-columns:11px 1fr 28px!important;background:rgba(17,17,17,.89)!important}
+  .login-system-live strong{font-size:.74vw!important}.login-system-live span{font-size:.57vw!important}.login-system-live svg{width:1.55vw!important;height:1.55vw!important}
+  .login-footer-live{left:2.55vw!important;bottom:5.15vh!important;gap:1.25vw!important;font-size:.60vw!important}.login-footer-live button{font-size:.60vw!important;color:#dfa13a!important}
+
+  .login-energy-line{left:-1vw!important;top:47.1%!important;width:35vw!important;opacity:.48;background:linear-gradient(90deg,transparent 1%,rgba(176,91,13,.30) 20%,#ffb642 58%,rgba(236,143,26,.40) 76%,transparent 100%)!important;box-shadow:0 0 10px rgba(255,166,48,.30),0 0 22px rgba(205,106,14,.10)!important}
+  .login-energy-line.one{transform:rotate(13deg)!important}.login-energy-line.two{top:53.4%!important;transform:rotate(-12deg)!important;opacity:.30!important}
+
+  .login-feedback{left:3.05vw!important;right:3.05vw!important}
+}
+
+/* Compact 1366x768-class displays while keeping the same desktop composition. */
+@media (min-width:1101px) and (max-height:780px){
+  .login-live-card{top:53.25vh!important;height:88.55vh!important;padding-top:13px!important;padding-bottom:13px!important}
+  .login-brand{height:155px!important}
+  .login-bottle-mark{width:48px!important;height:58px!important}
+  .login-brand strong{font-size:35px!important}.login-brand b{font-size:23px!important}.login-brand span{margin-top:7px!important;padding-top:7px!important;font-size:9px!important}
+  .login-field-label{font-size:10px!important}.login-field{height:40px!important}.login-field input{font-size:11px!important}.login-field-label:nth-of-type(2){margin-top:9px!important}
+  .login-options{margin-top:8px!important;font-size:9px!important}.login-options button{font-size:9px!important}
+  .login-enter{height:43px!important;margin-top:8px!important;font-size:12px!important}
+  .login-divider{height:30px!important;font-size:9px!important}
+  .login-alt-grid button{height:70px!important;font-size:9px!important}.login-alt-grid button svg{width:24px!important;height:24px!important}
+  .login-company{height:39px!important;margin-top:9px!important;font-size:10px!important}
+  .login-secure{padding-top:7px!important}.login-secure strong{font-size:10px!important}.login-secure span{font-size:8px!important}
+}
