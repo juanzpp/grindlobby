@@ -1,3 +1,4 @@
 @media (min-width:1101px){
-  .login-blueprint-bg{background-image:url('/assets/login-blueprint.webp?v=login-03-blueprint-20260829-3')!important}
+  /* Blueprint 03 desktop is rendered as live CSS layers in login-desktop.css. */
+  .login-blueprint-bg{background-image:none!important}
 }
