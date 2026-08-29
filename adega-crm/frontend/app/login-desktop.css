@@ -3,18 +3,31 @@
 @media (min-width:1101px){
   .login-screen{overflow:hidden;background:#050403;min-width:1101px}
 
-  /* Desktop uses the exact approved reference asset. Mobile keeps the prior asset. */
+  /* Desktop uses the full-resolution approved reference. */
   .login-blueprint-bg{
-    background-image:url('/assets/login-blueprint.webp')!important;
-    background-size:100% 100%!important;
+    background-image:url('/assets/login-blueprint.jpg')!important;
+    background-size:cover!important;
     background-position:50% 50%!important;
     background-repeat:no-repeat!important;
     image-rendering:auto!important;
-    filter:brightness(.995) saturate(1.02) contrast(1.01)!important;
+    filter:brightness(1.01) saturate(1.05) contrast(1.025)!important;
     transform:none!important
   }
+  .login-blueprint-bg:after{
+    content:"";
+    position:absolute;
+    left:50%;
+    top:50%;
+    transform:translate(-50%,-50%);
+    width:min(38vw,610px);
+    height:96vh;
+    max-height:870px;
+    border-radius:20px;
+    background:radial-gradient(ellipse at center,rgba(5,4,3,.28),rgba(5,4,3,.10) 72%,transparent 100%);
+    pointer-events:none
+  }
   .login-vignette{
-    background:radial-gradient(circle at 50% 47%,transparent 0 28%,rgba(0,0,0,.02) 48%,rgba(0,0,0,.12) 100%),linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,.04))!important
+    background:radial-gradient(circle at 50% 47%,transparent 0 28%,rgba(0,0,0,.015) 48%,rgba(0,0,0,.10) 100%),linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,.035))!important
   }
 
   .login-live-card{
@@ -28,7 +41,7 @@
     padding:clamp(18px,2.9vh,28px) clamp(34px,3.05vw,49px) clamp(18px,2.55vh,25px)!important;
     border-radius:clamp(16px,1.1vw,19px)!important;
     border:1px solid rgba(228,169,68,.76)!important;
-    background:linear-gradient(150deg,rgba(19,17,14,.948),rgba(8,8,8,.972) 54%,rgba(13,12,10,.96))!important;
+    background:linear-gradient(150deg,rgba(19,17,14,.955),rgba(8,8,8,.978) 54%,rgba(13,12,10,.968))!important;
     box-shadow:0 0 0 1px rgba(255,218,141,.055) inset,0 26px 76px rgba(0,0,0,.50),0 0 32px rgba(181,104,16,.07)!important;
     backdrop-filter:blur(8px) saturate(.98)!important;
     -webkit-backdrop-filter:blur(8px) saturate(.98)!important
