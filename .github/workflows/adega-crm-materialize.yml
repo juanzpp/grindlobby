@@ -25,30 +25,60 @@ jobs:
       - name: Materialize normalized source
         run: python adega-crm-bootstrap/materialize.py
 
-      - name: Add privacy tests
+      - name: Add standalone privacy tests
         shell: bash
         run: |
-          cat >> adega-crm/backend/tests/test_app.py <<'PY'
+          mkdir -p adega-crm/backend/tests
+          cat > adega-crm/backend/tests/test_privacy_zero_retention.py <<'PY'
+          from fastapi.testclient import TestClient
+          from app import main
 
-          def test_customer_pii_is_not_persisted(client):
-              p=client.get('/api/products?storefront=true').json()[0]
-              r=client.post('/api/storefront/orders',json={
-                  'channel':'storefront','payment_method':'pix','items':[{'product_id':p['id'],'qty':1}],
-                  'discount':0,'customer_name':'Nome Privado','customer_phone':'11988887777','external_id':'delivery'
+          client = TestClient(main.app)
+
+          def test_customer_pii_is_not_persisted():
+              products = client.get('/api/products?storefront=true').json()
+              assert products
+              p = products[0]
+              r = client.post('/api/storefront/orders', json={
+                  'channel': 'storefront',
+                  'payment_method': 'pix',
+                  'items': [{'product_id': p['id'], 'qty': 1}],
+                  'discount': 0,
+                  'customer_name': 'Nome Privado',
+                  'customer_phone': '11988887777',
+                  'external_id': 'delivery',
               })
-              assert r.status_code==200
+              assert r.status_code == 200, r.text
               with main.db() as conn:
-                  assert conn.execute('SELECT COUNT(*) c FROM customers').fetchone()['c']==0
-                  order=conn.execute('SELECT customer_id, external_id FROM orders WHERE id=?',(r.json()['id'],)).fetchone()
+                  assert conn.execute('SELECT COUNT(*) c FROM customers').fetchone()['c'] == 0
+                  order = conn.execute(
+                      'SELECT customer_id, external_id FROM orders WHERE id=?',
+                      (r.json()['id'],),
+                  ).fetchone()
                   assert order['customer_id'] is None
-                  assert order['external_id']=='delivery'
-                  dump=' '.join(str(x) for row in conn.execute('SELECT action,entity,entity_id,detail FROM audit_log').fetchall() for x in row if x is not None)
+                  assert order['external_id'] == 'delivery'
+                  dump = ' '.join(
+                      str(x)
+                      for row in conn.execute(
+                          'SELECT action,entity,entity_id,detail FROM audit_log'
+                      ).fetchall()
+                      for x in row if x is not None
+                  )
                   assert 'Nome Privado' not in dump
                   assert '11988887777' not in dump
 
-          def test_nominal_customer_registration_disabled(client):
-              r=client.post('/api/customers',json={'name':'Pessoa','phone':'11999999999'})
-              assert r.status_code==410
+          def test_nominal_customer_registration_is_disabled():
+              login = client.post('/api/auth/login', json={
+                  'email': 'ci-admin@invalid.local',
+                  'password': 'CI-only-Password@2026',
+                  'remember': False,
+                  'organization_slug': 'principal',
+              })
+              assert login.status_code == 200, login.text
+              r = client.post('/api/customers', json={
+                  'name': 'Pessoa', 'phone': '11999999999'
+              })
+              assert r.status_code == 410, r.text
           PY
 
       - name: Backend tests
@@ -62,6 +92,7 @@ jobs:
           cd adega-crm/backend
           python -m py_compile app/main.py app/auth.py
           pytest -q
+          rm -f adega.db *.db *.sqlite *.sqlite3
 
       - name: Privacy gate
         run: |
@@ -69,6 +100,7 @@ jobs:
           ! grep -RIn --exclude-dir=tests 'INSERT INTO customers' adega-crm/backend
           ! grep -RIn 'customer_name:customer.name,customer_phone:customer.phone' adega-crm/frontend
           ! grep -RInE '(CPF|RG|data de nascimento)' adega-crm/backend/app --include='*.py'
+          ! grep -RInE '(Adega@2026|260826)' adega-crm/backend/app --include='*.py'
 
       - name: Frontend typecheck and build
         env:
