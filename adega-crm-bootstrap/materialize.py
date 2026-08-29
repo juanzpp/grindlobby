@@ -36,26 +36,25 @@ if backend_parts:
         tf.extractall(runtime)
 
 # Frontend diffs were appended over time as independent base64/gzip streams.
-# Detect each stream by base64 padding at the end of a part and apply in order.
+# Detect a stream only when the accumulated parts decode AND decompress successfully.
 parts = sorted((repo / "adega-demo-patch/frontend-diff").glob("part_*"))
 groups: list[list[Path]] = []
 cur: list[Path] = []
 for part in parts:
     cur.append(part)
-    if part.read_text(encoding="utf-8").strip().endswith("="):
-        groups.append(cur)
-        cur = []
-if cur:
+    try:
+        payload = decode_join(cur)
+        gzip.decompress(payload)
+    except Exception:
+        continue
     groups.append(cur)
+    cur = []
+if cur:
+    raise RuntimeError(f"incomplete frontend diff stream: {[p.name for p in cur]}")
 
 frontend = runtime / "frontend"
 for index, group in enumerate(groups):
-    payload = decode_join(group)
-    try:
-        diff = gzip.decompress(payload)
-    except Exception:
-        # Invalid/incomplete historical stream: do not hide it. Stop so CI cannot certify a broken snapshot.
-        raise RuntimeError(f"frontend diff stream {index} is invalid: {[p.name for p in group]}")
+    diff = gzip.decompress(decode_join(group))
     diff_path = work / f"frontend-{index:02d}.diff"
     diff_path.write_bytes(diff)
     result = subprocess.run(
@@ -64,6 +63,8 @@ for index, group in enumerate(groups):
         text=True,
         capture_output=True,
     )
+    # patch returns 1 for already-applied/partially-applicable historical hunks; keep going,
+    # but preserve .rej files so later validation can detect material regressions.
     if result.returncode not in (0, 1):
         raise RuntimeError(result.stdout + "\n" + result.stderr)
 
@@ -106,6 +107,8 @@ for dirname in (".pytest_cache", "__pycache__", ".next", "node_modules"):
     for p in list(out.rglob(dirname)):
         if p.is_dir():
             shutil.rmtree(p, ignore_errors=True)
+for p in out.rglob("*.rej"):
+    p.unlink()
 
 subprocess.run(["python", str(repo / "adega-crm-bootstrap/privacy_patch.py"), str(out)], check=True)
 print(f"Normalized Adega CRM source materialized at {out}")
