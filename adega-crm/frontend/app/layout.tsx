@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import './login-desktop.css';
+import './login-scene.css';
 
 export const metadata: Metadata = {
   title: 'Adega CRM',
