@@ -1,0 +1,57 @@
+name: Adega CRM - CI
+
+on:
+  push:
+    branches:
+      - refactor/adega-crm-normalized-v130
+    paths:
+      - 'adega-crm/**'
+      - '.github/workflows/adega-crm-ci.yml'
+  pull_request:
+    paths:
+      - 'adega-crm/**'
+      - '.github/workflows/adega-crm-ci.yml'
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    env:
+      ADEGA_ADMIN_PASSWORD: 'CI-only-Password@2026'
+      ADEGA_ADMIN_PIN: '998877'
+      ADEGA_ADMIN_EMAIL: 'ci-admin@invalid.local'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r adega-crm/backend/requirements.txt
+      - run: cd adega-crm/backend && python -m py_compile app/main.py app/auth.py && pytest -q
+
+  privacy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Zero-retention checks
+        run: |
+          test ! -n "$(find adega-crm -type f \( -name '*.db' -o -name '*.sqlite' -o -name '*.sqlite3' \) -print -quit)"
+          ! grep -RIn --exclude-dir=tests 'INSERT INTO customers' adega-crm/backend
+          ! grep -RIn 'customer_name:customer.name,customer_phone:customer.phone' adega-crm/frontend
+          ! grep -RInE '(customer\.address.*JSON|customer_phone.*conn\.execute|customer_name.*conn\.execute)' adega-crm
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.15.0'
+          cache: npm
+          cache-dependency-path: adega-crm/frontend/package-lock.json
+      - name: Install
+        run: cd adega-crm/frontend && npm install --no-audit --no-fund
+      - name: Typecheck
+        run: cd adega-crm/frontend && npm run typecheck
+      - name: Build
+        env:
+          NEXT_PUBLIC_API_URL: 'http://127.0.0.1:8000'
+        run: cd adega-crm/frontend && npm run build
