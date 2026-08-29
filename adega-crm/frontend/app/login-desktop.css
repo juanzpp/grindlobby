@@ -3,9 +3,9 @@
 @media (min-width:1101px){
   .login-screen{overflow:hidden;background:#050403;min-width:1101px}
 
-  /* Desktop uses the full-resolution approved reference. */
+  /* Desktop uses the full-resolution approved reference materialized by prebuild. */
   .login-blueprint-bg{
-    background-image:url('/assets/login-blueprint.jpg')!important;
+    background-image:url('/assets/login-blueprint.webp')!important;
     background-size:cover!important;
     background-position:50% 50%!important;
     background-repeat:no-repeat!important;
