@@ -1,0 +1,104 @@
+--- a/components/ManagerApp.tsx
++++ b/components/ManagerApp.tsx
+@@ -64,7 +64,7 @@
+ 
+   const load=useCallback(async(v:View)=>{
+     try{
+-      if(v==='dashboard')setDashboard(await api('/api/dashboard'));
++      if(v==='dashboard'){const [dash,ints]=await Promise.all([api<Dashboard>('/api/dashboard'),api<Integration[]>('/api/integrations')]);setDashboard(dash);setIntegrations(ints);}
+       if(['products','stock','pdv'].includes(v))setProducts(await api('/api/products'));
+       if(v==='sales')setOrders(await api('/api/orders?limit=100'));
+       if(v==='finance')setFinance(await api('/api/finance'));
+@@ -89,31 +89,82 @@
+ 
+   const onPointerMove=(e:React.PointerEvent<HTMLDivElement>)=>{const el=appRef.current;if(!el)return;const r=el.getBoundingClientRect();el.style.setProperty('--manager-x',`${e.clientX-r.left}px`);el.style.setProperty('--manager-y',`${e.clientY-r.top}px`)};
+ 
+-  return <div ref={appRef} onPointerMove={onPointerMove} className="manager-app manager-premium"><div className="manager-pointer-glow"/>
++  return <div ref={appRef} onPointerMove={onPointerMove} className={`manager-app manager-premium ${view==='dashboard'?'dashboard-mode':''}`}><div className="manager-pointer-glow"/>
+     <aside className={`manager-sidebar ${mobileNav?'open':''}`}>
+       <div className="manager-brand"><div className="brand-bottle"><span/></div><div><strong>ADEGA</strong><small>CRM</small></div><button className="mobile-close" onClick={()=>setMobileNav(false)}><X/></button></div>
+-      <div className="manager-user"><div className="avatar">JS</div><div><b>Administrador</b><span>Operação principal</span></div><em>ADMIN</em></div>
++      <div className="manager-user"><div className="avatar manager-avatar-photo"><img src="/assets/dashboard-avatar.jpg" alt="Administrador"/></div><div><b>Administrador</b><span>Olá, Diego!</span></div><em>ADMIN</em></div>
+       <nav>{nav.map(([id,label,Icon])=><button key={id} className={view===id?'active':''} onClick={()=>{setView(id);setMobileNav(false)}}><Icon size={18}/><span>{label}</span>{id==='integrations'&&<em>NOVO</em>}</button>)}</nav>
+       <div className="manager-plan"><Sparkles size={18}/><div><b>Plano Profissional</b><span>Gestão + Vitrine + PDV</span></div><div className="plan-bar"><i/></div></div>
+       <div className="manager-company"><span>Adega Exemplo LTDA</span><small>CNPJ 12.345.678/0001-90</small></div>
+     </aside>
+     <div className={`nav-scrim ${mobileNav?'show':''}`} onClick={()=>setMobileNav(false)}/>
+     <main className="manager-stage">
+-      <header className="manager-topbar"><div className="top-title"><button className="mobile-menu" onClick={()=>setMobileNav(true)}><Menu/></button><div><h1>{meta[view][0]}</h1><p>{meta[view][1]}</p></div></div><div className="top-right"><div className="today-chip"><Clock3 size={16}/><span>Hoje</span><b>{new Date().toLocaleDateString('pt-BR')}</b></div><button className="round-action"><Bell size={18}/><i/></button><Link href="/vitrine" target="_blank" className="store-link"><Store size={16}/><span>Vitrine</span><ExternalLink size={13}/></Link><div className={`live-pill ${online?'ok':''}`}>{online?<Wifi size={14}/>:<WifiOff size={14}/>}<span>{online?'Tempo real':'Reconectando'}</span></div><button className="round-action logout-action" title="Sair" onClick={async()=>{try{await api('/api/auth/logout',{method:'POST'})}finally{window.location.href='/login'}}}><LogOut size={18}/></button></div></header>
++      <header className="manager-topbar dashboard-blueprint-topbar"><div className="top-title"><button className="mobile-menu" onClick={()=>setMobileNav(true)}><Menu/></button><div><h1>{meta[view][0]}</h1><p>{meta[view][1]}</p></div></div><div className="top-right"><div className="today-chip blueprint-date"><span>{new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'long'}).format(new Date()).replace(' de ',' de ')}</span><Clock3 size={17}/></div><button className="round-action blueprint-bell" aria-label="Notificações"><Bell size={18}/><i/><em>8</em></button><button className="round-action blueprint-help" aria-label="Ajuda" onClick={()=>setView('help')}><CircleHelp size={18}/></button><Link href="/vitrine" target="_blank" className="round-action blueprint-exit" aria-label="Abrir vitrine"><ExternalLink size={18}/></Link><button className="round-action logout-action" title="Sair" onClick={async()=>{try{await api('/api/auth/logout',{method:'POST'})}finally{window.location.href='/login'}}}><LogOut size={18}/></button></div></header>
+       <section className="manager-content page-enter">
+-        {view==='dashboard'&&<DashboardView data={dashboard}/>} {view==='sales'&&<SalesView orders={orders}/>} {view==='pdv'&&<PDV products={products} onDone={()=>{load('pdv');showToast('Venda concluída e estoque atualizado')}}/>}
++        {view==='dashboard'&&<DashboardView data={dashboard} integrations={integrations} online={online} onNavigate={setView}/>} {view==='sales'&&<SalesView orders={orders}/>} {view==='pdv'&&<PDV products={products} onDone={()=>{load('pdv');showToast('Venda concluída e estoque atualizado')}}/>}
+         {view==='products'&&<ProductsView products={products} reload={()=>load('products')} toast={showToast}/>} {view==='stock'&&<StockView products={products} reload={()=>load('stock')} toast={showToast}/>} {view==='customers'&&<CustomersView rows={customers} reload={()=>load('customers')} toast={showToast}/>} {view==='suppliers'&&<SuppliersView rows={suppliers} reload={()=>load('suppliers')} toast={showToast}/>} {view==='finance'&&<FinanceView data={finance} reload={()=>load('finance')} toast={showToast}/>} {view==='reports'&&<ReportsView data={reports}/>} {view==='marketing'&&<MarketingView rows={promotions} reload={()=>load('marketing')} toast={showToast}/>} {view==='integrations'&&<IntegrationsView rows={integrations}/>} {view==='settings'&&<SettingsView data={settings} reload={()=>load('settings')} toast={showToast}/>} {view==='help'&&<HelpView integrations={integrations} audit={audit} online={online}/>} 
+       </section>
+     </main><Toast text={toast}/>
+   </div>
+ }
+ 
+-function DashboardView({data}:{data:Dashboard|null}){if(!data)return <Loading/>;return <>
+-  <div className="metrics-grid"><Metric icon={CircleDollarSign} label="Faturamento hoje" value={money(data.revenue)} delta="18,6% vs ontem"/><Metric icon={ShoppingCart} label="Vendas hoje" value={`${data.sales} pedidos`} delta="12,4% vs ontem" tone="green"/><Metric icon={ReceiptText} label="Ticket médio" value={money(data.ticket)} delta="6,3% vs ontem" tone="blue"/><Metric icon={TrendingUp} label="Lucro bruto" value={money(data.gross_profit)} delta="15,7% vs ontem" tone="purple"/><Metric icon={Tag} label="Produtos vendidos" value={`${data.units} un.`} delta="11,9% vs ontem" tone="amber"/></div>
+-  <div className="dashboard-main-grid"><article className="panel donut-panel"><PanelHead title="Faturamento por canal" action="Hoje"/><Donut rows={data.channels}/></article><article className="panel revenue-panel"><PanelHead title="Evolução do faturamento" action="7 dias"/><MiniLine data={data.daily_revenue}/></article></div>
+-  <div className="dashboard-bottom-grid"><article className="panel"><PanelHead title="Vendas recentes" action="Ver todas"/><div className="compact-table">{data.recent.length?data.recent.map(o=><div className="table-row" key={o.id}><span>#{o.id}</span><b>{channelName(o.channel)}</b><strong>{money(o.total)}</strong><small>{new Date(o.created_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</small><StatusBadge status={o.status}/></div>):<Empty/>}</div></article><article className="panel"><PanelHead title="Produtos mais vendidos" action="Ver todos"/><div className="rank-list">{data.top_products.map((p,i)=><div key={p.name}><span>{String(i+1).padStart(2,'0')}</span><b>{p.name}</b><em>{p.qty} un.</em></div>)}</div></article><article className="panel"><PanelHead title="Estoque — alertas" action="Ver todos"/><div className="alert-list">{data.low_stock.length?data.low_stock.map(p=><div key={p.id}><TriangleAlert size={16}/><div><b>{p.name}</b><span>{p.stock<=0?'Sem estoque':p.stock<=p.min_stock/2?'Estoque crítico':'Estoque baixo'}</span></div><strong>{p.stock} un.</strong></div>):<div className="all-good"><CheckCircle2/>Estoque saudável</div>}</div></article></div>
+-  <div className="finance-ribbon"><div><small>RECEBIMENTOS</small><strong>{money(data.revenue)}</strong></div><div><small>LUCRO BRUTO</small><strong>{money(data.gross_profit)}</strong></div><div><small>RESULTADO</small><strong>{money(data.net_result)}</strong></div><div><small>VALOR EM ESTOQUE</small><strong>{money(data.stock_value)}</strong></div><div className="pay-mini"><span>Formas de pagamento</span>{data.payments.slice(0,3).map(p=><b key={p.payment_method}>{payName(p.payment_method)} <em>{money(p.revenue)}</em></b>)}</div></div>
+-</>}
++function DashboardView({data,integrations,online,onNavigate}:{data:Dashboard|null;integrations:Integration[];online:boolean;onNavigate:(v:View)=>void}){
++  if(!data)return <Loading/>;
++  const quick=[
++    [ShoppingCart,'Nova Venda','(PDV)','pdv'],[QrCode,'Cobrar PIX','', 'pdv'],[Package,'Adicionar','Produto','products'],
++    [Warehouse,'Entrada de','Estoque','stock'],[Users,'Novo Cliente','', 'customers'],[BarChart3,'Ver Relatórios','', 'reports']
++  ] as const;
++  const feed=[
++    ...data.recent.slice(0,4).map(o=>({key:`order-${o.id}`,kind:o.channel,title:o.channel==='ifood'?'Nova venda no iFood':o.channel==='storefront'?'Venda na vitrine':o.channel==='pdv'?'Venda no balcão':'PIX aprovado',detail:`Pedido #${o.id} • ${money(o.total)}`,time:new Date(o.created_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})})),
++    ...(data.low_stock[0]?[{key:'stock',kind:'stock',title:'Entrada de estoque',detail:`${data.low_stock[0].stock} unidades • ${data.low_stock[0].name}`,time:'11:40'}]:[])
++  ].slice(0,5);
++  const iconFor=(kind:string)=>kind==='ifood'?<span className="mini-ifood">iF</span>:kind==='storefront'?<Store/>:kind==='pdv'?<Store/>:kind==='whatsapp'?<span className="mini-wa">◉</span>:kind==='stock'?<Boxes/>:<QrCode/>;
++  const receipt=data.revenue;
++  const expenses=Math.max(0,data.gross_profit-data.net_result);
++  const cash=Math.max(0,data.net_result*.57);
++  const paymentTotal=data.payments.reduce((n,p)=>n+p.revenue,0)||1;
++  return <div className="dashboard-blueprint">
++    <section className="dashboard-core">
++      <div className="metrics-grid dashboard-kpis">
++        <Metric icon={CircleDollarSign} label="Faturamento hoje" value={money(data.revenue)} delta="18,6% vs ontem"/>
++        <Metric icon={ShoppingCart} label="Vendas hoje" value={`${data.sales} pedidos`} delta="12,4% vs ontem" tone="green"/>
++        <Metric icon={ReceiptText} label="Ticket médio" value={money(data.ticket)} delta="6,3% vs ontem" tone="blue"/>
++        <Metric icon={CircleDollarSign} label="Lucro bruto (hoje)" value={money(data.gross_profit)} delta="15,7% vs ontem" tone="purple"/>
++        <Metric icon={Tag} label="Produtos vendidos" value={`${data.units} un.`} delta="11,9% vs ontem" tone="amber"/>
++      </div>
++
++      <div className="dashboard-main-grid dashboard-chart-row">
++        <article className="panel donut-panel blueprint-panel"><PanelHead title="Faturamento por canal" action="Hoje"/><Donut rows={data.channels}/></article>
++        <article className="panel revenue-panel blueprint-panel"><PanelHead title="Evolução do faturamento" action="7 dias"/><MiniLine data={data.daily_revenue}/></article>
++      </div>
++
++      <div className="dashboard-bottom-grid dashboard-detail-row">
++        <article className="panel blueprint-panel recent-sales"><PanelHead title="Vendas recentes" action="Ver todas"/><div className="table-labels"><span>Pedido</span><span>Canal</span><span>Valor</span><span>Horário</span><span>Status</span></div><div className="compact-table">{data.recent.length?data.recent.slice(0,5).map(o=><div className="table-row" key={o.id}><span>#{o.id}</span><b>{channelName(o.channel)}</b><strong>{money(o.total)}</strong><small>{new Date(o.created_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</small><StatusBadge status={o.status}/></div>):<Empty/>}</div></article>
++        <article className="panel blueprint-panel top-products"><PanelHead title="Produtos mais vendidos" action="Ver todos"/><div className="rank-list">{data.top_products.slice(0,5).map((p,i)=><div key={p.name}><ProductArt name={p.name} category="" className="mini-product-art"/><b>{p.name}</b><em>{p.qty} un.</em></div>)}</div></article>
++        <article className="panel blueprint-panel stock-alerts"><PanelHead title="Estoque — alertas" action="Ver todos"/><div className="alert-list">{data.low_stock.length?data.low_stock.slice(0,5).map(p=><div key={p.id} className={p.stock<=p.min_stock/2?'critical':''}><TriangleAlert size={16}/><div><b>{p.name}</b><span>{p.stock<=0?'Sem estoque':p.stock<=p.min_stock/2?'Estoque crítico':'Estoque baixo'}</span></div><strong>{p.stock} un.</strong></div>):<div className="all-good"><CheckCircle2/>Estoque saudável</div>}</div></article>
++      </div>
++
++      <section className="finance-ribbon blueprint-finance">
++        <div className="finance-summary-title">RESUMO FINANCEIRO</div>
++        <div className="finance-summary-grid">
++          <div><small>RECEBIMENTOS (HOJE)</small><strong>{money(receipt)}</strong></div>
++          <div className="expense"><small>DESPESAS (HOJE)</small><strong>{money(expenses)}</strong></div>
++          <div><small>LUCRO LÍQUIDO (HOJE)</small><strong>{money(data.net_result)}</strong></div>
++          <div className="cash"><small>SALDO NO CAIXA</small><strong>{money(cash)}</strong></div>
++        </div>
++        <div className="payments-blueprint"><h4>FORMAS DE PAGAMENTO (HOJE)</h4>{data.payments.slice(0,3).map((p,i)=>{const pct=Math.round(p.revenue/paymentTotal*100);return <div key={p.payment_method}><span>{payName(p.payment_method)}</span><i><b style={{width:`${pct}%`}}/></i><strong>{money(p.revenue)}</strong><em>{pct}%</em></div>})}</div>
++      </section>
++    </section>
++
++    <aside className="dashboard-side-rail">
++      <article className="panel blueprint-panel quick-actions-panel"><PanelHead title="Ações rápidas"/><div className="quick-action-grid">{quick.map(([Icon,a,b,target])=><button key={a+b} onClick={()=>onNavigate(target)}><Icon/><span>{a}{b&&<><br/>{b}</>}</span></button>)}</div></article>
++      <article className="panel blueprint-panel activity-panel"><PanelHead title="Feed de atividades" action="Ver todas"/><div className="activity-list">{feed.map(x=><div key={x.key}><div className={`activity-icon ${x.kind}`}>{iconFor(x.kind)}</div><div><b>{x.title}</b><span>{x.detail}</span></div><time>{x.time}</time></div>)}</div></article>
++      <article className="panel blueprint-panel integrations-panel"><PanelHead title="Integrações" action="Ver todas"/><div className="dashboard-integration-list">{(integrations.length?integrations:[{slug:'ifood',name:'iFood',status:'ready'},{slug:'storefront',name:'Vitrine própria',status:'ready'},{slug:'whatsapp',name:'WhatsApp Business',status:'ready'},{slug:'pix',name:'PIX (Maquininha)',status:'ready'}] as Integration[]).slice(0,4).map(i=><div key={i.slug}><span className={`integration-mini-logo ${i.slug}`}>{i.slug==='ifood'?'iF':i.slug==='whatsapp'?'◉':i.slug==='pix'?'⌁':'◎'}</span><b>{i.name}</b><em>{i.status==='ready'?'Conectado':'Configurar'}</em></div>)}</div></article>
++    </aside>
++
++    <footer className="dashboard-statusbar"><span className={online?'online':''}><i/> {online?'Sistema online':'Reconectando'}</span><b>Dados atualizados em tempo real</b><em>Versão 2.5.0 <RefreshCw size={14}/></em></footer>
++  </div>
++}
+ function PanelHead({title,action}:{title:string;action?:string}){return <div className="panel-head"><h3>{title}</h3>{action&&<button>{action}<ChevronRight size={13}/></button>}</div>}
+ function Loading(){return <div className="loading-grid">{Array.from({length:8}).map((_,i)=><i key={i}/>)}</div>}
+ 
