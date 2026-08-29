@@ -1,0 +1,167 @@
+/* Desktop login scene rebuilt as real CSS layers.
+   The approved mockup is reference only; it is NOT rendered as a background image. */
+@media (min-width:1101px){
+  .login-screen{
+    background:#050403!important;
+    overflow:hidden!important;
+  }
+
+  /* Cinematic bar atmosphere: gradients + shelf/bottle layers, no screenshot. */
+  .login-blueprint-bg{
+    inset:0!important;
+    background-image:none!important;
+    background:
+      radial-gradient(ellipse at 14% 12%,rgba(223,150,55,.24) 0 4%,rgba(130,75,22,.11) 12%,transparent 28%),
+      radial-gradient(ellipse at 86% 13%,rgba(223,148,49,.22) 0 5%,rgba(127,72,19,.10) 13%,transparent 30%),
+      radial-gradient(ellipse at 11% 43%,rgba(177,101,27,.12),transparent 28%),
+      radial-gradient(ellipse at 88% 43%,rgba(180,103,28,.13),transparent 30%),
+      linear-gradient(90deg,rgba(7,5,3,.34) 0 31.5%,rgba(2,2,2,.92) 39%,rgba(3,3,3,.96) 61%,rgba(8,5,3,.34) 68.5% 100%),
+      linear-gradient(180deg,#090704 0%,#0a0805 54%,#030303 76%,#020202 100%)!important;
+    filter:none!important;
+    transform:none!important;
+    overflow:hidden!important;
+  }
+  .login-blueprint-bg:before{
+    content:""!important;
+    position:absolute!important;
+    inset:-3% -2% 20%!important;
+    width:auto!important;
+    height:auto!important;
+    border-radius:0!important;
+    transform:none!important;
+    background:
+      linear-gradient(180deg,
+        transparent 0 9%,rgba(204,137,48,.22) 9.3%,rgba(41,24,9,.62) 10.1%,transparent 11.2% 26%,
+        rgba(188,117,32,.22) 26.3%,rgba(35,20,8,.72) 27.2%,transparent 28.3% 45%,
+        rgba(190,119,33,.19) 45.3%,rgba(31,18,7,.74) 46.2%,transparent 47.3% 66%,
+        rgba(165,98,26,.16) 66.3%,rgba(24,14,6,.74) 67.2%,transparent 68.4%),
+      repeating-linear-gradient(90deg,
+        transparent 0 17px,
+        rgba(55,28,8,.45) 17px 22px,
+        rgba(176,105,30,.30) 22px 28px,
+        rgba(231,168,76,.15) 28px 31px,
+        rgba(35,18,7,.50) 31px 39px,
+        transparent 39px 58px)!important;
+    -webkit-mask-image:linear-gradient(180deg,transparent 0 5%,#000 7% 71%,transparent 74% 100%)!important;
+    mask-image:linear-gradient(180deg,transparent 0 5%,#000 7% 71%,transparent 74% 100%)!important;
+    opacity:.78!important;
+    filter:blur(.55px) saturate(1.05)!important;
+    pointer-events:none!important;
+  }
+  .login-blueprint-bg:after{
+    content:"ADEGA\A CRM"!important;
+    white-space:pre-line!important;
+    position:absolute!important;
+    left:auto!important;
+    right:6.6vw!important;
+    top:14.8vh!important;
+    width:24vw!important;
+    height:auto!important;
+    max-height:none!important;
+    border-radius:0!important;
+    background:none!important;
+    transform:none!important;
+    color:#d99334!important;
+    font-family:Georgia,'Times New Roman',serif!important;
+    font-size:clamp(44px,4.5vw,82px)!important;
+    line-height:.9!important;
+    letter-spacing:.025em!important;
+    text-align:center!important;
+    text-shadow:0 0 12px rgba(232,164,58,.48),0 0 42px rgba(170,89,12,.28)!important;
+    filter:blur(2.2px)!important;
+    opacity:.78!important;
+    pointer-events:none!important;
+  }
+
+  /* Left technology seal and copy are real UI decoration, not baked into an image. */
+  .login-screen:before{
+    content:"▥";
+    position:absolute;
+    left:10.3vw;
+    top:29.8vh;
+    width:78px;
+    height:78px;
+    border:1.5px solid rgba(239,190,92,.88);
+    border-radius:50%;
+    display:grid;
+    place-items:center;
+    color:#e8b64e;
+    font-size:30px;
+    font-weight:300;
+    background:radial-gradient(circle,rgba(94,58,15,.16),rgba(5,5,5,.32) 72%);
+    box-shadow:0 0 26px rgba(221,151,43,.08),inset 0 0 18px rgba(223,160,56,.04);
+    text-shadow:0 0 12px rgba(239,185,69,.34);
+    pointer-events:none;
+    z-index:1;
+  }
+  .login-vignette:before{
+    content:"TECNOLOGIA, CONTROLE\A E ELEGÂNCIA PARA SUA GESTÃO.";
+    white-space:pre-line;
+    position:absolute;
+    left:7.9vw;
+    top:41.6vh;
+    width:25vw;
+    color:rgba(238,235,229,.92);
+    font-size:clamp(15px,1.12vw,22px);
+    line-height:1.7;
+    letter-spacing:.025em;
+    text-align:center;
+    text-shadow:0 2px 15px rgba(0,0,0,.86);
+    pointer-events:none;
+  }
+
+  /* Glossy stone counter/reflection layer. */
+  .login-vignette:after{
+    content:"";
+    position:absolute;
+    left:-4%;
+    right:-4%;
+    bottom:-3%;
+    height:29vh;
+    background:
+      linear-gradient(166deg,transparent 0 28%,rgba(184,111,27,.12) 29%,transparent 31% 54%,rgba(230,163,56,.08) 55%,transparent 57%),
+      linear-gradient(14deg,transparent 0 42%,rgba(234,173,68,.08) 43%,transparent 45%),
+      radial-gradient(ellipse at 72% 27%,rgba(167,88,19,.16),transparent 28%),
+      linear-gradient(180deg,rgba(19,13,8,.32),rgba(4,4,4,.92));
+    border-top:1px solid rgba(205,137,43,.14);
+    box-shadow:0 -18px 70px rgba(0,0,0,.38),inset 0 18px 35px rgba(202,126,30,.025);
+    transform:perspective(900px) rotateX(5deg);
+    transform-origin:bottom;
+    pointer-events:none;
+  }
+
+  /* CSS-built whisky tumbler: separate decorative element, never part of the reference image. */
+  .login-screen:after{
+    content:"";
+    position:absolute;
+    right:8.2vw;
+    bottom:10.2vh;
+    width:clamp(132px,10.6vw,196px);
+    height:clamp(170px,25.5vh,250px);
+    border:2px solid rgba(230,220,194,.55);
+    border-top-color:rgba(255,241,209,.72);
+    border-radius:7px 7px 22px 22px;
+    background:
+      linear-gradient(35deg,transparent 0 39%,rgba(255,231,184,.14) 40% 43%,transparent 44% 100%),
+      linear-gradient(142deg,transparent 0 52%,rgba(255,222,169,.12) 53% 56%,transparent 57%),
+      linear-gradient(180deg,transparent 0 48%,rgba(126,61,11,.68) 49%,rgba(185,90,14,.78) 66%,rgba(89,40,8,.86) 100%);
+    box-shadow:
+      inset 9px 0 12px rgba(255,244,221,.05),
+      inset -9px 0 12px rgba(255,244,221,.04),
+      inset 0 -9px 18px rgba(255,166,45,.17),
+      0 20px 34px rgba(0,0,0,.48),
+      0 0 22px rgba(202,122,27,.10);
+    filter:drop-shadow(0 0 1px rgba(255,232,192,.4));
+    pointer-events:none;
+    z-index:2;
+  }
+
+  /* Center must stay clean; no ghost card/logo can exist behind the real form. */
+  .login-live-card{z-index:5!important}
+  .login-system-live,.login-footer-live{z-index:8!important}
+}
+
+/* Keep the already-approved tablet/mobile composition untouched. */
+@media (max-width:1100px){
+  .login-screen:before,.login-screen:after,.login-vignette:before,.login-vignette:after{content:none!important;display:none!important}
+}
