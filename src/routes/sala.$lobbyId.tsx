@@ -360,11 +360,37 @@ function RoomPage() {
     await trackPresence({ sharing: false });
   };
 
+  const ensureSfuForScreen = async () => {
+    const current = livekitSession.snapshot;
+    if (current.connected && current.lobbyId === lobbyId) return;
+
+    let stream = mic.current;
+    const hasLiveMic = Boolean(stream?.getAudioTracks().some((track) => track.readyState === "live"));
+    if (!stream || !hasLiveMic) {
+      stream = await captureMicrophone(cfg);
+      mic.current = stream;
+    }
+
+    setMicState("conectando ao SFU");
+    await livekitSession.connect({
+      lobbyId,
+      microphone: stream,
+      muted: mutedRef.current,
+      outputDeviceId: cfg.output,
+      outputVolume: cfg.outputVolume,
+    });
+    setMicState("SFU conectado");
+  };
+
   const startScreen = async () => {
+    let stream: MediaStream | null = null;
     try {
       setOpening(true);
+      setStatus("");
+      if (!navigator.mediaDevices?.getDisplayMedia) throw new Error("Seu navegador não oferece compartilhamento de tela.");
+
       const selected = preset(cfg.quality);
-      const stream = await navigator.mediaDevices.getDisplayMedia({
+      stream = await navigator.mediaDevices.getDisplayMedia({
         video: {
           width: { ideal: selected.width },
           height: { ideal: selected.height },
@@ -372,13 +398,20 @@ function RoomPage() {
         },
         audio: cfg.systemAudio,
       });
+
+      await ensureSfuForScreen();
       await livekitSession.startScreen(stream);
       setPreviewReady(false);
       await trackPresence({ sharing: true });
-      setOpening(false);
+      setStatus("Tela ao vivo iniciada.");
+      window.setTimeout(() => setStatus(""), 1600);
     } catch (error) {
+      stream?.getTracks().forEach((track) => track.stop());
+      const message = error instanceof Error ? error.message : "Não foi possível iniciar a tela ao vivo.";
+      const cancelled = error instanceof Error && error.name === "NotAllowedError";
+      setStatus(cancelled ? "Compartilhamento cancelado." : message);
+    } finally {
       setOpening(false);
-      setStatus(error instanceof Error && error.name !== "NotAllowedError" ? error.message : "Compartilhamento cancelado.");
     }
   };
 
@@ -465,9 +498,9 @@ function RoomPage() {
                       <MonitorUp className="h-7 w-7" />
                     </span>
                     <h2 className="mt-4 text-lg font-semibold">Tela ao vivo</h2>
-                    <p className="mt-2 text-sm text-white/40">A transmissão agora passa pelo SFU. Não há malha P2P entre todos os usuários.</p>
-                    <button onClick={() => void startScreen()} disabled={opening || !live.connected} className="mt-5 rounded-xl bg-purple-600 px-5 py-2.5 text-sm font-medium disabled:opacity-40">
-                      {opening ? "Abrindo captura..." : "Compartilhar tela"}
+                    <p className="mt-2 text-sm text-white/40">Compartilhe sua tela mesmo se o SFU estiver reconectando. A sala recupera a conexão automaticamente.</p>
+                    <button onClick={() => void startScreen()} disabled={opening} className="mt-5 rounded-xl bg-purple-600 px-5 py-2.5 text-sm font-medium disabled:opacity-40">
+                      {opening ? "Iniciando tela..." : "Compartilhar tela"}
                     </button>
                   </div>
                 )}
@@ -485,8 +518,8 @@ function RoomPage() {
                     <X className="h-4 w-4" /> Parar tela
                   </button>
                 ) : (
-                  <button onClick={() => void startScreen()} disabled={!live.connected} className="flex h-11 items-center gap-2 rounded-xl border border-white/10 bg-white/[.03] px-4 text-sm disabled:opacity-40">
-                    <MonitorUp className="h-4 w-4" /> Transmitir
+                  <button onClick={() => void startScreen()} disabled={opening} className="flex h-11 items-center gap-2 rounded-xl border border-purple-500/30 bg-purple-500/10 px-4 text-sm text-purple-100 disabled:opacity-40">
+                    <MonitorUp className="h-4 w-4" /> {opening ? "Iniciando..." : "Tela ao vivo"}
                   </button>
                 )}
                 <div className="ml-auto flex items-center gap-2 text-xs text-white/40">
