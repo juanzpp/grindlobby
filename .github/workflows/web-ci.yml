@@ -24,9 +24,11 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Media transport audit
         run: npm test
+      - name: Critical path lint
+        run: npx eslint src/lib/call-session.ts src/lib/livekit-session.ts src/routes/api.livekit-token.ts src/server.ts
       - name: Production build
         run: npm run build
-      - name: Lint debt report
+      - name: Full lint debt report
         if: always()
         continue-on-error: true
         run: npm run lint
