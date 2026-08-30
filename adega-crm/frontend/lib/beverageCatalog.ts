@@ -1,40 +1,25 @@
 export type BeverageCatalogItem={name:string;category:string;volumeMl:number;sku:string;image:string;barcode?:string};
 
-const photo=(id:string)=>`https://images.unsplash.com/${id}?auto=format&fit=crop&w=420&h=620&q=88`;
+export const productCutouts={whisky:'/assets/products/cutouts/whisky.png',spirit:'/assets/products/cutouts/clear-spirit.png',beer:'/assets/products/cutouts/beer.png',wine:'/assets/products/cutouts/wine.png',sparkling:'/assets/products/cutouts/sparkling.png',can:'/assets/products/cutouts/can.png',soda:'/assets/products/cutouts/soda.png',water:'/assets/products/cutouts/water.png'} as const;
+
+export function productCutoutFor(name:string,category=''){
+  const value=`${name} ${category}`.toLowerCase();
+  if(/whisky|whiskey|jack|chivas|jameson|ballantine/.test(value))return productCutouts.whisky;
+  if(/espumante|champagne|prosecco/.test(value))return productCutouts.sparkling;
+  if(/vinho|cabernet|chardonnay/.test(value))return productCutouts.wine;
+  if(/cerveja|long neck|heineken|budweiser|corona|stella/.test(value))return productCutouts.beer;
+  if(/energ|red bull|monster|t[oô]nica|lata|350\s*ml|473\s*ml|250\s*ml/.test(value))return productCutouts.can;
+  if(/refriger|coca|guaran[aá]|chá|suco/.test(value))return productCutouts.soda;
+  if(/[aá]gua|mineral/.test(value))return productCutouts.water;
+  return productCutouts.spirit;
+}
+
+const item=(name:string,category:string,volumeMl:number,sku:string,barcode?:string):BeverageCatalogItem=>({name,category,volumeMl,sku,barcode,image:productCutoutFor(name,category)});
 
 export const beverageCatalog:BeverageCatalogItem[]=[
-  {name:"Johnnie Walker Red Label",category:"Whisky",volumeMl:1000,sku:"JWRED1L",barcode:"5000267014203",image:"/assets/products/red-label.png"},
-  {name:"Jack Daniel's Old No. 7",category:"Whisky",volumeMl:1000,sku:"JD1L",image:photo("photo-1527281400683-1aae777175f8")},
-  {name:"Chivas Regal 12 anos",category:"Whisky",volumeMl:1000,sku:"CHIVAS1L",image:photo("photo-1569529465841-dfecdab7503b")},
-  {name:"Absolut Original",category:"Vodka",volumeMl:750,sku:"ABS750",image:photo("photo-1608885898957-a5598a5ae1d1")},
-  {name:"Smirnoff Nº 21",category:"Vodka",volumeMl:998,sku:"SMI998",barcode:"7893218000470",image:"/assets/products/smirnoff.png"},
-  {name:"Tanqueray London Dry",category:"Gin",volumeMl:750,sku:"TANQ750",image:photo("photo-1606767341197-b56c0c7373c9")},
-  {name:"Bombay Sapphire",category:"Gin",volumeMl:750,sku:"BOMB750",image:photo("photo-1584916201218-f4242ceb4809")},
-  {name:"Campari",category:"Destilados",volumeMl:750,sku:"CAMP750",image:photo("photo-1551538827-9c037cb4f32a")},
-  {name:"Heineken Long Neck",category:"Cervejas",volumeMl:330,sku:"HEI330",barcode:"7896045503412",image:"/assets/products/heineken.png"},
-  {name:"Budweiser Long Neck",category:"Cervejas",volumeMl:330,sku:"BUD330",image:photo("photo-1608270586620-248524c67de9")},
-  {name:"Corona Extra",category:"Cervejas",volumeMl:330,sku:"COR330",image:photo("photo-1505075106905-fb052892c116")},
-  {name:"Skol Pilsen",category:"Cervejas",volumeMl:350,sku:"SK350",image:photo("photo-1535958636474-b021ee887b13")},
-  {name:"Vinho Tinto Cabernet Sauvignon",category:"Vinhos",volumeMl:750,sku:"VINHCAB750",image:photo("photo-1510812431401-41d2bd2722f3")},
-  {name:"Vinho Branco Chardonnay",category:"Vinhos",volumeMl:750,sku:"VINHCHA750",image:photo("photo-1473973266408-ed4e27abdd47")},
-  {name:"Espumante Brut",category:"Espumantes",volumeMl:750,sku:"ESPBRUT750",image:photo("photo-1547595628-c61a29f496f0")},
-  {name:"Red Bull",category:"Energéticos",volumeMl:250,sku:"RB250",image:photo("photo-1622543925917-763c34d1a86e")},
-  {name:"Coca-Cola",category:"Refrigerantes",volumeMl:2000,sku:"COCA2L",image:photo("photo-1554866585-cd94860890b7")},
-  {name:"Água Tônica",category:"Não alcoólicos",volumeMl:350,sku:"TON350",image:photo("photo-1544145945-f90425340c7e")},
-  {name:"Jameson Irish Whiskey",category:"Whisky",volumeMl:750,sku:"JAM750",image:photo("photo-1569529465841-dfecdab7503b")},
-  {name:"Ballantine's Finest",category:"Whisky",volumeMl:1000,sku:"BALL1L",image:photo("photo-1527281400683-1aae777175f8")},
-  {name:"José Cuervo Especial",category:"Tequila",volumeMl:750,sku:"CUERVO750",image:photo("photo-1615887023516-9b47d38427e9")},
-  {name:"Bacardi Carta Blanca",category:"Rum",volumeMl:980,sku:"BAC980",image:photo("photo-1584916201218-f4242ceb4809")},
-  {name:"Cachaça 51",category:"Cachaças",volumeMl:965,sku:"C51965",image:photo("photo-1551538827-9c037cb4f32a")},
-  {name:"Jägermeister",category:"Licores",volumeMl:700,sku:"JAGER700",image:photo("photo-1606767341197-b56c0c7373c9")},
-  {name:"Baileys Original",category:"Licores",volumeMl:750,sku:"BAIL750",image:photo("photo-1551538827-9c037cb4f32a")},
-  {name:"Stella Artois Long Neck",category:"Cervejas",volumeMl:330,sku:"STELLA330",image:photo("photo-1608270586620-248524c67de9")},
-  {name:"Brahma Duplo Malte",category:"Cervejas",volumeMl:350,sku:"BRAH350",image:photo("photo-1535958636474-b021ee887b13")},
-  {name:"Monster Energy",category:"Energéticos",volumeMl:473,sku:"MON473",image:photo("photo-1622543925917-763c34d1a86e")},
-  {name:"Guaraná Antarctica",category:"Refrigerantes",volumeMl:2000,sku:"GUA2L",image:photo("photo-1554866585-cd94860890b7")},
-  {name:"Água Mineral sem gás",category:"Águas",volumeMl:500,sku:"AGUA500",image:photo("photo-1544145945-f90425340c7e")},
-  {name:"Suco de Laranja",category:"Sucos",volumeMl:1000,sku:"SUCLAR1L",image:photo("photo-1621506289937-a8e4df240d0b")},
-  {name:"Chá Gelado Pêssego",category:"Não alcoólicos",volumeMl:1500,sku:"CHAP1L5",image:photo("photo-1556679343-c7306c1976bc")},
+  item('Johnnie Walker Red Label','Whisky',1000,'JWRED1L','5000267014203'), item("Jack Daniel's Old No. 7",'Whisky',1000,'JD1L'), item('Chivas Regal 12 anos','Whisky',1000,'CHIVAS1L'), item('Absolut Original','Vodka',750,'ABS750'), item('Smirnoff Nº 21','Vodka',998,'SMI998','7893218000470'), item('Tanqueray London Dry','Gin',750,'TANQ750'), item('Bombay Sapphire','Gin',750,'BOMB750'), item('Campari','Destilados',750,'CAMP750'),
+  item('Heineken Long Neck','Cervejas',330,'HEI330','7896045503412'), item('Budweiser Long Neck','Cervejas',330,'BUD330'), item('Corona Extra','Cervejas',330,'COR330'), item('Skol Pilsen','Cervejas',350,'SK350'), item('Vinho Tinto Cabernet Sauvignon','Vinhos',750,'VINHCAB750'), item('Vinho Branco Chardonnay','Vinhos',750,'VINHCHA750'), item('Espumante Brut','Espumantes',750,'ESPBRUT750'), item('Red Bull','Energéticos',250,'RB250'), item('Coca-Cola','Refrigerantes',2000,'COCA2L'), item('Água Tônica','Não alcoólicos',350,'TON350'), item('Jameson Irish Whiskey','Whisky',750,'JAM750'), item("Ballantine's Finest",'Whisky',1000,'BALL1L'),
+  item('José Cuervo Especial','Tequila',750,'CUERVO750'), item('Bacardi Carta Blanca','Rum',980,'BAC980'), item('Cachaça 51','Cachaças',965,'C51965'), item('Jägermeister','Licores',700,'JAGER700'), item('Baileys Original','Licores',750,'BAIL750'), item('Stella Artois Long Neck','Cervejas',330,'STELLA330'), item('Brahma Duplo Malte','Cervejas',350,'BRAH350'), item('Monster Energy','Energéticos',473,'MON473'), item('Guaraná Antarctica','Refrigerantes',2000,'GUA2L'), item('Água Mineral sem gás','Águas',500,'AGUA500'), item('Suco de Laranja','Sucos',1000,'SUCLAR1L'), item('Chá Gelado Pêssego','Não alcoólicos',1500,'CHAP1L5'),
 ];
 
 export const catalogMatch=(name:string)=>beverageCatalog.find(item=>name.toLowerCase().includes(item.name.toLowerCase())||item.name.toLowerCase().includes(name.toLowerCase().replace(/\s+\d+\s*(ml|l).*$/i,'')));
