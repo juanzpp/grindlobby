@@ -4,6 +4,7 @@ import { AccessToken, TrackSource } from "livekit-server-sdk";
 
 const FALLBACK_SUPABASE_URL = "https://eilaxaklqgyvgjgpkonv.supabase.co";
 const FALLBACK_PUBLISHABLE_KEY = "sb_publishable_t_uiyr5fFapSPvusy5DtBA_M86m5bzO";
+const ACTIVE_MEMBER_WINDOW_MS = 90_000;
 
 function json(body: unknown, status = 200) {
   return Response.json(body, {
@@ -52,7 +53,7 @@ export const Route = createFileRoute("/api/livekit-token")({
 
         const { data: lobby, error: lobbyError } = await supabase
           .from("lobbies")
-          .select("route_code,owner_id,status,visibility,max_members")
+          .select("id,route_code,owner_id,status,visibility,max_members")
           .eq("route_code", lobbyId)
           .maybeSingle();
 
@@ -61,6 +62,24 @@ export const Route = createFileRoute("/api/livekit-token")({
           return json({ error: "Não foi possível validar o lobby." }, 500);
         }
         if (!lobby || lobby.status === "closed") return json({ error: "Lobby encerrado ou inexistente." }, 404);
+
+        const maxMembers = Math.max(1, Number(lobby.max_members || 10));
+        const activeSince = new Date(Date.now() - ACTIVE_MEMBER_WINDOW_MS).toISOString();
+        const { data: activeMembers, error: membersError } = await supabase
+          .from("lobby_members")
+          .select("user_id")
+          .eq("lobby_id", lobby.id)
+          .gte("last_seen_at", activeSince);
+
+        if (membersError) {
+          console.error("[voice] active member lookup failed", { code: membersError.code });
+          return json({ error: "Não foi possível validar a capacidade da sala." }, 500);
+        }
+
+        const activeUserIds = new Set((activeMembers || []).map((row) => row.user_id).filter(Boolean));
+        if (!activeUserIds.has(user.id) && activeUserIds.size >= maxMembers) {
+          return json({ error: "Lobby lotado." }, 409);
+        }
 
         const name =
           user.user_metadata?.display_name ||
