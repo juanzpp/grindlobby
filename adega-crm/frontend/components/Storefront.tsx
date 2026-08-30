@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import anime from 'animejs';
+import { gsap } from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import {
   Search, ShoppingCart, Heart, UserRound, Home, Grid2X2, Tag, Flame, Package,
   Wine, Beer, Zap, ChevronRight, ChevronLeft, MapPin, Truck, ShieldCheck,
@@ -64,12 +66,20 @@ export default function Storefront(){
     anime({targets:'.hero-sweep',translateX:['-160%','190%'],opacity:[0,.52,0],duration:3600,delay:900,loop:true,easing:'easeInOutQuad'});
     anime({targets:'.spark-dot',translateY:()=>anime.random(-50,-135),translateX:()=>anime.random(-36,38),opacity:[0,.95,0],scale:[.3,1.4],delay:anime.stagger(92),duration:()=>anime.random(2300,4500),loop:true,easing:'easeOutQuad'});
     anime({targets:'.hero-liquid-orb',scale:[.92,1.08],rotate:[-4,4],direction:'alternate',loop:true,duration:4500,easing:'easeInOutSine'});
+    anime({targets:'.bottle-glass-sheen',translateX:['-180%','230%'],opacity:[0,.62,0],duration:4200,delay:1100,loop:true,easing:'easeInOutQuad'});
   },[products.length]);
 
   useEffect(()=>{
+    if(!cartOpen)return;
+    const close=(event:KeyboardEvent)=>{if(event.key==='Escape')setCartOpen(false)};
+    document.addEventListener('keydown',close);
+    const previous=document.body.style.overflow;
+    document.body.style.overflow='hidden';
+    return()=>{document.removeEventListener('keydown',close);document.body.style.overflow=previous};
+  },[cartOpen]);
+
+  useEffect(()=>{
     if(!cartOpen||prefersReduced())return;
-    anime.remove('.store-cart-drawer');
-    anime({targets:'.store-cart-drawer',translateX:[42,0],opacity:[.75,1],duration:460,easing:'easeOutExpo'});
     anime({targets:'.drawer-item',opacity:[0,1],translateX:[18,0],delay:anime.stagger(55),duration:380,easing:'easeOutCubic'});
   },[cartOpen]);
 
@@ -88,6 +98,16 @@ export default function Storefront(){
     if(sort==='name')l=[...l].sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
     return l;
   },[products,query,category,sort]);
+
+  useEffect(()=>{
+    if(prefersReduced())return;
+    gsap.registerPlugin(ScrollTrigger);
+    const context=gsap.context(()=>{
+      gsap.from('.store-product-card',{scrollTrigger:{trigger:'.store-product-grid',start:'top 88%',once:true},y:22,opacity:0,duration:.65,stagger:.045,ease:'power2.out'});
+      gsap.to('.store-promo-band',{scrollTrigger:{trigger:'.store-promo-band',start:'top bottom',end:'bottom top',scrub:1.4},backgroundPosition:'100% 50%',ease:'none'});
+    },appRef);
+    return()=>context.revert();
+  },[filtered.length]);
 
   const animateFly=(source?:HTMLElement|null)=>{
     if(prefersReduced()||!source)return;
@@ -171,12 +191,12 @@ export default function Storefront(){
         <div className="hero-copy-next">
           <span className="hero-kicker"><Sparkles/> O CLÁSSICO QUE NUNCA SAI DE MODA</span>
           <small className="hero-brand">JOHNNIE WALKER</small>
-          <h1 className="hero-title"><strong>RED LABEL</strong><span>Keep Walking</span></h1>
-          <p className="hero-desc">Sabor marcante, equilíbrio perfeito e tradição em cada gole. Um ícone para celebrar seus melhores momentos.</p>
+          <h1 className="hero-title"><strong>GOLD LABEL</strong><span>Reserve</span></h1>
+          <p className="hero-desc">Textura aveludada, notas de mel e tradição escocesa em uma apresentação à altura dos seus melhores momentos.</p>
           <div className="hero-buy-row"><button onClick={e=>red&&add(red,1,e.currentTarget)}><ShoppingCart/>ADICIONAR AO CARRINHO</button><div><strong>{money(red?.price||0)}</strong><del>{money(oldPrice)}</del><em>-15%</em></div></div>
           <div className="hero-trust"><span><ShieldCheck/>100% Original</span><span><Truck/>Entrega Rápida</span><span><Package/>{red?.stock||0} em estoque</span></div>
         </div>
-        <div className="hero-parallax-product"><div className="hero-product-next hero-bottle-float"><div className="hero-bottle-shadow"/><img className="hero-bottle-real" src="/assets/products/red-label.png" alt="Johnnie Walker Red Label"/></div></div>
+        <div className="hero-parallax-product"><div className="hero-product-next hero-bottle-float"><div className="hero-bottle-shadow"/><div className="bottle-product-stage"><img className="hero-bottle-real" src="/assets/products/red-label.png" alt="Johnnie Walker Gold Label Reserve com embalagem"/><i className="bottle-glass-sheen" aria-hidden="true"/></div></div></div>
         <div className="hero-offer-orb"><small>OFERTA</small><strong>ESPECIAL</strong><span>15% OFF</span></div>
         <div className="hero-script"><span>Tradição</span><span>Qualidade</span><span>Sabor</span></div>
         <div className="hero-live-badge"><CheckCircle2/><span><b>Loja aberta</b><small>entrega média 35 min</small></span></div>
@@ -201,7 +221,7 @@ export default function Storefront(){
     </main>
 
     <div className={`cart-overlay ${cartOpen?'open':''}`} onClick={()=>setCartOpen(false)}/>
-    <aside className={`store-cart-drawer ${cartOpen?'open':''}`}>
+    <aside className={`store-cart-drawer ${cartOpen?'open':''}`} role="dialog" aria-modal="true" aria-label="Meu carrinho" aria-hidden={!cartOpen}>
       <div className="drawer-head"><div><ShoppingCart/><span><small>SEU PEDIDO</small><h2>Meu Carrinho</h2></span></div><button onClick={()=>setCartOpen(false)}><X/></button></div>
       <div className="drawer-items">{cart.length?cart.map(i=><div className="drawer-item" key={i.id}><div className="drawer-art"><ProductArt name={i.name} category={i.category} image={i.image_url}/></div><div><b>{i.name}</b><small>{money(i.price)} cada</small><div className="drawer-qty"><button onClick={()=>change(i.id,-1)}><Minus/></button><span>{i.qty}</span><button onClick={()=>change(i.id,1)}><Plus/></button></div></div><strong>{money(i.price*i.qty)}</strong><button className="drawer-delete" onClick={()=>setCart(c=>c.filter(x=>x.id!==i.id))}><Trash2/></button></div>):<div className="drawer-empty"><ShoppingCart/><h3>Seu carrinho está vazio</h3><p>Adicione seus rótulos favoritos.</p></div>}</div>
       <div className="fulfillment"><button className={fulfillment==='delivery'?'active':''} onClick={()=>setFulfillment('delivery')}><Truck/><span>Entrega<small>30–45 min</small></span></button><button className={fulfillment==='pickup'?'active':''} onClick={()=>setFulfillment('pickup')}><Store/><span>Retirada<small>10–15 min</small></span></button></div>
@@ -210,7 +230,7 @@ export default function Storefront(){
       <button className="checkout-next" disabled={!cart.length} onClick={checkout}>FINALIZAR COMPRA <ArrowRight/></button><div className="secure-check"><ShieldCheck/><span><b>Compra segura</b><small>Pedido integrado ao Adega CRM</small></span></div>
     </aside>
 
-    {selected&&<div className="product-modal-next"><div className="product-modal-overlay" onClick={()=>setSelected(null)}/><div className="product-modal-box"><button className="modal-x" onClick={()=>setSelected(null)}><X/></button><div className="modal-product-visual"><div className="modal-aura"/><ProductArt name={selected.name} category={selected.category}/></div><div className="modal-product-info"><small>{selected.category} · SKU {selected.sku||'—'}</small><h2>{selected.name}</h2><div className="modal-rating"><Star fill="currentColor"/><Star fill="currentColor"/><Star fill="currentColor"/><Star fill="currentColor"/><Star fill="currentColor"/><span>4,9 · produto disponível</span></div><del>{money(selected.price*1.12)}</del><strong>{money(selected.price)}</strong><p>Estoque sincronizado em tempo real com o gestor. Escolha entrega ou retirada e finalize seu pedido com segurança.</p><div className="modal-features"><span><Package/><b>{selected.stock} un.</b><small>Em estoque</small></span><span><Truck/><b>30–45 min</b><small>Entrega média</small></span><span><ShieldCheck/><b>Original</b><small>Procedência</small></span></div><button onClick={e=>{add(selected,1,e.currentTarget);setSelected(null)}}><ShoppingCart/>ADICIONAR AO CARRINHO</button></div></div></div>}
+    {selected&&<div className="product-modal-next"><div className="product-modal-overlay" onClick={()=>setSelected(null)}/><div className="product-modal-box"><button className="modal-x" onClick={()=>setSelected(null)}><X/></button><div className="modal-product-visual"><div className="modal-aura"/><ProductArt name={selected.name} category={selected.category} image={selected.image_url}/></div><div className="modal-product-info"><small>{selected.category} · SKU {selected.sku||'—'}</small><h2>{selected.name}</h2><div className="modal-rating"><Star fill="currentColor"/><Star fill="currentColor"/><Star fill="currentColor"/><Star fill="currentColor"/><Star fill="currentColor"/><span>4,9 · produto disponível</span></div><del>{money(selected.price*1.12)}</del><strong>{money(selected.price)}</strong><p>Estoque sincronizado em tempo real com o gestor. Escolha entrega ou retirada e finalize seu pedido com segurança.</p><div className="modal-features"><span><Package/><b>{selected.stock} un.</b><small>Em estoque</small></span><span><Truck/><b>30–45 min</b><small>Entrega média</small></span><span><ShieldCheck/><b>Original</b><small>Procedência</small></span></div><button onClick={e=>{add(selected,1,e.currentTarget);setSelected(null)}}><ShoppingCart/>ADICIONAR AO CARRINHO</button></div></div></div>}
 
     <nav className="mobile-store-bottom"><button className="active"><Home/><span>Início</span></button><button onClick={()=>document.getElementById('products')?.scrollIntoView({behavior:'smooth'})}><Tag/><span>Ofertas</span></button><button className="mobile-cart-main" onClick={()=>setCartOpen(true)}><ShoppingCart/><em>{count}</em></button><button><Package/><span>Pedidos</span></button><button onClick={()=>setMenuOpen(true)}><Menu/><span>Mais</span></button></nav>
     <div className={`toast-next ${toast?'show':''}`}>{toast}</div>
