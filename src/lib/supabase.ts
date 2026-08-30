@@ -32,9 +32,7 @@ const authStorage = {
     if (!inBrowser()) return null;
 
     try {
-      return (
-        window.localStorage.getItem(key) ?? window.sessionStorage.getItem(key)
-      );
+      return window.localStorage.getItem(key) ?? window.sessionStorage.getItem(key);
     } catch {
       return null;
     }
@@ -47,12 +45,10 @@ const authStorage = {
       const persistent = readPersistenceMode() === "local";
       const primary = persistent ? window.localStorage : window.sessionStorage;
       const secondary = persistent ? window.sessionStorage : window.localStorage;
-
       secondary.removeItem(key);
       primary.setItem(key, value);
     } catch {
-      // Storage can be unavailable in strict privacy modes. Supabase will keep
-      // the current in-memory session for the lifetime of the page.
+      // Storage can be unavailable in strict privacy modes.
     }
   },
 
@@ -72,10 +68,7 @@ export function setAuthPersistence(persist: boolean) {
   if (!inBrowser()) return;
 
   try {
-    window.localStorage.setItem(
-      PERSISTENCE_MODE_KEY,
-      persist ? "local" : "session",
-    );
+    window.localStorage.setItem(PERSISTENCE_MODE_KEY, persist ? "local" : "session");
   } catch {
     // Session-only behavior is the safe fallback when localStorage is blocked.
   }
@@ -151,24 +144,16 @@ async function restoreTransferredSession() {
   const transferred = decodeTransfer(raw);
   if (!transferred?.access_token || !transferred.refresh_token) return;
 
-  await supabase.auth.setSession({
-    access_token: transferred.access_token,
-    refresh_token: transferred.refresh_token,
-  });
+  try {
+    await supabase.auth.setSession({
+      access_token: transferred.access_token,
+      refresh_token: transferred.refresh_token,
+    });
+  } catch (error) {
+    console.warn("[auth] session transfer failed", error);
+  }
 }
 
+// Important: do not monkey-patch getUser/getSession to await this promise.
+// setSession may internally consult auth state, which can create a self-wait deadlock.
 export const authReady = restoreTransferredSession();
-
-const originalGetUser = supabase.auth.getUser.bind(supabase.auth);
-const originalGetSession = supabase.auth.getSession.bind(supabase.auth);
-
-Object.assign(supabase.auth, {
-  async getUser(...args: Parameters<typeof originalGetUser>) {
-    await authReady;
-    return originalGetUser(...args);
-  },
-  async getSession(...args: Parameters<typeof originalGetSession>) {
-    await authReady;
-    return originalGetSession(...args);
-  },
-});
