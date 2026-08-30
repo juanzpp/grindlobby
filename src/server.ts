@@ -18,8 +18,6 @@ async function getServerEntry(): Promise<ServerEntry> {
   return serverEntryPromise;
 }
 
-// h3 swallows in-handler throws into a normal 500 Response with body
-// {"unhandled":true,"message":"HTTPError"} — try/catch alone never fires for those.
 async function normalizeCatastrophicSsrResponse(response: Response): Promise<Response> {
   if (response.status < 500) return response;
   const contentType = response.headers.get("content-type") ?? "";
@@ -44,16 +42,32 @@ function isH3SwallowedErrorBody(body: string): boolean {
   }
 }
 
+function healthResponse() {
+  return new Response(JSON.stringify({ ok: true, service: "grindlobby" }), {
+    status: 200,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+      "x-content-type-options": "nosniff",
+    },
+  });
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     const url = new URL(request.url);
-    if (url.pathname === "/healthz") {
-      return new Response(JSON.stringify({ ok: true, service: "grindlobby" }), {
-        status: 200,
+
+    if (url.pathname === "/healthz" || url.pathname === "/health") return healthResponse();
+
+    // Render/CDN/bot probes commonly use HEAD. Running those through React SSR can
+    // create a streaming response nobody consumes, which was leaving transforms
+    // alive until Nitro's 120s forced-cleanup threshold.
+    if (request.method === "HEAD") {
+      return new Response(null, {
+        status: 204,
         headers: {
-          "content-type": "application/json; charset=utf-8",
           "cache-control": "no-store",
-          "x-content-type-options": "nosniff",
+          "x-grind-probe": "head-bypass",
         },
       });
     }
