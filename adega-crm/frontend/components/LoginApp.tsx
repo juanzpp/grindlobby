@@ -4,7 +4,7 @@ import { FormEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, us
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowRight, Building2, Check, Eye, EyeOff, Fingerprint, Grid3X3,
-  LockKeyhole, Mail, ScanFace, ShieldCheck, Signal, X, LoaderCircle
+  LockKeyhole, Mail, ScanFace, ShieldCheck, Signal, X, LoaderCircle, Wine, Sparkles
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { requestPlatformPasskey, type PasskeyLoginOptionsJSON } from '@/lib/webauthn';
@@ -123,8 +123,9 @@ export default function LoginApp() {
     });
     const sceneAnimation = reduced ? null : gsap.timeline()
       .fromTo('.post-login-content', { autoAlpha: 0, y: 18 }, { autoAlpha: 1, y: 0, duration: 0.65, ease: 'power3.out' })
-      .fromTo('.post-login-bottle', { rotate: -4, y: -4 }, { rotate: 1.5, y: 3, duration: 1.25, yoyo: true, repeat: 1, ease: 'sine.inOut' }, 0.15)
-      .fromTo('.post-login-bottle-liquid', { x: -12, y: 3, skewX: -7 }, { x: 14, y: -4, skewX: 8, duration: 0.76, yoyo: true, repeat: 3, ease: 'sine.inOut' }, 0.18)
+      .fromTo('.toast-glass.left', { rotate: -18, x: -18 }, { rotate: -7, x: 5, duration: 0.7, yoyo: true, repeat: 2, ease: 'sine.inOut' }, 0.15)
+      .fromTo('.toast-glass.right', { rotate: 18, x: 18 }, { rotate: 7, x: -5, duration: 0.7, yoyo: true, repeat: 2, ease: 'sine.inOut' }, 0.15)
+      .fromTo('.toast-spark', { scale: 0, autoAlpha: 0 }, { scale: 1, autoAlpha: 1, duration: 0.3, yoyo: true, repeat: 5, ease: 'power2.out' }, 0.5)
       .to('.post-login-loader', { autoAlpha: 0, duration: 0.42, ease: 'power1.in' }, (duration - 220) / 1000);
     const destinationTimer = transitioning ? window.setTimeout(() => router.replace('/gestor', { scroll: false }), duration + 80) : null;
     return () => {
@@ -286,10 +287,10 @@ export default function LoginApp() {
         <div className="post-login-scene" />
         <div className="post-login-veil" />
         <div className="post-login-content">
-          <div className="post-login-pour" aria-hidden="true">
-            <img className="post-login-bottle" src="/assets/whisky-loader-v1.png" alt="" />
-            <i className="post-login-bottle-liquid" />
-            <i className="post-login-drops"><b/><b/><b/></i>
+          <div className="post-login-toast" aria-hidden="true">
+            <Wine className="toast-glass left" />
+            <Sparkles className="toast-spark" />
+            <Wine className="toast-glass right" />
           </div>
           <div className="post-login-track" aria-hidden="true"><i className={loadProgress > .5 ? 'is-flowing' : ''} style={{width:`${loadProgress}%`}}><b/><span/></i></div>
           <div className="post-login-copy"><span>Sincronizando seu ambiente de gestão…</span></div>

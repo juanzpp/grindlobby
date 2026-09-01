@@ -117,6 +117,7 @@ export default function Storefront(){
   },[selected]);
 
   const red=products.find(isRed)||products[0];
+  const featuredCombo=red?{...red,name:'Combo Baly + Eternity Watermelon',price:55}:undefined;
   const categories=useMemo(()=>[...new Set(products.map(p=>p.category))],[products]);
   const filtered=useMemo(()=>{
     let l=products.filter(p=>(!query||`${p.name} ${p.category}`.toLowerCase().includes(query.toLowerCase()))&&(!category||p.category===category));
@@ -181,8 +182,6 @@ export default function Storefront(){
     }catch(e:any){setCheckoutState('idle');showToast(e.message)}
   };
   const toggleFav=(id:number)=>setFavorites(f=>{const n=new Set(f);if(n.has(id))n.delete(id);else n.add(id);return n});
-  const oldPrice=red?red.price*1.18:0;
-
   const tilt=(e:React.PointerEvent<HTMLElement>)=>{if(prefersReducedMotion()||window.innerWidth<900)return;const r=e.currentTarget.getBoundingClientRect(),x=(e.clientX-r.left)/r.width,y=(e.clientY-r.top)/r.height;e.currentTarget.style.setProperty('--card-x',`${x*100}%`);e.currentTarget.style.setProperty('--card-y',`${y*100}%`);e.currentTarget.style.setProperty('--card-rx',`${(y-.5)*-5}deg`);e.currentTarget.style.setProperty('--card-ry',`${(x-.5)*7}deg`)};
   const untilt=(e:React.PointerEvent<HTMLElement>)=>{e.currentTarget.style.setProperty('--card-rx','0deg');e.currentTarget.style.setProperty('--card-ry','0deg')};
   const closeProduct=useCallback(()=>{const layer=appRef.current?.querySelector('.product-modal-next')||null;animateLayerOut(layer,()=>setSelected(null),{card:'.product-modal-box',backdrop:'.product-modal-overlay'})},[]);
@@ -214,11 +213,11 @@ export default function Storefront(){
       <section className="store-hero-next premium-hero">
         <div className="hero-bg"/>
         <div className="hero-copy-next">
-          <span className="hero-kicker"><Sparkles/> O CLÁSSICO QUE NUNCA SAI DE MODA</span>
-          <small className="hero-brand">JOHNNIE WALKER</small>
-          <h1 className="hero-title"><strong>GOLD LABEL</strong><span>Reserve</span></h1>
-          <p className="hero-desc">Textura aveludada, notas de mel e tradição escocesa em uma apresentação à altura dos seus melhores momentos.</p>
-          <div className="hero-buy-row"><button onClick={e=>red&&add(red,1,e.currentTarget)}><ShoppingCart/>ADICIONAR AO CARRINHO</button><div><strong>{money(red?.price||0)}</strong><del>{money(oldPrice)}</del><em>-15%</em></div></div>
+          <span className="hero-kicker"><Sparkles/> COMBO ESPECIAL DA CASA</span>
+          <small className="hero-brand">BALY + ETERNITY</small>
+          <h1 className="hero-title"><strong>COMBO</strong><span>Watermelon</span></h1>
+          <p className="hero-desc">Uma combinação vibrante e refrescante, pronta para transformar qualquer encontro em uma noite memorável.</p>
+          <div className="hero-buy-row"><button onClick={e=>featuredCombo&&add(featuredCombo,1,e.currentTarget)}><ShoppingCart/>ADICIONAR AO CARRINHO</button><div><strong>{money(55)}</strong></div></div>
           <div className="hero-trust"><span><ShieldCheck/>100% Original</span><span><Truck/>Entrega Rápida</span><span><Package/>{red?.stock||0} em estoque</span></div>
         </div>
         <div className="hero-static-product"><Image className="hero-static-image" src="/assets/hero-baly-eternity-watermelon.png" alt="Baly Energy Drink, Eternity Gin Watermelon e gelo sabor melancia" fill priority sizes="(max-width: 820px) 72vw, 56vw"/></div>
