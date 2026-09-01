@@ -1,20 +1,24 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import anime from 'animejs';
 import {
   LayoutDashboard, ReceiptText, ShoppingCart, Package, Warehouse, Users, Truck,
   WalletCards, ChartNoAxesCombined, Megaphone, PlugZap, Settings, CircleHelp,
   Bell, ExternalLink, Search, Plus, Minus, Trash2, ChevronRight, Boxes,
   CreditCard, Banknote, QrCode, TrendingUp, ArrowUpRight, TriangleAlert,
-  Wifi, WifiOff, Menu, X, RefreshCw, Tag, CircleDollarSign, CheckCircle2,
+  Menu, X, RefreshCw, Tag, CircleDollarSign, CheckCircle2,
   SlidersHorizontal, ShieldCheck, Sparkles, Clock3, Store, BarChart3, LogOut, Fingerprint
 } from 'lucide-react';
 import ProductArt from './ProductArt';
 import {beverageCatalog,type BeverageCatalogItem} from '@/lib/beverageCatalog';
 import { api, dateTime, money, wsUrl } from '@/lib/api';
 import { createPlatformPasskey, type PasskeyRegisterOptionsJSON } from '@/lib/webauthn';
+import AnimatedNumber from './motion/AnimatedNumber';
+import type { NumberPresentation } from '@/lib/animations/numbers';
+import { gsap, prefersReducedMotion, setMotionHint, clearMotionHint } from '@/lib/animations/gsap';
+import { animateLayerIn, animateLayerOut, animateStatus, pulseFeedback } from '@/lib/animations/motion';
+import { useDelegatedPressFeedback, useLayerEntranceObserver } from '@/lib/animations/react';
 
 type Product={id:number;name:string;category:string;sku?:string;barcode?:string;cost:number;price:number;stock:number;min_stock:number;storefront:number;volume_ml?:number;image_url?:string};
 type Order={id:number;channel:string;payment_method:string;status:string;subtotal:number;discount:number;total:number;created_at:string;customer_id?:number};
@@ -39,8 +43,8 @@ const payName=(v:string)=>({pix:'PIX',card:'Cartão',cash:'Dinheiro',ifood:'iFoo
 
 function Toast({text}:{text:string}){return <div className={`toast-next ${text?'show':''}`}>{text}</div>}
 function Empty({children='Nenhum registro encontrado.'}:{children?:React.ReactNode}){return <div className="empty-state"><Boxes size={28}/><p>{children}</p></div>}
-function StatusBadge({status}:{status:string}){const ok=/confirm|ready|ativa|online|normal/i.test(status);const warn=/pend|agendada|baixo|config/i.test(status);return <span className={`status-badge ${ok?'ok':warn?'warn':'bad'}`}>{status}</span>}
-function Metric({icon:Icon,label,value,delta,tone='gold',art}:{icon:any;label:string;value:string;delta:string;tone?:string;art?:string}){return <article className={`metric-card tone-${tone}`}><div className={`metric-icon ${art?'metric-real-icon':''}`}>{art?<img src={art} alt=""/>:<Icon size={20}/>}</div><div className="metric-copy"><small>{label}</small><strong>{value}</strong><span><TrendingUp size={12}/>{delta}</span></div><ArrowUpRight className="metric-arrow" size={16}/></article>}
+function StatusBadge({status}:{status:string}){const ref=useRef<HTMLSpanElement|null>(null);const ok=/confirm|ready|ativa|online|normal|conclu/i.test(status);const warn=/pend|agendada|baixo|config|prepar/i.test(status);useLayoutEffect(()=>{animateStatus(ref.current)},[status]);return <span ref={ref} className={`status-badge ${ok?'ok':warn?'warn':'bad'}`}>{status}</span>}
+function Metric({icon:Icon,label,value,delta,tone='gold',art,presentation='currency',suffix=''}:{icon:any;label:string;value:number|string;delta:string;tone?:string;art?:string;presentation?:NumberPresentation;suffix?:string}){return <article className={`metric-card tone-${tone}`}><div className={`metric-icon ${art?'metric-real-icon':''}`}>{art?<img src={art} alt=""/>:<Icon size={20}/>}</div><div className="metric-copy"><small>{label}</small><strong>{typeof value==='number'?<AnimatedNumber value={value} presentation={presentation} suffix={suffix}/>:value}</strong><span><TrendingUp size={12}/>{delta}</span></div><ArrowUpRight className="metric-arrow" size={16}/></article>}
 function BrandIcon({kind}:{kind:string}){const src:Record<string,string>={pix:'https://cdn.simpleicons.org/pix/32BCAD',whatsapp:'https://cdn.simpleicons.org/whatsapp/25D366',ifood:'https://cdn.simpleicons.org/ifood/EA1D2C'};if(src[kind])return <img className="brand-real-icon" src={src[kind]} alt={kind}/>;if(kind==='storefront')return <Store/>;if(kind==='pdv')return <ShoppingCart/>;if(kind==='stock')return <Boxes/>;return <QrCode/>}
 function MiniLine({data}:{data:{date:string;revenue:number}[]}){const max=Math.max(1,...data.map(d=>d.revenue));const w=720,h=190,p=18;const pts=data.map((d,i)=>`${p+i*((w-p*2)/Math.max(1,data.length-1))},${h-p-(d.revenue/max)*(h-p*2)}`).join(' ');return <div className="line-chart"><svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none"><defs><linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#f6bd4c" stopOpacity=".32"/><stop offset="1" stopColor="#f6bd4c" stopOpacity="0"/></linearGradient></defs><g className="grid-lines"><line x1="0" y1="40" x2={w} y2="40"/><line x1="0" y1="95" x2={w} y2="95"/><line x1="0" y1="150" x2={w} y2="150"/></g><polygon fill="url(#area)" points={`${p},${h-p} ${pts} ${w-p},${h-p}`}/><polyline points={pts} fill="none" stroke="#f6bd4c" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>{data.map((d,i)=>{const [x,y]=pts.split(' ')[i].split(',');return <circle key={d.date} cx={x} cy={y} r="4" fill="#090a0c" stroke="#ffd36a" strokeWidth="3"/>})}</svg><div className="chart-axis">{data.map(d=><span key={d.date}>{new Date(`${d.date}T12:00:00`).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'})}</span>)}</div></div>}
 function Donut({rows}:{rows:{channel:string;revenue:number}[]}){const total=rows.reduce((a,b)=>a+Number(b.revenue),0)||1;let cur=0;const colors=['#f4b93f','#24c96b','#4d8eff','#8d4de8','#ea4a61'];const stops=rows.map((r,i)=>{const a=cur;cur+=Number(r.revenue)/total*100;return `${colors[i%colors.length]} ${a}% ${cur}%`}).join(', ');return <div className="donut-wrap"><div className="donut" style={{background:`conic-gradient(${stops||'#2a2a2d 0 100%'})`}}><div><strong>{money(total)}</strong><span>Total</span></div></div><div className="donut-legend">{rows.slice(0,5).map((r,i)=><div key={r.channel}><i style={{background:colors[i%colors.length]}}/><span>{channelName(r.channel)}</span><b>{money(r.revenue)}</b><em>{Math.round(Number(r.revenue)/total*100)}%</em></div>)}</div></div>}
@@ -62,7 +66,13 @@ export default function ManagerApp(){
   const [integrations,setIntegrations]=useState<Integration[]>([]);
   const [settings,setSettings]=useState<SettingsData|null>(null);
   const [audit,setAudit]=useState<any[]>([]);
-  const showToast=(s:string)=>{setToast(s);setTimeout(()=>setToast(''),2600)};
+  const animatedViews=useRef(new Set<string>());
+  const toastTimer=useRef<number|undefined>(undefined);
+  const showToast=useCallback((s:string)=>{setToast(s);if(toastTimer.current)window.clearTimeout(toastTimer.current);toastTimer.current=window.setTimeout(()=>setToast(''),2600)},[]);
+
+  useDelegatedPressFeedback(appRef,'.manager-mobile-tabs button,.quick-action-grid button,.pdv-product,.qty-control button,.cash-calculator nav button,.finish-sale,.payment-grid button,.primary-small,.modal-primary');
+  useLayerEntranceObserver(appRef);
+  useEffect(()=>()=>{if(toastTimer.current)window.clearTimeout(toastTimer.current)},[]);
 
   const load=useCallback(async(v:View)=>{
     try{
@@ -78,16 +88,35 @@ export default function ManagerApp(){
       if(v==='settings')setSettings(await api('/api/settings'));
       if(v==='help'){setIntegrations(await api('/api/integrations'));setAudit(await api('/api/audit?limit=12'));}
     }catch(e:any){showToast(e.message)}
-  },[]);
+  },[showToast]);
   useEffect(()=>{load(view);},[view,load]);
-  useEffect(()=>{
-    const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if(!reduced) anime({targets:'.page-enter > *',opacity:[0,1],translateY:[10,0],delay:anime.stagger(35),duration:420,easing:'easeOutCubic'});
+  useLayoutEffect(()=>{
+    const root=appRef.current;if(!root||prefersReducedMotion())return;
+    const context=gsap.context(()=>{
+      gsap.fromTo('.page-enter',{autoAlpha:0,y:6},{autoAlpha:1,y:0,duration:.2,ease:'power2.out',clearProps:'transform,opacity'});
+      const active=root.querySelector('.manager-mobile-tabs button.active');
+      if(active)gsap.fromTo(active.querySelectorAll('svg,span'),{scale:.94,autoAlpha:.72},{scale:1.08,autoAlpha:1,duration:.18,ease:'power2.out',stagger:.02,yoyo:true,repeat:1,clearProps:'transform,opacity'});
+    },appRef);
+    return()=>context.revert();
+  },[view]);
+  useLayoutEffect(()=>{
+    const root=appRef.current;if(!root||prefersReducedMotion())return;
+    const animatedKeys=animatedViews.current;
+    const ready=view==='dashboard'?Boolean(dashboard):view==='sales'?orders.length>0:['products','stock','pdv'].includes(view)?products.length>0:true;
+    const key=`${view}:${view==='dashboard'?Boolean(dashboard):view==='sales'?orders.length:['products','stock','pdv'].includes(view)?products.length:1}`;
+    if(!ready||animatedKeys.has(key))return;
+    animatedKeys.add(key);
+    const targets=root.querySelectorAll('.page-enter .metric-card,.page-enter .panel,.page-enter .data-row,.page-enter .product-row,.page-enter .pdv-product');
+    if(!targets.length)return;
+    setMotionHint(targets);
+    let completed=false;
+    const tween=gsap.fromTo(targets,{autoAlpha:0,y:10},{autoAlpha:1,y:0,duration:.32,stagger:.025,ease:'power2.out',onComplete:()=>{completed=true;clearMotionHint(targets);gsap.set(targets,{clearProps:'transform,opacity,visibility'})}});
+    return()=>{tween.kill();if(!completed){animatedKeys.delete(key);gsap.set(targets,{clearProps:'transform,opacity,visibility,willChange'})}};
   },[view,dashboard,products.length,orders.length]);
   useEffect(()=>{
     let ws:WebSocket|undefined, timer:any;
     const connect=()=>{try{ws=new WebSocket(wsUrl());ws.onopen=()=>setOnline(true);ws.onmessage=(e)=>{const m=JSON.parse(e.data);if(m.type==='new_order'){showToast(`Nova venda #${m.order_id} · ${money(m.total)}`);if(view==='dashboard')load('dashboard')}if(m.type==='stock_changed'&&['stock','pdv'].includes(view))load(view)};ws.onclose=()=>{setOnline(false);timer=setTimeout(connect,1800)}}catch{setOnline(false)}};connect();return()=>{clearTimeout(timer);ws?.close()};
-  },[view,load]);
+  },[view,load,showToast]);
 
   const onPointerMove=(e:React.PointerEvent<HTMLDivElement>)=>{const el=appRef.current;if(!el)return;const r=el.getBoundingClientRect();el.style.setProperty('--manager-x',`${e.clientX-r.left}px`);el.style.setProperty('--manager-y',`${e.clientY-r.top}px`)};
 
@@ -128,11 +157,11 @@ function DashboardView({data,integrations,online,onNavigate}:{data:Dashboard|nul
   return <div className="dashboard-blueprint">
     <section className="dashboard-core">
       <div className="metrics-grid dashboard-kpis">
-        <Metric icon={CircleDollarSign} label="Faturamento hoje" value={money(data.revenue)} delta="18,6% vs ontem"/>
-        <Metric icon={ShoppingCart} label="Vendas hoje" value={`${data.sales} pedidos`} delta="12,4% vs ontem" tone="green"/>
-        <Metric icon={ReceiptText} label="Ticket médio" value={money(data.ticket)} delta="6,3% vs ontem" tone="blue"/>
-        <Metric icon={CircleDollarSign} label="Lucro bruto (hoje)" value={money(data.gross_profit)} delta="15,7% vs ontem" tone="purple"/>
-        <Metric icon={Tag} label="Produtos vendidos" value={`${data.units} un.`} delta="11,9% vs ontem" tone="amber"/>
+        <Metric icon={CircleDollarSign} label="Faturamento hoje" value={data.revenue} delta="18,6% vs ontem"/>
+        <Metric icon={ShoppingCart} label="Vendas hoje" value={data.sales} presentation="integer" suffix=" pedidos" delta="12,4% vs ontem" tone="green"/>
+        <Metric icon={ReceiptText} label="Ticket médio" value={data.ticket} delta="6,3% vs ontem" tone="blue"/>
+        <Metric icon={CircleDollarSign} label="Lucro bruto (hoje)" value={data.gross_profit} delta="15,7% vs ontem" tone="purple"/>
+        <Metric icon={Tag} label="Produtos vendidos" value={data.units} presentation="integer" suffix=" un." delta="11,9% vs ontem" tone="amber"/>
       </div>
 
       <div className="dashboard-main-grid dashboard-chart-row">
@@ -149,10 +178,10 @@ function DashboardView({data,integrations,online,onNavigate}:{data:Dashboard|nul
       <section className="finance-ribbon blueprint-finance">
         <div className="finance-summary-title">RESUMO FINANCEIRO</div>
         <div className="finance-summary-grid">
-          <div><small>RECEBIMENTOS (HOJE)</small><strong>{money(receipt)}</strong></div>
-          <div className="expense"><small>DESPESAS (HOJE)</small><strong>{money(expenses)}</strong></div>
-          <div><small>LUCRO LÍQUIDO (HOJE)</small><strong>{money(data.net_result)}</strong></div>
-          <div className="cash"><small>SALDO NO CAIXA</small><strong>{money(cash)}</strong></div>
+          <div><small>RECEBIMENTOS (HOJE)</small><strong><AnimatedNumber value={receipt}/></strong></div>
+          <div className="expense"><small>DESPESAS (HOJE)</small><strong><AnimatedNumber value={expenses}/></strong></div>
+          <div><small>LUCRO LÍQUIDO (HOJE)</small><strong><AnimatedNumber value={data.net_result}/></strong></div>
+          <div className="cash"><small>SALDO NO CAIXA</small><strong><AnimatedNumber value={cash}/></strong></div>
         </div>
         <div className="payments-blueprint"><h4>FORMAS DE PAGAMENTO (HOJE)</h4>{data.payments.slice(0,3).map((p,i)=>{const pct=Math.round(p.revenue/paymentTotal*100);return <div key={p.payment_method}><span>{payName(p.payment_method)}</span><i><b style={{width:`${pct}%`}}/></i><strong>{money(p.revenue)}</strong><em>{pct}%</em></div>})}</div>
       </section>
@@ -183,14 +212,37 @@ function BarcodeScanner({title,onClose,onDetected}:{title:string;onClose:()=>voi
 }
 
 function PDV({products,onDone,toast}:{products:Product[];onDone:()=>void;toast:(s:string)=>void}){
+  const pdvRef=useRef<HTMLDivElement|null>(null);
+  const checkoutTimer=useRef<number|undefined>(undefined);
   const [q,setQ]=useState(''),[category,setCategory]=useState('Todos'),[scanner,setScanner]=useState(false),[cart,setCart]=useState<Record<number,number>>({}),[method,setMethod]=useState('pix'),[received,setReceived]=useState('');
+  const [checkoutState,setCheckoutState]=useState<'idle'|'loading'|'success'>('idle');
+  useEffect(()=>()=>{if(checkoutTimer.current)window.clearTimeout(checkoutTimer.current)},[]);
   const list=products.filter(p=>p.stock>0&&(category==='Todos'||p.category===category)&&(!q||`${p.name} ${p.category} ${p.barcode||''} ${p.sku||''}`.toLowerCase().includes(q.toLowerCase())));
   const items=Object.entries(cart).map(([id,qty])=>({p:products.find(p=>p.id===+id)!,qty})).filter(x=>x.p);
   const total=items.reduce((s,x)=>s+x.p.price*x.qty,0),paid=Number(String(received).replace(',','.'))||0,change=Math.max(0,paid-total);
-  const add=(id:number,d=1)=>setCart(c=>{const p=products.find(x=>x.id===id);const n=Math.max(0,Math.min(p?.stock||0,(c[id]||0)+d));const v={...c};if(n)v[id]=n;else delete v[id];return v});
+  const add=(id:number,d=1,source?:HTMLElement|null)=>{setCart(c=>{const p=products.find(x=>x.id===id);const n=Math.max(0,Math.min(p?.stock||0,(c[id]||0)+d));const v={...c};if(n)v[id]=n;else delete v[id];return v});if(source)pulseFeedback(source,1.025);window.requestAnimationFrame(()=>{const row=pdvRef.current?.querySelector(`[data-cart-id="${id}"]`);if(row&&!prefersReducedMotion())gsap.fromTo(row,{autoAlpha:.72,x:d>0?10:-5},{autoAlpha:1,x:0,duration:.2,ease:'power2.out',clearProps:'transform,opacity'})})};
+  const remove=(id:number)=>{const done=()=>setCart(c=>{const n={...c};delete n[id];return n});const row=pdvRef.current?.querySelector(`[data-cart-id="${id}"]`);if(!row||prefersReducedMotion())return done();gsap.to(row,{autoAlpha:0,x:14,duration:.16,ease:'power2.in',onComplete:done})};
   const scanned=(code:string)=>{setScanner(false);const p=products.find(p=>p.stock>0&&(p.barcode===code||p.sku?.toLowerCase()===code.toLowerCase()));if(!p){toast(`Produto ${code} não encontrado no estoque`);return}add(p.id);toast(`${p.name} adicionado à venda`)};
-  const checkout=async()=>{if(!items.length||method==='cash'&&paid<total)return;await api('/api/orders',{method:'POST',body:JSON.stringify({channel:'pdv',payment_method:method,items:items.map(x=>({product_id:x.p.id,qty:x.qty})),discount:0})});setCart({});setReceived('');onDone()};
-  return <><div className="pdv-layout"><article className="panel pdv-products"><div className="pdv-search"><Search/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Buscar produto, categoria ou código de barras..."/><button aria-label="Bipar produto" onClick={()=>setScanner(true)}><ScanIcon/></button></div><div className="category-chips" aria-label="Filtrar por categoria"><button className={category==='Todos'?'active':''} onClick={()=>setCategory('Todos')}>Todos</button>{[...new Set(products.map(p=>p.category))].map(c=><button className={category===c?'active':''} key={c} onClick={()=>setCategory(c)}>{c}</button>)}</div><div className="pdv-grid">{list.map(p=><button className="pdv-product" key={p.id} onClick={()=>add(p.id)}><ProductArt name={p.name} category={p.category} image={p.image_url}/><div><small>{p.category}{p.volume_ml?` · ${p.volume_ml} ml`:''}</small><b>{p.name}</b><strong>{money(p.price)}</strong><em>{p.stock} un.</em></div><span><Plus/></span></button>)}</div>{!list.length&&<Empty>Nenhum produto disponível neste filtro.</Empty>}</article><aside className="panel pdv-cart"><div className="cart-title"><div><small>CAIXA ABERTO</small><h3>Venda atual</h3></div><span>{items.reduce((s,x)=>s+x.qty,0)} itens</span></div><div className="pdv-cart-list">{items.length?items.map(x=><div key={x.p.id}><ProductArt name={x.p.name} category={x.p.category} image={x.p.image_url}/><div><b>{x.p.name}</b><small>{money(x.p.price)} cada</small><div className="qty-control"><button aria-label="Diminuir quantidade" onClick={()=>add(x.p.id,-1)}><Minus/></button><span>{x.qty}</span><button aria-label="Aumentar quantidade" onClick={()=>add(x.p.id,1)}><Plus/></button></div></div><strong>{money(x.p.price*x.qty)}</strong><button aria-label="Remover produto" className="remove" onClick={()=>setCart(c=>{const n={...c};delete n[x.p.id];return n})}><Trash2/></button></div>):<Empty>Adicione produtos para iniciar a venda.</Empty>}</div><div className="pdv-summary"><div><span>Subtotal</span><b>{money(total)}</b></div><div><span>Desconto</span><b>{money(0)}</b></div><div className="total"><span>Total</span><strong>{money(total)}</strong></div></div><div className="payment-grid"><button className={method==='pix'?'active pix':''} onClick={()=>setMethod('pix')}><QrCode/>PIX</button><button className={method==='card'?'active card':''} onClick={()=>setMethod('card')}><CreditCard/>Cartão</button><button className={method==='cash'?'active cash':''} onClick={()=>setMethod('cash')}><Banknote/>Dinheiro</button></div>{method==='cash'&&<div className="cash-calculator"><label>Valor recebido (R$)<input inputMode="decimal" value={received} onChange={e=>setReceived(e.target.value)} placeholder="0,00"/></label><div><span>Troco</span><strong>{money(change)}</strong></div><nav>{[20,50,100,200].map(v=><button key={v} onClick={()=>setReceived(String(v))}>R$ {v}</button>)}</nav></div>}<button className="finish-sale" disabled={!items.length||(method==='cash'&&paid<total)} onClick={checkout}>FINALIZAR VENDA <ChevronRight/></button></aside></div>{scanner&&<BarcodeScanner title="Bipar produto no caixa" onClose={()=>setScanner(false)} onDetected={scanned}/>}</>
+  const checkout=async()=>{if(!items.length||method==='cash'&&paid<total||checkoutState!=='idle')return;setCheckoutState('loading');try{await api('/api/orders',{method:'POST',body:JSON.stringify({channel:'pdv',payment_method:method,items:items.map(x=>({product_id:x.p.id,qty:x.qty})),discount:0})});setCheckoutState('success');setCart({});setReceived('');onDone();checkoutTimer.current=window.setTimeout(()=>setCheckoutState('idle'),520)}catch(e:any){setCheckoutState('idle');toast(e.message||'Não foi possível finalizar a venda')}};
+  return <>
+    <div ref={pdvRef} className="pdv-layout">
+      <article className="panel pdv-products">
+        <div className="pdv-search"><Search/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Buscar produto, categoria ou código de barras..."/><button aria-label="Bipar produto" onClick={()=>setScanner(true)}><ScanIcon/></button></div>
+        <div className="category-chips" aria-label="Filtrar por categoria"><button className={category==='Todos'?'active':''} onClick={()=>setCategory('Todos')}>Todos</button>{[...new Set(products.map(p=>p.category))].map(c=><button className={category===c?'active':''} key={c} onClick={()=>setCategory(c)}>{c}</button>)}</div>
+        <div className="pdv-grid">{list.map(p=><button className="pdv-product" key={p.id} onClick={e=>add(p.id,1,e.currentTarget)}><ProductArt name={p.name} category={p.category} image={p.image_url}/><div><small>{p.category}{p.volume_ml?` · ${p.volume_ml} ml`:''}</small><b>{p.name}</b><strong>{money(p.price)}</strong><em>{p.stock} un.</em></div><span><Plus/></span></button>)}</div>
+        {!list.length&&<Empty>Nenhum produto disponível neste filtro.</Empty>}
+      </article>
+      <aside className="panel pdv-cart">
+        <div className="cart-title"><div><small>CAIXA ABERTO</small><h3>Venda atual</h3></div><span>{items.reduce((s,x)=>s+x.qty,0)} itens</span></div>
+        <div className="pdv-cart-list">{items.length?items.map(x=><div data-cart-id={x.p.id} key={x.p.id}><ProductArt name={x.p.name} category={x.p.category} image={x.p.image_url}/><div><b>{x.p.name}</b><small>{money(x.p.price)} cada</small><div className="qty-control"><button aria-label="Diminuir quantidade" onClick={e=>add(x.p.id,-1,e.currentTarget)}><Minus/></button><span>{x.qty}</span><button aria-label="Aumentar quantidade" onClick={e=>add(x.p.id,1,e.currentTarget)}><Plus/></button></div></div><strong><AnimatedNumber value={x.p.price*x.qty}/></strong><button aria-label="Remover produto" className="remove" onClick={()=>remove(x.p.id)}><Trash2/></button></div>):<Empty>Adicione produtos para iniciar a venda.</Empty>}</div>
+        <div className="pdv-summary"><div><span>Subtotal</span><b><AnimatedNumber value={total}/></b></div><div><span>Desconto</span><b>{money(0)}</b></div><div className="total"><span>Total</span><strong><AnimatedNumber value={total}/></strong></div></div>
+        <div className="payment-grid"><button className={method==='pix'?'active pix':''} onClick={()=>setMethod('pix')}><QrCode/>PIX</button><button className={method==='card'?'active card':''} onClick={()=>setMethod('card')}><CreditCard/>Cartão</button><button className={method==='cash'?'active cash':''} onClick={()=>setMethod('cash')}><Banknote/>Dinheiro</button></div>
+        {method==='cash'&&<div className="cash-calculator"><label>Valor recebido (R$)<input inputMode="decimal" value={received} onChange={e=>setReceived(e.target.value)} placeholder="0,00"/></label><div><span>Troco</span><strong><AnimatedNumber value={change}/></strong></div><nav>{[20,50,100,200].map(v=><button key={v} onClick={()=>setReceived(String(v))}>R$ {v}</button>)}</nav></div>}
+        <button className={`finish-sale ${checkoutState}`} disabled={!items.length||(method==='cash'&&paid<total)||checkoutState!=='idle'} onClick={checkout}>{checkoutState==='loading'?<><RefreshCw className="spin"/>PROCESSANDO</>:checkoutState==='success'?<><CheckCircle2/>VENDA CONCLUÍDA</>:<>FINALIZAR VENDA <ChevronRight/></>}</button>
+      </aside>
+    </div>
+    {scanner&&<BarcodeScanner title="Bipar produto no caixa" onClose={()=>setScanner(false)} onDetected={scanned}/>}
+  </>
 }
 function ScanIcon(){return <span style={{fontWeight:800}}>▥</span>}
 
@@ -211,6 +263,7 @@ function ProductsView({products,reload,toast}:{products:Product[];reload:()=>voi
   </>;
 }
 
+/* eslint-disable react-hooks/rules-of-hooks -- useBarcode is an event handler, not a React Hook */
 function StockView({products,reload,toast}:{products:Product[];reload:()=>void;toast:(s:string)=>void}){
   const [catalogOpen,setCatalogOpen]=useState(false),[query,setQuery]=useState(''),[selected,setSelected]=useState<BeverageCatalogItem|null>(null);
   const [scannerOpen,setScannerOpen]=useState(false),[scanValue,setScanValue]=useState(''),[scanning,setScanning]=useState(false);
@@ -226,6 +279,7 @@ function StockView({products,reload,toast}:{products:Product[];reload:()=>void;t
   const catalog=beverageCatalog.filter(x=>!query||`${x.name} ${x.category} ${x.volumeMl}`.toLowerCase().includes(query.toLowerCase()));
   return <><div className="stock-metrics"><Metric icon={Boxes} label="Valor total em estoque" value={money(total)} delta={`${products.length} produtos`} tone="green"/><Metric icon={TriangleAlert} label="Abaixo do mínimo" value={`${critical}`} delta="Exige atenção" tone="amber"/><Metric icon={Package} label="Sem estoque" value={`${products.filter(p=>p.stock<=0).length}`} delta="Reposição necessária" tone="purple"/></div><article className="panel data-panel"><div className="stock-toolbar"><div><h3>Produtos em estoque</h3><span>Fotos e volumes integrados à base</span></div><div className="stock-actions"><button className="scan-stock" onClick={()=>setScannerOpen(true)}><ScanIcon/>Bipar com câmera</button><button className="primary-small" onClick={()=>setCatalogOpen(true)}><Plus/>Adicionar da base</button></div></div><div className="data-table stock-data"><div className="data-head"><span>Produto</span><span>Atual</span><span>Mínimo</span><span>Status</span><span>Movimentar</span><span>Ações</span></div>{products.map(p=><div className="data-row" key={p.id}><div className="stock-product-cell"><ProductArt name={p.name} category={p.category} image={p.image_url}/><span><b>{p.name}</b><small>{p.volume_ml?`${p.volume_ml} ml · `:''}{p.category}</small></span></div><strong>{p.stock} un.</strong><span>{p.min_stock} un.</span><StatusBadge status={p.stock<=0?'Sem estoque':p.stock<=p.min_stock?'Baixo':'Normal'}/><div className="inline-adjust"><button onClick={()=>adjust(p,-1)}><Minus/></button><button onClick={()=>adjust(p,1)}><Plus/></button></div><button className="ghost-inline">Histórico</button></div>)}</div></article>{scannerOpen&&<div className="catalog-layer"><div className="modal-backdrop" onClick={()=>{stopScanner();setScannerOpen(false)}}/><section className="scanner-card"><div className="catalog-head"><div><small>ENTRADA DE ESTOQUE</small><h3>Leia o código de barras</h3></div><button onClick={()=>{stopScanner();setScannerOpen(false)}}><X/></button></div><div className="scanner-viewport"><video ref={videoRef} muted playsInline/><i/><span>{scanning?'Aponte para o código do produto':'Câmera pronta para iniciar'}</span></div><button className="scanner-start" onClick={startScanner} disabled={scanning}>{scanning?'Lendo código…':'Ativar câmera do celular'}</button><div className="scanner-manual"><span>Ou digite o código</span><div><input inputMode="numeric" value={scanValue} onChange={e=>setScanValue(e.target.value)} placeholder="EAN, UPC ou SKU"/><button onClick={()=>useBarcode(scanValue)}>Confirmar</button></div></div></section></div>}{catalogOpen&&<div className="catalog-layer"><div className="modal-backdrop" onClick={()=>setCatalogOpen(false)}/><section className="catalog-card"><div className="catalog-head"><div><small>ESTOQUE · BASE ADEGA CRM</small><h3>{selected?'Complete a entrada':'Selecione uma bebida'}</h3></div><button onClick={()=>{setCatalogOpen(false);setSelected(null)}}><X/></button></div>{selected?<div className="stock-catalog-entry"><div className="selected-stock-drink"><ProductArt name={selected.name} category={selected.category} image={selected.image}/><div><small>{selected.category}</small><h4>{selected.name}</h4><strong>{selected.volumeMl} ml</strong></div></div><div className="form-grid"><label>Custo<input type="number" value={entry.cost} onChange={e=>setEntry({...entry,cost:e.target.value})}/></label><label>Preço<input type="number" value={entry.price} onChange={e=>setEntry({...entry,price:e.target.value})}/></label><label>Quantidade<input type="number" value={entry.stock} onChange={e=>setEntry({...entry,stock:e.target.value})}/></label><label>Estoque mínimo<input type="number" value={entry.min_stock} onChange={e=>setEntry({...entry,min_stock:e.target.value})}/></label><button className="ghost-inline" onClick={()=>setSelected(null)}>Voltar à base</button><button className="modal-primary" onClick={addFromBase}>Adicionar ao estoque</button></div></div>:<><div className="catalog-search"><Search/><input autoFocus value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar por nome, categoria ou ml..."/></div><div className="beverage-catalog-grid">{catalog.map(item=><button key={item.sku} onClick={()=>setSelected(item)}><ProductArt name={item.name} category={item.category} image={item.image}/><div><small>{item.category}</small><b>{item.name}</b><span>{item.volumeMl} ml</span></div><Plus/></button>)}</div></>}</section></div>}</>;
 }
+/* eslint-enable react-hooks/rules-of-hooks */
 
 function CustomersView({rows}:{rows:Customer[];reload:()=>void;toast:(s:string)=>void}){const total=rows[0];return <div className="split-layout"><article className="panel data-panel"><PanelHead title="Clientes — modo privacidade" action="Zero retenção de PII"/><div className="people-list"><div><div className="person-avatar">AN</div><div><b>Compras anônimas</b><small>Nomes, telefones, e-mails e endereços não são armazenados</small></div><span>{total?.orders||0} pedidos</span><strong>{money(total?.spent||0)}</strong></div></div></article><aside className="panel side-form"><h3>Privacidade por padrão</h3><p>O CRM mantém apenas métricas de vendas. Dados necessários para entrega são usados somente durante o checkout e encaminhados ao canal operacional, sem retenção no banco da Adega CRM.</p><div className="security-note">LGPD · minimização · zero-data retention para clientes</div></aside></div>}
 function SuppliersView({rows,reload,toast}:{rows:Supplier[];reload:()=>void;toast:(s:string)=>void}){const [f,setF]=useState({name:'',contact:'',phone:''});const add=async()=>{if(!f.name)return;await api('/api/suppliers',{method:'POST',body:JSON.stringify(f)});setF({name:'',contact:'',phone:''});reload();toast('Fornecedor adicionado')};return <div className="split-layout"><article className="panel data-panel"><PanelHead title="Fornecedores" action={`${rows.length} cadastrados`}/><div className="supplier-grid">{rows.map(s=><article key={s.id}><Truck/><div><b>{s.name}</b><span>{s.contact||'Contato comercial'}</span><small>{s.phone||'Sem telefone'}</small></div><ChevronRight/></article>)}</div>{!rows.length&&<Empty/>}</article><aside className="panel side-form"><h3>Novo fornecedor</h3><label>Empresa<input value={f.name} onChange={e=>setF({...f,name:e.target.value})}/></label><label>Contato<input value={f.contact} onChange={e=>setF({...f,contact:e.target.value})}/></label><label>Telefone<input value={f.phone} onChange={e=>setF({...f,phone:e.target.value})}/></label><button onClick={add}>Cadastrar fornecedor</button></aside></div>}
@@ -259,4 +313,10 @@ function PasskeySetup({toast}:{toast:(s:string)=>void}){
 
 function SettingsView({data,reload,toast}:{data:SettingsData|null;reload:()=>void;toast:(s:string)=>void}){const [f,setF]=useState<SettingsData|null>(data);useEffect(()=>setF(data),[data]);if(!f)return <Loading/>;const save=async()=>{await api('/api/settings',{method:'PUT',body:JSON.stringify(f)});reload();toast('Configurações salvas')};return <div className="settings-layout"><article className="panel settings-form"><PanelHead title="Dados da adega" action="Configuração"/><div className="form-grid"><label className="wide">Nome da loja<input value={f.store_name} onChange={e=>setF({...f,store_name:e.target.value})}/></label><label>WhatsApp<input value={f.whatsapp} onChange={e=>setF({...f,whatsapp:e.target.value})}/></label><label>Chave PIX<input value={f.pix_key} onChange={e=>setF({...f,pix_key:e.target.value})}/></label><label>Taxa de entrega<input type="number" value={f.delivery_fee} onChange={e=>setF({...f,delivery_fee:+e.target.value})}/></label><label>Pedido mínimo<input type="number" value={f.minimum_order} onChange={e=>setF({...f,minimum_order:+e.target.value})}/></label><label className="toggle-row wide"><span><b>Vitrine aberta</b><small>Permitir novos pedidos</small></span><input type="checkbox" checked={f.store_open} onChange={e=>setF({...f,store_open:e.target.checked})}/></label><button className="modal-primary wide" onClick={save}>Salvar configurações</button></div></article><article className="security-panel"><ShieldCheck/><small>SEGURANÇA OPERACIONAL</small><h3>Base preparada para operação profissional.</h3><div><span>API FastAPI</span><StatusBadge status="Online"/></div><div><span>Banco SQLite WAL</span><StatusBadge status="Online"/></div><div><span>Auditoria crítica</span><StatusBadge status="Ativa"/></div><div><span>PIX / iFood</span><StatusBadge status="Aguardando configuração"/></div><PasskeySetup toast={toast}/></article></div>}
 function HelpView({integrations,audit,online}:{integrations:Integration[];audit:any[];online:boolean}){return <div className="help-layout"><article className="panel"><PanelHead title="Diagnóstico do sistema" action="v1.0 Next"/><div className="diagnostic"><div><b>Frontend Next.js</b><StatusBadge status="Online"/></div><div><b>API FastAPI</b><StatusBadge status="Online"/></div><div><b>Tempo real</b><StatusBadge status={online?'Online':'Reconectando'}/></div>{integrations.map(i=><div key={i.slug}><b>{i.name}</b><StatusBadge status={i.status==='ready'?'Pronto':'Pendente'}/></div>)}</div></article><article className="panel"><PanelHead title="Atividade auditada" action="Últimas ações"/><div className="audit-list">{audit.map(a=><div key={a.id}><div><b>{a.action} · {a.entity}</b><span>{dateTime(a.created_at)}</span></div><small>#{a.entity_id||'—'}</small></div>)}</div></article></div>}
-function Modal({title,onClose,children}:{title:string;onClose:()=>void;children?:React.ReactNode}){return <div className="modal-layer"><div className="modal-backdrop" onClick={onClose}/><div className="modal-card"><div className="modal-head"><h3>{title}</h3><button onClick={onClose}><X/></button></div>{children}</div></div>}
+function Modal({title,onClose,children}:{title:string;onClose:()=>void;children?:React.ReactNode}){
+  const layerRef=useRef<HTMLDivElement|null>(null);
+  useLayoutEffect(()=>{const layer=layerRef.current;if(!layer)return;const animation=animateLayerIn(layer);return()=>{animation.kill()}},[]);
+  const close=()=>animateLayerOut(layerRef.current,onClose);
+  useEffect(()=>{const onKey=(event:KeyboardEvent)=>{if(event.key==='Escape')close()};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey)});
+  return <div ref={layerRef} className="modal-layer" role="dialog" aria-modal="true" aria-label={title}><div className="modal-backdrop" onClick={close}/><div className="modal-card"><div className="modal-head"><h3>{title}</h3><button onClick={close} aria-label="Fechar"><X/></button></div>{children}</div></div>
+}

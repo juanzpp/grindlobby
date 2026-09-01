@@ -7,7 +7,7 @@ import { api } from '@/lib/api';
 export default function AuthenticatedManager(){
   const router=useRouter();
   const [ready,setReady]=useState(false);
-  useEffect(()=>{api('/api/auth/me').then(()=>setReady(true)).catch(()=>router.replace('/login'));},[router]);
+  useEffect(()=>{api('/api/auth/me').then(()=>setReady(true)).catch(()=>router.replace('/login',{scroll:false}));},[router]);
   if(!ready)return <div className="auth-boot"><div/><span>Validando acesso seguro…</span></div>;
   return <ManagerApp/>;
 }

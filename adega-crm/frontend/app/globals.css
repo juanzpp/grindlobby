@@ -453,3 +453,26 @@ button:active{transform:scale(.985)}
   .finance-layout,.reports-layout,.integrations-grid,.settings-layout,.help-layout,.marketing-layout,.customers-layout,.suppliers-layout{grid-template-columns:1fr!important}.panel-head{min-height:50px;padding:10px 12px}.panel-head h3{font-size:13px!important}.panel-head button{min-height:40px;font-size:10px!important}.report-tabs,.quick-tabs{overflow-x:auto;flex-wrap:nowrap;scrollbar-width:none}.report-tabs button,.quick-tabs button{min-height:42px;flex:none;font-size:11px!important}.line-chart{overflow-x:auto}.line-chart svg,.chart-axis{min-width:560px}.donut-wrap{grid-template-columns:1fr!important}.integration-card,.setting-card,.help-card{min-height:150px}.toast-next{bottom:82px!important;max-width:calc(100vw - 24px)}
 }
 @media(max-width:430px){.manager-content{padding-inline:8px}.stock-metrics,.finance-metrics,.dashboard-kpis{grid-template-columns:1fr!important}.pdv-grid{grid-template-columns:1fr 1fr!important}.beverage-catalog-grid{grid-template-columns:1fr!important}.beverage-catalog-grid>button{min-height:142px!important;grid-template-columns:62px 1fr 22px!important}.data-row,.product-row{grid-template-columns:1fr auto!important}.manager-mobile-tabs{left:5px;right:5px}.manager-mobile-tabs button span{font-size:9px}}
+
+/* GSAP: performance-safe mobile motion layer */
+.status-badge{transition:color .18s ease,background-color .18s ease,border-color .18s ease}.login-modal,.catalog-card,.post-login-content{animation:none}.finish-sale.success{background:linear-gradient(135deg,#35c96f,#168445);color:#06150c}.checkout-next.success{background:linear-gradient(135deg,#78df93,#33a65d);color:#07150c}.finish-sale.loading,.checkout-next.loading{cursor:wait}.manager-app button,.storefront-app button,.login-screen button{touch-action:manipulation}.pdv-cart-list>div,.drawer-item,.store-product-card,.metric-card{transform:translateZ(0)}
+
+@media(max-width:820px) and (prefers-reduced-motion:no-preference){
+  .storefront-cinematic.gsap-drawer-ready .store-cart-drawer{left:0;right:0;top:auto;bottom:0;width:100%;height:min(92dvh,760px);max-height:calc(100dvh - env(safe-area-inset-top));padding-bottom:max(76px,calc(18px + env(safe-area-inset-bottom)));border-left:0;border-top:1px solid #3a3429;border-radius:18px 18px 0 0;transition:none;visibility:visible;transform:none}
+  .storefront-cinematic.gsap-drawer-ready .cart-overlay,.storefront-cinematic.gsap-drawer-ready .cart-overlay.open{background:rgba(0,0,0,.48);transition:none}
+  .product-modal-next{align-items:end;padding:0}.product-modal-box{width:100%;max-height:94dvh;overflow:auto;border-radius:18px 18px 0 0}
+  .post-login-bottle,.post-login-bottle-liquid{animation:none}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .login-ambient-light span,.login-corner-light,.login-energy-line,.login-border-flow,.post-login-content,.post-login-bottle,.post-login-bottle-liquid,.post-login-drops b,.post-login-track>i,.post-login-track>i:before,.post-login-track>i>b,.hero-bottle-float,.hero-aura,.hero-ring,.hero-sweep,.spark-dot,.hero-liquid-orb,.bottle-glass-sheen,.scanner-viewport i:after{animation:none!important}
+  .manager-app *,.storefront-app *,.login-screen *{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}
+}
+
+@media(max-width:820px){
+  .manager-app .manager-sidebar{position:fixed;top:0;bottom:0;left:0;height:100dvh;max-height:100dvh;overflow-y:auto;padding-top:max(20px,env(safe-area-inset-top));padding-bottom:max(16px,env(safe-area-inset-bottom))}
+  .manager-app .nav-scrim.show{z-index:140}
+  .storefront-cinematic .store-left-rail{position:fixed;top:0;bottom:0;left:0;height:100dvh;z-index:60}
+  .storefront-cinematic .store-stage{position:relative;z-index:3}
+  .storefront-cinematic .mobile-store-bottom{position:fixed;left:0;right:0;bottom:0;z-index:70}
+}

@@ -1,9 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import anime from 'animejs';
-import { gsap } from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Search, ShoppingCart, Heart, UserRound, Home, Grid2X2, Tag, Flame, Package,
   Wine, Beer, Zap, ChevronRight, ChevronLeft, MapPin, Truck, ShieldCheck,
@@ -12,7 +9,11 @@ import {
   Sparkles, CheckCircle2, Clock3, Gift, ChevronDown
 } from 'lucide-react';
 import ProductArt from './ProductArt';
+import AnimatedNumber from './motion/AnimatedNumber';
 import { api, money } from '@/lib/api';
+import { FULL_MOTION_QUERY, getScrollTrigger, gsap, isMobileMotionViewport, prefersReducedMotion, setMotionHint, clearMotionHint } from '@/lib/animations/gsap';
+import { animateLayerIn, animateLayerOut, pressFeedback, pulseFeedback } from '@/lib/animations/motion';
+import { useDelegatedPressFeedback } from '@/lib/animations/react';
 
 type Product={id:number;name:string;category:string;sku?:string;cost:number;price:number;stock:number;min_stock:number;storefront:number;volume_ml?:number;image_url?:string};
 type SettingsData={store_name:string;whatsapp:string;pix_key:string;delivery_fee:number;minimum_order:number;store_open:boolean};
@@ -20,8 +21,6 @@ type CartItem=Product&{qty:number};
 
 const isRed=(p?:Product)=>/johnnie\s+walker.*red\s+label|red\s+label/i.test(p?.name||'');
 const catIcon=(c:string)=>{const s=c.toLowerCase();if(s.includes('cervej'))return Beer;if(s.includes('energ'))return Zap;return Wine};
-
-function prefersReduced(){return typeof window!=='undefined'&&window.matchMedia('(prefers-reduced-motion: reduce)').matches}
 
 export default function Storefront(){
   const [products,setProducts]=useState<Product[]>([]);
@@ -39,34 +38,48 @@ export default function Storefront(){
   const [discount,setDiscount]=useState(0);
   const [customer,setCustomer]=useState({name:'',phone:'',address:''});
   const [toast,setToast]=useState('');
+  const [checkoutState,setCheckoutState]=useState<'idle'|'loading'|'success'>('idle');
   const appRef=useRef<HTMLDivElement|null>(null);
   const heroRef=useRef<HTMLElement|null>(null);
-  const showToast=(t:string)=>{setToast(t);setTimeout(()=>setToast(''),2500)};
+  const toastTimer=useRef<number|undefined>(undefined);
+  const checkoutTimer=useRef<number|undefined>(undefined);
+  const showToast=useCallback((t:string)=>{setToast(t);if(toastTimer.current)window.clearTimeout(toastTimer.current);toastTimer.current=window.setTimeout(()=>setToast(''),2500)},[]);
+
+  useDelegatedPressFeedback(appRef,'.hero-buy-row>button,.product-info>button,.product-visual,.drawer-qty button,.checkout-next,.fulfillment button,.quick-tabs button,.category-ribbon button,.mobile-store-bottom button');
+  useEffect(()=>()=>{if(toastTimer.current)window.clearTimeout(toastTimer.current);if(checkoutTimer.current)window.clearTimeout(checkoutTimer.current)},[]);
 
   useEffect(()=>{
     Promise.all([api<Product[]>('/api/products?storefront=true'),api<SettingsData>('/api/settings')])
       .then(([p,s])=>{setProducts(p);setSettings(s)}).catch(e=>showToast(e.message));
     const f=localStorage.getItem('adega-next-favorites');
     if(f) try{setFavorites(new Set(JSON.parse(f)))}catch{}
-  },[]);
+  },[showToast]);
   useEffect(()=>{localStorage.setItem('adega-next-favorites',JSON.stringify([...favorites]))},[favorites]);
 
-  useEffect(()=>{
-    if(prefersReduced())return;
-    const tl=anime.timeline({easing:'easeOutExpo'});
-    tl.add({targets:'.hero-kicker,.hero-brand',opacity:[0,1],translateY:[12,0],duration:600,delay:anime.stagger(85)})
-      .add({targets:'.hero-title span,.hero-title strong',opacity:[0,1],translateY:[42,0],scale:[.94,1],duration:900,delay:anime.stagger(90)},'-=360')
-      .add({targets:'.hero-desc,.hero-buy-row,.hero-trust',opacity:[0,1],translateY:[18,0],duration:650,delay:anime.stagger(90)},'-=560')
-      .add({targets:'.hero-bottle-real',opacity:[0,1],translateY:[52,0],rotate:[-2.3,0],scale:[.86,1],duration:1250},'-=980')
-      .add({targets:'.hero-offer-orb',opacity:[0,1],scale:[.65,1],rotate:[-12,0],duration:760},'-=720')
-      .add({targets:'.category-ribbon button',opacity:[0,1],translateY:[12,0],delay:anime.stagger(45),duration:460},'-=280');
-    anime({targets:'.hero-bottle-float',translateY:[0,-9],rotateY:[-7,7],rotateZ:[-.45,.45],direction:'alternate',loop:true,duration:3900,easing:'easeInOutSine'});
-    anime({targets:'.hero-aura',scale:[.90,1.14],opacity:[.24,.64],direction:'alternate',loop:true,duration:2800,easing:'easeInOutSine'});
-    anime({targets:'.hero-ring',rotate:360,duration:19000,loop:true,easing:'linear'});
-    anime({targets:'.hero-sweep',translateX:['-160%','190%'],opacity:[0,.52,0],duration:3600,delay:900,loop:true,easing:'easeInOutQuad'});
-    anime({targets:'.spark-dot',translateY:()=>anime.random(-50,-135),translateX:()=>anime.random(-36,38),opacity:[0,.95,0],scale:[.3,1.4],delay:anime.stagger(92),duration:()=>anime.random(2300,4500),loop:true,easing:'easeOutQuad'});
-    anime({targets:'.hero-liquid-orb',scale:[.92,1.08],rotate:[-4,4],direction:'alternate',loop:true,duration:4500,easing:'easeInOutSine'});
-    anime({targets:'.bottle-glass-sheen',translateX:['-180%','230%'],opacity:[0,.62,0],duration:4200,delay:1100,loop:true,easing:'easeInOutQuad'});
+  useLayoutEffect(()=>{
+    if(!products.length||!appRef.current)return;
+    const media=gsap.matchMedia();
+    media.add({motion:FULL_MOTION_QUERY,mobile:'(max-width: 820px)'},context=>{
+      if(!context.conditions?.motion)return;
+      const mobile=Boolean(context.conditions.mobile);
+      const targets=appRef.current?.querySelectorAll('.hero-kicker,.hero-brand,.hero-title span,.hero-title strong,.hero-desc,.hero-buy-row,.hero-trust,.hero-bottle-real,.hero-offer-orb,.category-ribbon button');
+      if(targets)setMotionHint(targets);
+      const timeline=gsap.timeline({defaults:{ease:'power3.out'},onComplete:()=>targets&&clearMotionHint(targets)});
+      timeline
+        .fromTo('.hero-kicker,.hero-brand',{autoAlpha:0,y:12},{autoAlpha:1,y:0,duration:mobile?.34:.55,stagger:.055})
+        .fromTo('.hero-title span,.hero-title strong',{autoAlpha:0,y:mobile?14:28,scale:.96},{autoAlpha:1,y:0,scale:1,duration:mobile?.48:.72,stagger:.06},mobile?.12:.18)
+        .fromTo('.hero-desc,.hero-buy-row,.hero-trust',{autoAlpha:0,y:14},{autoAlpha:1,y:0,duration:mobile?.36:.52,stagger:.055},mobile?.26:.36)
+        .fromTo('.hero-bottle-real',{autoAlpha:0,y:mobile?24:42,rotate:-2,scale:.9},{autoAlpha:1,y:0,rotate:0,scale:1,duration:mobile?.62:.95},mobile?.16:.24)
+        .fromTo('.hero-offer-orb',{autoAlpha:0,scale:.78,rotate:-8},{autoAlpha:1,scale:1,rotate:0,duration:.48},mobile?.35:.5)
+        .fromTo('.category-ribbon button',{autoAlpha:0,y:10},{autoAlpha:1,y:0,duration:.3,stagger:mobile?.025:.04},mobile?.46:.66);
+    });
+    media.add('(min-width: 821px) and (prefers-reduced-motion: no-preference)',()=>{
+      gsap.to('.hero-bottle-float',{y:-9,rotationY:7,rotationZ:.45,yoyo:true,repeat:-1,duration:3.9,ease:'sine.inOut'});
+      gsap.to('.hero-aura',{scale:1.14,opacity:.64,yoyo:true,repeat:-1,duration:2.8,ease:'sine.inOut'});
+      gsap.to('.hero-ring',{rotation:360,repeat:-1,duration:19,ease:'none'});
+      gsap.to('.hero-liquid-orb',{scale:1.08,rotation:4,yoyo:true,repeat:-1,duration:4.5,ease:'sine.inOut'});
+    });
+    return()=>media.revert();
   },[products.length]);
 
   useEffect(()=>{
@@ -78,15 +91,37 @@ export default function Storefront(){
     return()=>{document.removeEventListener('keydown',close);document.body.style.overflow=previous};
   },[cartOpen]);
 
-  useEffect(()=>{
-    if(!cartOpen||prefersReduced())return;
-    anime({targets:'.drawer-item',opacity:[0,1],translateX:[18,0],delay:anime.stagger(55),duration:380,easing:'easeOutCubic'});
+  useLayoutEffect(()=>{
+    const root=appRef.current;if(!root||!isMobileMotionViewport())return;
+    const drawer=root.querySelector('.store-cart-drawer'),overlay=root.querySelector('.cart-overlay');
+    if(!drawer||!overlay)return;
+    root.classList.add('gsap-drawer-ready');
+    gsap.set(drawer,{x:0,xPercent:0,yPercent:100,autoAlpha:0,pointerEvents:'none'});
+    gsap.set(overlay,{autoAlpha:0,pointerEvents:'none'});
+    return()=>{root.classList.remove('gsap-drawer-ready');gsap.set([drawer,overlay],{clearProps:'all'});};
+  },[]);
+
+  useLayoutEffect(()=>{
+    const root=appRef.current;if(!root||!isMobileMotionViewport())return;
+    const drawer=root.querySelector('.store-cart-drawer'),overlay=root.querySelector('.cart-overlay');
+    if(!drawer||!overlay)return;
+    gsap.killTweensOf([drawer,overlay]);
+    if(cartOpen){
+      gsap.set([drawer,overlay],{visibility:'visible'});gsap.set(drawer,{pointerEvents:'auto'});gsap.set(overlay,{pointerEvents:'auto'});
+      const timeline=gsap.timeline().to(overlay,{autoAlpha:1,duration:.18,ease:'power1.out'},0).to(drawer,{x:0,xPercent:0,yPercent:0,autoAlpha:1,duration:.32,ease:'power3.out'},0);
+      timeline.fromTo(root.querySelectorAll('.drawer-item'),{autoAlpha:0,x:14},{autoAlpha:1,x:0,duration:.24,stagger:.035,ease:'power2.out',clearProps:'transform,opacity'},.1);
+      return()=>{timeline.kill()};
+    }
+    const timeline=gsap.timeline({onComplete:()=>{gsap.set([drawer,overlay],{visibility:'hidden',pointerEvents:'none'});}}).to(drawer,{yPercent:100,autoAlpha:0,duration:.24,ease:'power2.in'},0).to(overlay,{autoAlpha:0,duration:.16,ease:'power1.in'},0);
+    return()=>{timeline.kill()};
   },[cartOpen]);
 
-  useEffect(()=>{
-    if(!selected||prefersReduced())return;
-    anime({targets:'.product-modal-box',opacity:[0,1],scale:[.94,1],translateY:[16,0],duration:500,easing:'easeOutExpo'});
-    anime({targets:'.modal-product-visual .real-product,.modal-product-visual .bottle-art',opacity:[0,1],translateY:[24,0],rotate:[-2,0],duration:700,delay:80,easing:'easeOutExpo'});
+  useLayoutEffect(()=>{
+    if(!selected||!appRef.current)return;
+    const layer=appRef.current.querySelector('.product-modal-next');if(!layer)return;
+    const timeline=animateLayerIn(layer,{card:'.product-modal-box',backdrop:'.product-modal-overlay'});
+    if(!prefersReducedMotion())timeline?.fromTo('.modal-product-visual .real-product,.modal-product-visual .bottle-art',{autoAlpha:0,y:18,rotate:-2},{autoAlpha:1,y:0,rotate:0,duration:.42,ease:'power3.out'},.06);
+    return()=>{timeline.kill()};
   },[selected]);
 
   const red=products.find(isRed)||products[0];
@@ -99,18 +134,24 @@ export default function Storefront(){
     return l;
   },[products,query,category,sort]);
 
+  useLayoutEffect(()=>{
+    if(prefersReducedMotion()||!appRef.current)return;
+    const active=appRef.current.querySelectorAll('.category-ribbon button.active,.quick-tabs button.active');
+    if(active.length)pulseFeedback(active,1.025);
+  },[category]);
+
   useEffect(()=>{
-    if(prefersReduced())return;
-    gsap.registerPlugin(ScrollTrigger);
-    const context=gsap.context(()=>{
-      gsap.from('.store-product-card',{scrollTrigger:{trigger:'.store-product-grid',start:'top 88%',once:true},y:22,opacity:0,duration:.65,stagger:.045,ease:'power2.out'});
-      gsap.to('.store-promo-band',{scrollTrigger:{trigger:'.store-promo-band',start:'top bottom',end:'bottom top',scrub:1.4},backgroundPosition:'100% 50%',ease:'none'});
-    },appRef);
-    return()=>context.revert();
+    if(prefersReducedMotion()||!filtered.length)return;
+    let cancelled=false,context:gsap.Context|undefined;
+    getScrollTrigger().then(ScrollTrigger=>{if(cancelled||!ScrollTrigger||!appRef.current)return;context=gsap.context(()=>{
+      gsap.from('.store-product-card',{scrollTrigger:{trigger:'.store-product-grid',start:'top 90%',once:true},y:window.innerWidth<=820?14:20,opacity:0,duration:window.innerWidth<=820?.38:.58,stagger:window.innerWidth<=820?.035:.045,ease:'power2.out',clearProps:'transform,opacity'});
+      if(window.innerWidth>820)gsap.to('.store-promo-band',{scrollTrigger:{trigger:'.store-promo-band',start:'top bottom',end:'bottom top',scrub:1.2},backgroundPosition:'100% 50%',ease:'none'});
+    },appRef)});
+    return()=>{cancelled=true;context?.revert()};
   },[filtered.length]);
 
   const animateFly=(source?:HTMLElement|null)=>{
-    if(prefersReduced()||!source)return;
+    if(prefersReducedMotion()||!source)return;
     const target=document.querySelector('.header-cart') as HTMLElement|null;
     if(!target)return;
     const a=source.getBoundingClientRect(),b=target.getBoundingClientRect();
@@ -119,32 +160,35 @@ export default function Storefront(){
     orb.innerHTML='<span>+</span>';
     Object.assign(orb.style,{left:`${a.left+a.width/2-14}px`,top:`${a.top+a.height/2-14}px`});
     document.body.appendChild(orb);
-    anime({targets:orb,translateX:(b.left+b.width/2)-(a.left+a.width/2),translateY:(b.top+b.height/2)-(a.top+a.height/2),scale:[1,.45],rotate:[0,260],opacity:[1,.9,0],duration:720,easing:'easeInOutCubic',complete:()=>orb.remove()});
-    anime({targets:'.header-cart',scale:[1,1.055,1],boxShadow:['0 0 0 rgba(239,188,75,0)','0 0 34px rgba(239,188,75,.42)','0 0 0 rgba(239,188,75,0)'],duration:680,easing:'easeOutQuad'});
+    gsap.to(orb,{x:(b.left+b.width/2)-(a.left+a.width/2),y:(b.top+b.height/2)-(a.top+a.height/2),scale:.45,rotation:260,autoAlpha:0,duration:.62,ease:'power2.inOut',onComplete:()=>orb.remove()});
+    pulseFeedback(target,1.055);
   };
 
   const add=(p:Product,qty=1,source?:HTMLElement|null)=>{
     if(p.stock<=0)return showToast('Produto sem estoque');
     setCart(c=>{const x=c.find(i=>i.id===p.id);if(x)return c.map(i=>i.id===p.id?{...i,qty:Math.min(p.stock,i.qty+qty)}:i);return [...c,{...p,qty:Math.min(p.stock,qty)}]});
     showToast(`${p.name} adicionado`);
+    pressFeedback(source||null);
     animateFly(source);
-    if(!prefersReduced())anime({targets:'.cart-badge',scale:[1,1.55,1],duration:480,easing:'easeOutBack'});
+    pulseFeedback('.cart-badge',1.4);
   };
 
-  const change=(id:number,d:number)=>setCart(c=>c.map(i=>i.id===id?{...i,qty:Math.max(0,Math.min(i.stock,i.qty+d))}:i).filter(i=>i.qty>0));
+  const change=(id:number,d:number)=>{setCart(c=>c.map(i=>i.id===id?{...i,qty:Math.max(0,Math.min(i.stock,i.qty+d))}:i).filter(i=>i.qty>0));window.requestAnimationFrame(()=>pulseFeedback(appRef.current?.querySelector(`[data-drawer-item="${id}"] .drawer-qty span`)||null,1.12))};
+  const removeCartItem=(id:number)=>{const done=()=>setCart(c=>c.filter(x=>x.id!==id));const row=appRef.current?.querySelector(`[data-drawer-item="${id}"]`);if(!row||prefersReducedMotion())return done();gsap.to(row,{autoAlpha:0,x:16,duration:.16,ease:'power2.in',onComplete:done})};
   const count=cart.reduce((a,b)=>a+b.qty,0),subtotal=cart.reduce((a,b)=>a+b.qty*b.price,0),fee=fulfillment==='delivery'?Number(settings?.delivery_fee||0):0,total=Math.max(0,subtotal+fee-discount);
   const applyCoupon=()=>{if(coupon.trim().toUpperCase()==='ADEGA10'){const d=subtotal*.1;setDiscount(d);showToast('Cupom ADEGA10 aplicado')}else{setDiscount(0);showToast('Cupom inválido')}};
   const checkout=async()=>{
     if(!cart.length)return;
     if(!customer.name.trim())return showToast('Informe seu nome');
     if(total<Number(settings?.minimum_order||0))return showToast(`Pedido mínimo: ${money(settings?.minimum_order||0)}`);
+    setCheckoutState('loading');
     try{
       const r=await api<any>('/api/storefront/orders',{method:'POST',body:JSON.stringify({channel:'storefront',payment_method:'pix',items:cart.map(i=>({product_id:i.id,qty:i.qty})),discount,external_id:fulfillment})});
       if(fulfillment==='delivery'&&settings?.whatsapp){const msg=`Pedido #${r.id}%0ACliente: ${encodeURIComponent(customer.name)}%0ATelefone: ${encodeURIComponent(customer.phone)}%0AEntrega: ${encodeURIComponent(customer.address)}`;window.open(`https://wa.me/${String(settings.whatsapp).replace(/\D/g,'')}?text=${msg}`,'_blank','noopener,noreferrer')}
-      setCustomer({name:'',phone:'',address:''});setCart([]);setDiscount(0);setCartOpen(false);setProducts(await api<Product[]>('/api/products?storefront=true'));showToast(`Pedido #${r.id} confirmado — dados pessoais não foram armazenados`);
-    }catch(e:any){showToast(e.message)}
+      setCheckoutState('success');setCustomer({name:'',phone:'',address:''});setCart([]);setDiscount(0);setProducts(await api<Product[]>('/api/products?storefront=true'));showToast(`Pedido #${r.id} confirmado — dados pessoais não foram armazenados`);checkoutTimer.current=window.setTimeout(()=>{setCartOpen(false);setCheckoutState('idle')},420);
+    }catch(e:any){setCheckoutState('idle');showToast(e.message)}
   };
-  const toggleFav=(id:number)=>setFavorites(f=>{const n=new Set(f);n.has(id)?n.delete(id):n.add(id);return n});
+  const toggleFav=(id:number)=>setFavorites(f=>{const n=new Set(f);if(n.has(id))n.delete(id);else n.add(id);return n});
   const oldPrice=red?red.price*1.18:0;
 
   const onAppPointer=(e:React.PointerEvent<HTMLDivElement>)=>{
@@ -152,13 +196,15 @@ export default function Storefront(){
     const r=el.getBoundingClientRect();el.style.setProperty('--pointer-x',`${e.clientX-r.left}px`);el.style.setProperty('--pointer-y',`${e.clientY-r.top}px`);
   };
   const onHeroPointer=(e:React.PointerEvent<HTMLElement>)=>{
-    if(prefersReduced()||window.innerWidth<900)return;
+    if(prefersReducedMotion()||window.innerWidth<900)return;
     const r=e.currentTarget.getBoundingClientRect();const nx=(e.clientX-r.left)/r.width-.5,ny=(e.clientY-r.top)/r.height-.5;
     e.currentTarget.style.setProperty('--hero-x',`${nx*16}px`);e.currentTarget.style.setProperty('--hero-y',`${ny*10}px`);e.currentTarget.style.setProperty('--hero-rx',`${ny*-2.2}deg`);e.currentTarget.style.setProperty('--hero-ry',`${nx*3}deg`);
   };
   const resetHero=(e:React.PointerEvent<HTMLElement>)=>{e.currentTarget.style.setProperty('--hero-x','0px');e.currentTarget.style.setProperty('--hero-y','0px');e.currentTarget.style.setProperty('--hero-rx','0deg');e.currentTarget.style.setProperty('--hero-ry','0deg')};
-  const tilt=(e:React.PointerEvent<HTMLElement>)=>{if(prefersReduced()||window.innerWidth<900)return;const r=e.currentTarget.getBoundingClientRect(),x=(e.clientX-r.left)/r.width,y=(e.clientY-r.top)/r.height;e.currentTarget.style.setProperty('--card-x',`${x*100}%`);e.currentTarget.style.setProperty('--card-y',`${y*100}%`);e.currentTarget.style.setProperty('--card-rx',`${(y-.5)*-5}deg`);e.currentTarget.style.setProperty('--card-ry',`${(x-.5)*7}deg`)};
+  const tilt=(e:React.PointerEvent<HTMLElement>)=>{if(prefersReducedMotion()||window.innerWidth<900)return;const r=e.currentTarget.getBoundingClientRect(),x=(e.clientX-r.left)/r.width,y=(e.clientY-r.top)/r.height;e.currentTarget.style.setProperty('--card-x',`${x*100}%`);e.currentTarget.style.setProperty('--card-y',`${y*100}%`);e.currentTarget.style.setProperty('--card-rx',`${(y-.5)*-5}deg`);e.currentTarget.style.setProperty('--card-ry',`${(x-.5)*7}deg`)};
   const untilt=(e:React.PointerEvent<HTMLElement>)=>{e.currentTarget.style.setProperty('--card-rx','0deg');e.currentTarget.style.setProperty('--card-ry','0deg')};
+  const closeProduct=useCallback(()=>{const layer=appRef.current?.querySelector('.product-modal-next')||null;animateLayerOut(layer,()=>setSelected(null),{card:'.product-modal-box',backdrop:'.product-modal-overlay'})},[]);
+  useEffect(()=>{if(!selected)return;const close=(event:KeyboardEvent)=>{if(event.key==='Escape')closeProduct()};document.addEventListener('keydown',close);return()=>document.removeEventListener('keydown',close)},[selected,closeProduct]);
 
   return <div ref={appRef} onPointerMove={onAppPointer} className="storefront-app storefront-cinematic">
     <div className="store-noise"/><div className="store-pointer-glow"/>
@@ -223,14 +269,14 @@ export default function Storefront(){
     <div className={`cart-overlay ${cartOpen?'open':''}`} onClick={()=>setCartOpen(false)}/>
     <aside className={`store-cart-drawer ${cartOpen?'open':''}`} role="dialog" aria-modal="true" aria-label="Meu carrinho" aria-hidden={!cartOpen}>
       <div className="drawer-head"><div><ShoppingCart/><span><small>SEU PEDIDO</small><h2>Meu Carrinho</h2></span></div><button onClick={()=>setCartOpen(false)}><X/></button></div>
-      <div className="drawer-items">{cart.length?cart.map(i=><div className="drawer-item" key={i.id}><div className="drawer-art"><ProductArt name={i.name} category={i.category} image={i.image_url}/></div><div><b>{i.name}</b><small>{money(i.price)} cada</small><div className="drawer-qty"><button onClick={()=>change(i.id,-1)}><Minus/></button><span>{i.qty}</span><button onClick={()=>change(i.id,1)}><Plus/></button></div></div><strong>{money(i.price*i.qty)}</strong><button className="drawer-delete" onClick={()=>setCart(c=>c.filter(x=>x.id!==i.id))}><Trash2/></button></div>):<div className="drawer-empty"><ShoppingCart/><h3>Seu carrinho está vazio</h3><p>Adicione seus rótulos favoritos.</p></div>}</div>
+      <div className="drawer-items">{cart.length?cart.map(i=><div className="drawer-item" data-drawer-item={i.id} key={i.id}><div className="drawer-art"><ProductArt name={i.name} category={i.category} image={i.image_url}/></div><div><b>{i.name}</b><small>{money(i.price)} cada</small><div className="drawer-qty"><button onClick={()=>change(i.id,-1)} aria-label="Diminuir quantidade"><Minus/></button><span>{i.qty}</span><button onClick={()=>change(i.id,1)} aria-label="Aumentar quantidade"><Plus/></button></div></div><strong><AnimatedNumber value={i.price*i.qty}/></strong><button className="drawer-delete" onClick={()=>removeCartItem(i.id)} aria-label={`Remover ${i.name}`}><Trash2/></button></div>):<div className="drawer-empty"><ShoppingCart/><h3>Seu carrinho está vazio</h3><p>Adicione seus rótulos favoritos.</p></div>}</div>
       <div className="fulfillment"><button className={fulfillment==='delivery'?'active':''} onClick={()=>setFulfillment('delivery')}><Truck/><span>Entrega<small>30–45 min</small></span></button><button className={fulfillment==='pickup'?'active':''} onClick={()=>setFulfillment('pickup')}><Store/><span>Retirada<small>10–15 min</small></span></button></div>
       <div className="drawer-form"><label>Nome<input value={customer.name} onChange={e=>setCustomer({...customer,name:e.target.value})} placeholder="Seu nome"/></label><label>WhatsApp<input value={customer.phone} onChange={e=>setCustomer({...customer,phone:e.target.value})} placeholder="(11) 99999-9999"/></label>{fulfillment==='delivery'&&<label>Endereço<input value={customer.address} onChange={e=>setCustomer({...customer,address:e.target.value})} placeholder="Rua, número e bairro"/></label>}<label>Cupom<div className="coupon-input"><input value={coupon} onChange={e=>setCoupon(e.target.value)} placeholder="Digite seu cupom"/><button onClick={applyCoupon}>Aplicar</button></div></label></div>
-      <div className="drawer-summary"><div><span>Subtotal</span><b>{money(subtotal)}</b></div><div><span>Taxa de entrega</span><b>{money(fee)}</b></div><div className="discount"><span>Desconto</span><b>− {money(discount)}</b></div><div className="grand"><span>Total</span><strong>{money(total)}</strong></div></div>
-      <button className="checkout-next" disabled={!cart.length} onClick={checkout}>FINALIZAR COMPRA <ArrowRight/></button><div className="secure-check"><ShieldCheck/><span><b>Compra segura</b><small>Pedido integrado ao Adega CRM</small></span></div>
+      <div className="drawer-summary"><div><span>Subtotal</span><b><AnimatedNumber value={subtotal}/></b></div><div><span>Taxa de entrega</span><b><AnimatedNumber value={fee}/></b></div><div className="discount"><span>Desconto</span><b>− <AnimatedNumber value={discount}/></b></div><div className="grand"><span>Total</span><strong><AnimatedNumber value={total}/></strong></div></div>
+      <button className={`checkout-next ${checkoutState}`} disabled={!cart.length||checkoutState!=='idle'} onClick={checkout}>{checkoutState==='loading'?<>PROCESSANDO…</>:checkoutState==='success'?<><CheckCircle2/>PEDIDO CONFIRMADO</>:<>FINALIZAR COMPRA <ArrowRight/></>}</button><div className="secure-check"><ShieldCheck/><span><b>Compra segura</b><small>Pedido integrado ao Adega CRM</small></span></div>
     </aside>
 
-    {selected&&<div className="product-modal-next"><div className="product-modal-overlay" onClick={()=>setSelected(null)}/><div className="product-modal-box"><button className="modal-x" onClick={()=>setSelected(null)}><X/></button><div className="modal-product-visual"><div className="modal-aura"/><ProductArt name={selected.name} category={selected.category} image={selected.image_url}/></div><div className="modal-product-info"><small>{selected.category} · SKU {selected.sku||'—'}</small><h2>{selected.name}</h2><div className="modal-rating"><Star fill="currentColor"/><Star fill="currentColor"/><Star fill="currentColor"/><Star fill="currentColor"/><Star fill="currentColor"/><span>4,9 · produto disponível</span></div><del>{money(selected.price*1.12)}</del><strong>{money(selected.price)}</strong><p>Estoque sincronizado em tempo real com o gestor. Escolha entrega ou retirada e finalize seu pedido com segurança.</p><div className="modal-features"><span><Package/><b>{selected.stock} un.</b><small>Em estoque</small></span><span><Truck/><b>30–45 min</b><small>Entrega média</small></span><span><ShieldCheck/><b>Original</b><small>Procedência</small></span></div><button onClick={e=>{add(selected,1,e.currentTarget);setSelected(null)}}><ShoppingCart/>ADICIONAR AO CARRINHO</button></div></div></div>}
+    {selected&&<div className="product-modal-next" role="dialog" aria-modal="true" aria-label={`Detalhes de ${selected.name}`}><div className="product-modal-overlay" onClick={closeProduct}/><div className="product-modal-box"><button className="modal-x" onClick={closeProduct} aria-label="Fechar detalhes do produto"><X/></button><div className="modal-product-visual"><div className="modal-aura"/><ProductArt name={selected.name} category={selected.category} image={selected.image_url}/></div><div className="modal-product-info"><small>{selected.category} · SKU {selected.sku||'—'}</small><h2>{selected.name}</h2><div className="modal-rating"><Star fill="currentColor"/><Star fill="currentColor"/><Star fill="currentColor"/><Star fill="currentColor"/><Star fill="currentColor"/><span>4,9 · produto disponível</span></div><del>{money(selected.price*1.12)}</del><strong>{money(selected.price)}</strong><p>Estoque sincronizado em tempo real com o gestor. Escolha entrega ou retirada e finalize seu pedido com segurança.</p><div className="modal-features"><span><Package/><b>{selected.stock} un.</b><small>Em estoque</small></span><span><Truck/><b>30–45 min</b><small>Entrega média</small></span><span><ShieldCheck/><b>Original</b><small>Procedência</small></span></div><button onClick={e=>{add(selected,1,e.currentTarget);closeProduct()}}><ShoppingCart/>ADICIONAR AO CARRINHO</button></div></div></div>}
 
     <nav className="mobile-store-bottom"><button className="active"><Home/><span>Início</span></button><button onClick={()=>document.getElementById('products')?.scrollIntoView({behavior:'smooth'})}><Tag/><span>Ofertas</span></button><button className="mobile-cart-main" onClick={()=>setCartOpen(true)}><ShoppingCart/><em>{count}</em></button><button><Package/><span>Pedidos</span></button><button onClick={()=>setMenuOpen(true)}><Menu/><span>Mais</span></button></nav>
     <div className={`toast-next ${toast?'show':''}`}>{toast}</div>

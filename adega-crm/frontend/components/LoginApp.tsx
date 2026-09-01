@@ -1,14 +1,16 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import anime from 'animejs';
 import {
   ArrowRight, Building2, Check, Eye, EyeOff, Fingerprint, Grid3X3,
   LockKeyhole, Mail, ScanFace, ShieldCheck, Signal, X, LoaderCircle
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { requestPlatformPasskey, type PasskeyLoginOptionsJSON } from '@/lib/webauthn';
+import { FULL_MOTION_QUERY, gsap, prefersReducedMotion, setMotionHint, clearMotionHint } from '@/lib/animations/gsap';
+import { animateLayerIn, animateLayerOut } from '@/lib/animations/motion';
+import { useDelegatedPressFeedback } from '@/lib/animations/react';
 
 type Org = { name: string; slug: string };
 type Health = { ok: boolean; version?: string };
@@ -31,7 +33,7 @@ export default function LoginApp() {
   const router = useRouter();
   const search = useSearchParams();
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const [email, setEmail] = useState(() => typeof window === 'undefined' ? '' : localStorage.getItem('adega_login_email') || '');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
@@ -42,7 +44,7 @@ export default function LoginApp() {
   const [online, setOnline] = useState<boolean | null>(null);
   const [version, setVersion] = useState('1.1.0');
   const [orgs, setOrgs] = useState<Org[]>([]);
-  const [org, setOrg] = useState(() => typeof window === 'undefined' ? 'principal' : localStorage.getItem('adega_org') || 'principal');
+  const [org, setOrg] = useState('principal');
   const [pin, setPin] = useState('');
   const [resetToken, setResetToken] = useState(search.get('reset') || '');
   const [newPassword, setNewPassword] = useState('');
@@ -55,7 +57,11 @@ export default function LoginApp() {
   const previewingLoader = process.env.NODE_ENV === 'development' && search.get('preview-loader') === '1';
   const showPostLoginLoader = transitioning || previewingLoader;
 
+  useDelegatedPressFeedback(rootRef, '.login-enter,.login-alt-grid button,.login-company,.modal-gold,.company-list button');
+
   useEffect(() => {
+    setEmail(localStorage.getItem('adega_login_email') || '');
+    setOrg(localStorage.getItem('adega_org') || 'principal');
     Promise.allSettled([
       api<Health>('/api/health'),
       api<Org[]>('/api/auth/organizations'),
@@ -69,46 +75,86 @@ export default function LoginApp() {
       if (settingsResult.status === 'fulfilled') setSupportWhatsapp(String(settingsResult.value.whatsapp || '').replace(/\D/g,''));
     });
 
-    api('/api/auth/me').then(() => router.replace('/gestor')).catch(() => undefined);
+    api('/api/auth/me').then(() => router.replace('/gestor', { scroll: false })).catch(() => undefined);
 
     if (search.get('reset')) setModal('reset');
 
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (!reduced) {
-      anime.timeline({ easing: 'easeOutExpo' })
-        .add({ targets: '.login-live-card', opacity: [0, 1], translateY: [18, 0], scale: [.985, 1], duration: 850 })
-        .add({ targets: '.login-live-card .login-animate', opacity: [0, 1], translateY: [10, 0], delay: anime.stagger(35), duration: 460 }, '-=610');
-      anime({ targets: '.login-corner-light', opacity: [.35, 1], scale: [.92, 1.08], direction: 'alternate', loop: true, duration: 1800, easing: 'easeInOutSine' });
-      anime({ targets: '.login-energy-line.one', translateX: [-40, 32], translateY: [7, -5], opacity: [.16, .5], direction: 'alternate', loop: true, duration: 4800, easing: 'easeInOutSine' });
-      anime({ targets: '.login-energy-line.two', translateX: [28, -34], opacity: [.12, .36], direction: 'alternate', loop: true, duration: 5600, easing: 'easeInOutSine' });
-    }
   }, [router, search]);
+
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const media = gsap.matchMedia();
+    media.add({ motion: FULL_MOTION_QUERY, mobile: '(max-width: 820px)' }, context => {
+      if (!context.conditions?.motion) return;
+      const mobile = context.conditions?.mobile;
+      const card = root.querySelector('.login-live-card');
+      const parts = root.querySelectorAll('.login-live-card .login-animate');
+      if (!card) return;
+      setMotionHint([card, ...parts]);
+      const timeline = gsap.timeline({
+        defaults: { ease: 'power3.out' },
+        onComplete: () => clearMotionHint([card, ...parts]),
+      });
+      timeline
+        .fromTo('.login-blueprint-bg', { autoAlpha: 0 }, { autoAlpha: 1, duration: mobile ? 0.32 : 0.45 }, 0)
+        .fromTo(card, { autoAlpha: 0, y: mobile ? 14 : 18, scale: 0.94 }, { autoAlpha: 1, y: 0, scale: 1, duration: mobile ? 0.48 : 0.7 }, 0.08)
+        .fromTo(parts, { autoAlpha: 0, y: 10 }, { autoAlpha: 1, y: 0, duration: 0.34, stagger: mobile ? 0.025 : 0.035 }, mobile ? 0.22 : 0.3)
+        .fromTo('.login-system-live,.login-footer-live', { autoAlpha: 0, y: 6 }, { autoAlpha: 1, y: 0, duration: 0.28, stagger: 0.04 }, mobile ? 0.48 : 0.62);
+    });
+    media.add('(min-width: 821px) and (prefers-reduced-motion: no-preference)', () => {
+      gsap.to('.login-corner-light', { opacity: 1, scale: 1.08, yoyo: true, repeat: -1, duration: 1.8, ease: 'sine.inOut' });
+      gsap.to('.login-energy-line.one', { x: 32, y: -5, opacity: 0.5, yoyo: true, repeat: -1, duration: 4.8, ease: 'sine.inOut' });
+      gsap.to('.login-energy-line.two', { x: -34, opacity: 0.36, yoyo: true, repeat: -1, duration: 5.6, ease: 'sine.inOut' });
+    });
+    return () => media.revert();
+  }, []);
 
   useEffect(() => {
     if (!showPostLoginLoader) return;
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const reduced = prefersReducedMotion();
     const progress = { value: 0 };
     const duration = reduced ? 700 : 3200;
-    const progressAnimation = anime({
-      targets: progress,
+    const progressAnimation = gsap.to(progress, {
       value: 100,
-      round: 1,
-      duration,
-      easing: reduced ? 'linear' : 'easeInOutQuart',
-      update: () => setLoadProgress(progress.value),
+      duration: duration / 1000,
+      ease: reduced ? 'none' : 'power2.inOut',
+      onUpdate: () => setLoadProgress(Math.round(progress.value)),
     });
-    const sceneAnimation = reduced ? null : anime.timeline({ loop: false })
-      .add({ targets: '.post-login-content', opacity: [0, 1], translateY: [18, 0], duration: 650, easing: 'easeOutExpo' })
-      .add({ targets: '.post-login-bottle', rotate: [-4, 1.5], translateY: [-4, 3], duration: 1250, direction: 'alternate', loop: 2, easing: 'easeInOutSine' }, 150)
-      .add({ targets: '.post-login-bottle-liquid', translateX: [-12, 14], translateY: [3, -4], skewX: [-7, 8], duration: 760, direction: 'alternate', loop: 4, easing: 'easeInOutSine' }, 180)
-      .add({ targets: '.post-login-loader', opacity: [1, 0], duration: 420, easing: 'easeInQuad' }, duration - 220);
-    const destinationTimer = transitioning ? window.setTimeout(() => router.replace('/gestor'), duration + 80) : null;
+    const sceneAnimation = reduced ? null : gsap.timeline()
+      .fromTo('.post-login-content', { autoAlpha: 0, y: 18 }, { autoAlpha: 1, y: 0, duration: 0.65, ease: 'power3.out' })
+      .fromTo('.post-login-bottle', { rotate: -4, y: -4 }, { rotate: 1.5, y: 3, duration: 1.25, yoyo: true, repeat: 1, ease: 'sine.inOut' }, 0.15)
+      .fromTo('.post-login-bottle-liquid', { x: -12, y: 3, skewX: -7 }, { x: 14, y: -4, skewX: 8, duration: 0.76, yoyo: true, repeat: 3, ease: 'sine.inOut' }, 0.18)
+      .to('.post-login-loader', { autoAlpha: 0, duration: 0.42, ease: 'power1.in' }, (duration - 220) / 1000);
+    const destinationTimer = transitioning ? window.setTimeout(() => router.replace('/gestor', { scroll: false }), duration + 80) : null;
     return () => {
-      progressAnimation.pause();
-      sceneAnimation?.pause();
+      progressAnimation.kill();
+      sceneAnimation?.kill();
       if (destinationTimer) window.clearTimeout(destinationTimer);
     };
   }, [showPostLoginLoader, transitioning, router]);
+
+  useLayoutEffect(() => {
+    if (!modal || !rootRef.current) return;
+    const layer = rootRef.current.querySelector('.login-modal-layer');
+    if (!layer) return;
+    const animation = animateLayerIn(layer, { card: '.login-modal', backdrop: '.login-modal-backdrop' });
+    return () => { animation?.kill(); };
+  }, [modal]);
+
+  useLayoutEffect(() => {
+    if (!error || prefersReducedMotion() || !rootRef.current) return;
+    const context = gsap.context(() => {
+      gsap.fromTo('.login-live-card', { x: -3 }, { x: 0, duration: 0.28, ease: 'elastic.out(1,0.45)', clearProps: 'transform' });
+      gsap.fromTo('.login-feedback.error', { autoAlpha: 0, y: -4 }, { autoAlpha: 1, y: 0, duration: 0.2, ease: 'power2.out' });
+    }, rootRef);
+    return () => context.revert();
+  }, [error]);
+
+  const closeModal = useCallback(() => {
+    const layer = rootRef.current?.querySelector('.login-modal-layer') || null;
+    animateLayerOut(layer, () => setModal(null), { card: '.login-modal', backdrop: '.login-modal-backdrop' });
+  }, []);
 
   function clearFeedback() { setError(''); setMessage(''); }
 
@@ -250,12 +296,12 @@ export default function LoginApp() {
         </div>
       </section>}
 
-      {modal&&<div className="login-modal-layer" role="dialog" aria-modal="true"><div className="login-modal-backdrop" onClick={()=>setModal(null)}/><section className="login-modal">
-        <button className="modal-x" onClick={()=>setModal(null)}><X/></button>
+      {modal&&<div className="login-modal-layer" role="dialog" aria-modal="true"><div className="login-modal-backdrop" onClick={closeModal}/><section className="login-modal">
+        <button className="modal-x" onClick={closeModal}><X/></button>
         {modal==='forgot'&&<form onSubmit={forgotPassword}><Mail/><h3>Recuperar acesso</h3><p>Enviaremos um link de recuperação para o e-mail cadastrado.</p><label>E-mail<input value={email} onChange={e=>setEmail(e.target.value)} autoFocus/></label><button className="modal-gold" disabled={loading}>Enviar recuperação</button></form>}
         {modal==='pin'&&<form onSubmit={doPin}><Grid3X3/><h3>PIN de acesso</h3><p>Use o PIN configurado para esta conta.</p><label>E-mail<input value={email} onChange={e=>setEmail(e.target.value)}/></label><label>PIN<input value={pin} onChange={e=>setPin(e.target.value.replace(/\D/g,'').slice(0,8))} inputMode="numeric" autoFocus placeholder="••••••"/></label><button className="modal-gold" disabled={loading||pin.length<4}>Entrar com PIN</button></form>}
         {modal==='company'&&<div className="modal-content"><Building2/><h3>Selecionar empresa</h3><p>Escolha qual operação deseja acessar.</p><div className="company-list">{orgs.map(o=><button key={o.slug} className={o.slug===org?'active':''} onClick={()=>chooseOrg(o.slug)}><Building2/><span><b>{o.name}</b><small>{o.slug}</small></span>{o.slug===org&&<Check/>}</button>)}</div></div>}
-        {modal==='passkey'&&<div className="modal-content"><Fingerprint/><h3>Biometria do dispositivo</h3><p>{passkeyInfo||'Aguardando o autenticador seguro do aparelho…'}</p><button className="modal-gold" onClick={()=>setModal(null)}>Entendi</button></div>}
+        {modal==='passkey'&&<div className="modal-content"><Fingerprint/><h3>Biometria do dispositivo</h3><p>{passkeyInfo||'Aguardando o autenticador seguro do aparelho…'}</p><button className="modal-gold" onClick={closeModal}>Entendi</button></div>}
         {modal==='reset'&&<form onSubmit={resetPassword}><LockKeyhole/><h3>Definir nova senha</h3><p>Mínimo de 10 caracteres, com maiúscula, minúscula, número e símbolo.</p><label>Nova senha<input type="password" value={newPassword} onChange={e=>setNewPassword(e.target.value)} autoFocus/></label><button className="modal-gold" disabled={loading||newPassword.length<10}>Atualizar senha</button></form>}
       </section></div>}
     </div>
