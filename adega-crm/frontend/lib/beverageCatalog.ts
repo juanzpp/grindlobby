@@ -23,6 +23,11 @@ const realPackshots:Record<string,string>={
   TANQ750:'/assets/products/tanqueray.png',
   BUD330:'/assets/products/budweiser.png',
   COR330:'/assets/products/corona.png',
+  JD1L:'/assets/products/jack-daniels.png',
+  RB250:'/assets/products/red-bull.png',
+  SK350:'/assets/products/skol.png',
+  COCA2L:'/assets/products/coca-cola.png',
+  CAMP750:'/assets/products/campari.png',
 };
 const item=(name:string,category:string,volumeMl:number,sku:string,barcode?:string):BeverageCatalogItem=>({name,category,volumeMl,sku,barcode,image:realPackshots[sku]||productCutoutFor(name,category)});
 

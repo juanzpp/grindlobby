@@ -220,7 +220,7 @@ export default function Storefront(){
           <div className="hero-buy-row"><button onClick={e=>featuredCombo&&add(featuredCombo,1,e.currentTarget)}><ShoppingCart/>ADICIONAR AO CARRINHO</button><div><strong>{money(55)}</strong></div></div>
           <div className="hero-trust"><span><ShieldCheck/>100% Original</span><span><Truck/>Entrega Rápida</span><span><Package/>{red?.stock||0} em estoque</span></div>
         </div>
-        <div className="hero-static-product"><Image className="hero-static-image" src="/assets/hero-baly-eternity-watermelon.png" alt="Baly Energy Drink, Eternity Gin Watermelon e gelo sabor melancia" fill priority sizes="(max-width: 820px) 72vw, 56vw"/></div>
+        <div className="hero-static-product hero-product-enter"><Image className="hero-static-image" src="/assets/hero-baly-eternity-watermelon.png" alt="Baly Energy Drink, Eternity Gin Watermelon e gelo sabor melancia" fill priority fetchPriority="high" sizes="(max-width: 820px) 72vw, 56vw"/></div>
         <div className="hero-live-badge"><CheckCircle2/><span><b>Loja aberta</b><small>entrega média 35 min</small></span></div>
         <button className="hero-arrow left"><ChevronLeft/></button><button className="hero-arrow right"><ChevronRight/></button><div className="hero-pagination"><button className="active"/><button/><button/><button/><span>01 / 04</span></div>
       </section>

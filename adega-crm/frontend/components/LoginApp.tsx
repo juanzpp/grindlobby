@@ -127,9 +127,8 @@ export default function LoginApp() {
       .fromTo('.toast-glass.right', { rotate: 18, x: 18 }, { rotate: 7, x: -5, duration: 0.7, yoyo: true, repeat: 2, ease: 'sine.inOut' }, 0.15)
       .fromTo('.toast-spark', { scale: 0, autoAlpha: 0, rotation:-35 }, { scale: 1, autoAlpha: 1, rotation:35, duration: 0.34, yoyo: true, repeat: 5, ease: 'power2.out' }, 0.42)
       .fromTo('.toast-orbit', { rotation:0, scale:.82, autoAlpha:.25 }, { rotation:360, scale:1.08, autoAlpha:.8, duration:2.1, ease:'none' }, 0.1)
-      .fromTo('.toast-bubble', { y:24, scale:.4, autoAlpha:0 }, { y:-62, scale:1, autoAlpha:1, duration:1.15, stagger:.12, repeat:1, ease:'power1.out' }, 0.3)
-      .to('.post-login-loader', { autoAlpha: 0, duration: 0.42, ease: 'power1.in' }, (duration - 220) / 1000);
-    const destinationTimer = transitioning ? window.setTimeout(() => router.replace('/gestor', { scroll: false }), duration + 80) : null;
+      .fromTo('.toast-bubble', { y:24, scale:.4, autoAlpha:0 }, { y:-62, scale:1, autoAlpha:1, duration:1.15, stagger:.12, repeat:1, ease:'power1.out' }, 0.3);
+    const destinationTimer = transitioning ? window.setTimeout(() => window.location.replace('/gestor'), duration) : null;
     return () => {
       progressAnimation.kill();
       sceneAnimation?.kill();
