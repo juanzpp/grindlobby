@@ -472,6 +472,7 @@ button:active{transform:scale(.985)}
 }
 
 @media(max-width:820px){
+  html,body{width:100%;max-width:100%;overflow-x:hidden}.manager-app,.manager-stage,.manager-content,.storefront-app,.store-stage{width:100%;max-width:100%;min-width:0}.manager-content,.store-stage{overflow-x:clip}
   .manager-app .manager-sidebar{position:fixed;top:0;bottom:0;left:0;height:100dvh;max-height:100dvh;overflow-y:auto;padding-top:max(20px,env(safe-area-inset-top));padding-bottom:max(16px,env(safe-area-inset-bottom))}
   .manager-app .nav-scrim.show{z-index:140}
   .storefront-cinematic .store-left-rail{position:fixed;top:0;bottom:0;left:0;height:100dvh;z-index:60}
@@ -491,4 +492,11 @@ button:active{transform:scale(.985)}
 
 @media(max-width:480px){
   .hero-static-product{top:136px;right:-9%;width:78%;height:238px}
+}
+
+@media(max-width:520px){
+  .login-screen{display:block;min-width:0;overflow-x:hidden}
+  .login-live-card{width:min(350px,calc(100vw - 40px));margin:8px auto 84px;min-height:630px;padding:17px 18px 18px}
+  .login-brand{height:126px}.login-bottle-mark{width:42px;height:50px}.login-brand strong{font-size:27px;line-height:28px}.login-brand b{font-size:19px;line-height:22px}.login-brand span{margin-top:7px;padding-top:7px;font-size:8.5px}
+  .login-field-label:nth-of-type(2){margin-top:11px}.login-options{margin-top:10px}.login-enter{margin-top:10px}.login-divider{height:36px}.login-alt-grid button{height:68px}.login-alt-grid button svg{width:23px;height:23px}.login-company{height:40px;margin-top:11px}.login-secure{padding-top:13px}.login-secure strong{font-size:12px}.login-secure span{font-size:10px}
 }
