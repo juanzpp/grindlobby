@@ -476,3 +476,17 @@ button:active{transform:scale(.985)}
   .storefront-cinematic .store-stage{position:relative;z-index:3}
   .storefront-cinematic .mobile-store-bottom{position:fixed;left:0;right:0;bottom:0;z-index:70}
 }
+
+/* Hero com arte estática: sem parallax, glow ou esfera vermelha. */
+.storefront-cinematic .store-hero-next{background:linear-gradient(120deg,#08090a 0%,#0a0c0e 52%,#070809 100%)}
+.storefront-cinematic .store-hero-next .hero-bg{background:linear-gradient(90deg,#050709 0%,#080a0c 58%,#07090b 100%)}
+.hero-static-product{position:absolute;right:1.5%;bottom:0;z-index:4;width:min(56%,850px);height:94%;pointer-events:none}
+.hero-static-image{object-fit:contain;object-position:right bottom;filter:none!important;transform:none!important;transition:none!important}
+
+@media(max-width:820px){
+  .hero-static-product{top:122px;right:-6%;bottom:auto;width:72%;height:260px}
+}
+
+@media(max-width:480px){
+  .hero-static-product{top:136px;right:-9%;width:78%;height:238px}
+}

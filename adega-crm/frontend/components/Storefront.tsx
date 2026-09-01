@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import Image from 'next/image';
 import {
   Search, ShoppingCart, Heart, UserRound, Home, Grid2X2, Tag, Flame, Package,
   Wine, Beer, Zap, ChevronRight, ChevronLeft, MapPin, Truck, ShieldCheck,
@@ -40,7 +41,6 @@ export default function Storefront(){
   const [toast,setToast]=useState('');
   const [checkoutState,setCheckoutState]=useState<'idle'|'loading'|'success'>('idle');
   const appRef=useRef<HTMLDivElement|null>(null);
-  const heroRef=useRef<HTMLElement|null>(null);
   const toastTimer=useRef<number|undefined>(undefined);
   const checkoutTimer=useRef<number|undefined>(undefined);
   const showToast=useCallback((t:string)=>{setToast(t);if(toastTimer.current)window.clearTimeout(toastTimer.current);toastTimer.current=window.setTimeout(()=>setToast(''),2500)},[]);
@@ -62,22 +62,14 @@ export default function Storefront(){
     media.add({motion:FULL_MOTION_QUERY,mobile:'(max-width: 820px)'},context=>{
       if(!context.conditions?.motion)return;
       const mobile=Boolean(context.conditions.mobile);
-      const targets=appRef.current?.querySelectorAll('.hero-kicker,.hero-brand,.hero-title span,.hero-title strong,.hero-desc,.hero-buy-row,.hero-trust,.hero-bottle-real,.hero-offer-orb,.category-ribbon button');
+      const targets=appRef.current?.querySelectorAll('.hero-kicker,.hero-brand,.hero-title span,.hero-title strong,.hero-desc,.hero-buy-row,.hero-trust,.category-ribbon button');
       if(targets)setMotionHint(targets);
       const timeline=gsap.timeline({defaults:{ease:'power3.out'},onComplete:()=>targets&&clearMotionHint(targets)});
       timeline
         .fromTo('.hero-kicker,.hero-brand',{autoAlpha:0,y:12},{autoAlpha:1,y:0,duration:mobile?.34:.55,stagger:.055})
         .fromTo('.hero-title span,.hero-title strong',{autoAlpha:0,y:mobile?14:28,scale:.96},{autoAlpha:1,y:0,scale:1,duration:mobile?.48:.72,stagger:.06},mobile?.12:.18)
         .fromTo('.hero-desc,.hero-buy-row,.hero-trust',{autoAlpha:0,y:14},{autoAlpha:1,y:0,duration:mobile?.36:.52,stagger:.055},mobile?.26:.36)
-        .fromTo('.hero-bottle-real',{autoAlpha:0,y:mobile?24:42,rotate:-2,scale:.9},{autoAlpha:1,y:0,rotate:0,scale:1,duration:mobile?.62:.95},mobile?.16:.24)
-        .fromTo('.hero-offer-orb',{autoAlpha:0,scale:.78,rotate:-8},{autoAlpha:1,scale:1,rotate:0,duration:.48},mobile?.35:.5)
         .fromTo('.category-ribbon button',{autoAlpha:0,y:10},{autoAlpha:1,y:0,duration:.3,stagger:mobile?.025:.04},mobile?.46:.66);
-    });
-    media.add('(min-width: 821px) and (prefers-reduced-motion: no-preference)',()=>{
-      gsap.to('.hero-bottle-float',{y:-9,rotationY:7,rotationZ:.45,yoyo:true,repeat:-1,duration:3.9,ease:'sine.inOut'});
-      gsap.to('.hero-aura',{scale:1.14,opacity:.64,yoyo:true,repeat:-1,duration:2.8,ease:'sine.inOut'});
-      gsap.to('.hero-ring',{rotation:360,repeat:-1,duration:19,ease:'none'});
-      gsap.to('.hero-liquid-orb',{scale:1.08,rotation:4,yoyo:true,repeat:-1,duration:4.5,ease:'sine.inOut'});
     });
     return()=>media.revert();
   },[products.length]);
@@ -191,23 +183,13 @@ export default function Storefront(){
   const toggleFav=(id:number)=>setFavorites(f=>{const n=new Set(f);if(n.has(id))n.delete(id);else n.add(id);return n});
   const oldPrice=red?red.price*1.18:0;
 
-  const onAppPointer=(e:React.PointerEvent<HTMLDivElement>)=>{
-    const el=appRef.current;if(!el)return;
-    const r=el.getBoundingClientRect();el.style.setProperty('--pointer-x',`${e.clientX-r.left}px`);el.style.setProperty('--pointer-y',`${e.clientY-r.top}px`);
-  };
-  const onHeroPointer=(e:React.PointerEvent<HTMLElement>)=>{
-    if(prefersReducedMotion()||window.innerWidth<900)return;
-    const r=e.currentTarget.getBoundingClientRect();const nx=(e.clientX-r.left)/r.width-.5,ny=(e.clientY-r.top)/r.height-.5;
-    e.currentTarget.style.setProperty('--hero-x',`${nx*16}px`);e.currentTarget.style.setProperty('--hero-y',`${ny*10}px`);e.currentTarget.style.setProperty('--hero-rx',`${ny*-2.2}deg`);e.currentTarget.style.setProperty('--hero-ry',`${nx*3}deg`);
-  };
-  const resetHero=(e:React.PointerEvent<HTMLElement>)=>{e.currentTarget.style.setProperty('--hero-x','0px');e.currentTarget.style.setProperty('--hero-y','0px');e.currentTarget.style.setProperty('--hero-rx','0deg');e.currentTarget.style.setProperty('--hero-ry','0deg')};
   const tilt=(e:React.PointerEvent<HTMLElement>)=>{if(prefersReducedMotion()||window.innerWidth<900)return;const r=e.currentTarget.getBoundingClientRect(),x=(e.clientX-r.left)/r.width,y=(e.clientY-r.top)/r.height;e.currentTarget.style.setProperty('--card-x',`${x*100}%`);e.currentTarget.style.setProperty('--card-y',`${y*100}%`);e.currentTarget.style.setProperty('--card-rx',`${(y-.5)*-5}deg`);e.currentTarget.style.setProperty('--card-ry',`${(x-.5)*7}deg`)};
   const untilt=(e:React.PointerEvent<HTMLElement>)=>{e.currentTarget.style.setProperty('--card-rx','0deg');e.currentTarget.style.setProperty('--card-ry','0deg')};
   const closeProduct=useCallback(()=>{const layer=appRef.current?.querySelector('.product-modal-next')||null;animateLayerOut(layer,()=>setSelected(null),{card:'.product-modal-box',backdrop:'.product-modal-overlay'})},[]);
   useEffect(()=>{if(!selected)return;const close=(event:KeyboardEvent)=>{if(event.key==='Escape')closeProduct()};document.addEventListener('keydown',close);return()=>document.removeEventListener('keydown',close)},[selected,closeProduct]);
 
-  return <div ref={appRef} onPointerMove={onAppPointer} className="storefront-app storefront-cinematic">
-    <div className="store-noise"/><div className="store-pointer-glow"/>
+  return <div ref={appRef} className="storefront-app storefront-cinematic">
+    <div className="store-noise"/>
     <aside className={`store-left-rail ${menuOpen?'open':''}`}>
       <button className="rail-close" onClick={()=>setMenuOpen(false)}><X/></button>
       <div className="lux-logo"><div className="logo-crown">♛</div><strong>ADEGA</strong><span>DRINKS & BEBIDAS</span></div>
@@ -229,11 +211,8 @@ export default function Storefront(){
         <button className="header-cart" onClick={()=>setCartOpen(true)}><ShoppingCart/><div><b>Meu Carrinho</b><span>{count} {count===1?'item':'itens'}</span></div><em className="cart-badge">{count}</em></button>
       </header>
 
-      <section ref={heroRef} onPointerMove={onHeroPointer} onPointerLeave={resetHero} className="store-hero-next premium-hero">
-        <div className="hero-bg">
-          <div className="hero-liquid-orb orb-one"/><div className="hero-liquid-orb orb-two"/><div className="hero-red-flow"/><div className="hero-aura"/><div className="hero-ring"/><div className="hero-sweep"/>
-          {Array.from({length:24}).map((_,i)=><i key={i} className="spark-dot" style={{left:`${48+(i*17)%50}%`,top:`${8+(i*23)%82}%`}}/> )}
-        </div>
+      <section className="store-hero-next premium-hero">
+        <div className="hero-bg"/>
         <div className="hero-copy-next">
           <span className="hero-kicker"><Sparkles/> O CLÁSSICO QUE NUNCA SAI DE MODA</span>
           <small className="hero-brand">JOHNNIE WALKER</small>
@@ -242,9 +221,7 @@ export default function Storefront(){
           <div className="hero-buy-row"><button onClick={e=>red&&add(red,1,e.currentTarget)}><ShoppingCart/>ADICIONAR AO CARRINHO</button><div><strong>{money(red?.price||0)}</strong><del>{money(oldPrice)}</del><em>-15%</em></div></div>
           <div className="hero-trust"><span><ShieldCheck/>100% Original</span><span><Truck/>Entrega Rápida</span><span><Package/>{red?.stock||0} em estoque</span></div>
         </div>
-        <div className="hero-parallax-product"><div className="hero-product-next hero-bottle-float"><div className="hero-bottle-shadow"/><div className="bottle-product-stage"><img className="hero-bottle-real" src="/assets/products/red-label.png" alt="Johnnie Walker Gold Label Reserve com embalagem"/><i className="bottle-glass-sheen" aria-hidden="true"/></div></div></div>
-        <div className="hero-offer-orb"><small>OFERTA</small><strong>ESPECIAL</strong><span>15% OFF</span></div>
-        <div className="hero-script"><span>Tradição</span><span>Qualidade</span><span>Sabor</span></div>
+        <div className="hero-static-product"><Image className="hero-static-image" src="/assets/hero-baly-eternity-watermelon.png" alt="Baly Energy Drink, Eternity Gin Watermelon e gelo sabor melancia" fill priority sizes="(max-width: 820px) 72vw, 56vw"/></div>
         <div className="hero-live-badge"><CheckCircle2/><span><b>Loja aberta</b><small>entrega média 35 min</small></span></div>
         <button className="hero-arrow left"><ChevronLeft/></button><button className="hero-arrow right"><ChevronRight/></button><div className="hero-pagination"><button className="active"/><button/><button/><button/><span>01 / 04</span></div>
       </section>
