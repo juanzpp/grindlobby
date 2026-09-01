@@ -306,7 +306,11 @@ class ProductIn(BaseModel):
     min_stock: int = Field(default=5, ge=0)
     storefront: bool = True
     volume_ml: int | None = Field(default=None, gt=0, le=10000)
-    image_url: str | None = Field(default=None, max_length=1000)
+    image_url: str | None = Field(default=None, max_length=1_000_000)
+
+
+class ProductImageIn(BaseModel):
+    image_url: str = Field(min_length=10, max_length=1_000_000)
 
 
 class StockAdjust(BaseModel):
@@ -463,6 +467,20 @@ async def create_product(payload: ProductIn):
         conn.execute("INSERT INTO audit_log(action,entity,entity_id,detail,created_at) VALUES(?,?,?,?,?)", ("create", "product", str(pid), payload.name, now_iso()))
     await manager.broadcast({"type": "product_created", "product_id": pid})
     return {"id": pid}
+
+
+@app.patch("/api/products/{product_id}/image")
+async def update_product_image(product_id: int, payload: ProductImageIn):
+    if not (payload.image_url.startswith("data:image/") or payload.image_url.startswith("https://") or payload.image_url.startswith("/")):
+        raise HTTPException(422, "Formato de imagem não permitido")
+    with db() as conn:
+        product = conn.execute("SELECT name FROM products WHERE id=?", (product_id,)).fetchone()
+        if not product:
+            raise HTTPException(404, "Produto não encontrado")
+        conn.execute("UPDATE products SET image_url=? WHERE id=?", (payload.image_url, product_id))
+        conn.execute("INSERT INTO audit_log(action,entity,entity_id,detail,created_at) VALUES(?,?,?,?,?)", ("update_image", "product", str(product_id), product["name"], now_iso()))
+    await manager.broadcast({"type": "product_updated", "product_id": product_id})
+    return {"ok": True}
 
 
 @app.post("/api/products/{product_id}/stock")

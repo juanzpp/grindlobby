@@ -500,3 +500,6 @@ button:active{transform:scale(.985)}
   .login-brand{height:126px}.login-bottle-mark{width:42px;height:50px}.login-brand strong{font-size:27px;line-height:28px}.login-brand b{font-size:19px;line-height:22px}.login-brand span{margin-top:7px;padding-top:7px;font-size:8.5px}
   .login-field-label:nth-of-type(2){margin-top:11px}.login-options{margin-top:10px}.login-enter{margin-top:10px}.login-divider{height:36px}.login-alt-grid button{height:68px}.login-alt-grid button svg{width:23px;height:23px}.login-company{height:40px;margin-top:11px}.login-secure{padding-top:13px}.login-secure strong{font-size:12px}.login-secure span{font-size:10px}
 }
+
+.manual-photo-picker input,.product-photo-upload input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.product-photo-upload{display:inline-flex!important;width:max-content;margin-top:5px;padding:4px 7px;border:1px solid #58451f;border-radius:5px;background:#19140b;color:#e8b957!important;font-size:8px!important;font-weight:750;cursor:pointer}
