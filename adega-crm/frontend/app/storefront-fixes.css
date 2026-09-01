@@ -1,0 +1,74 @@
+/* Mobile storefront corrections — removes dead space, fixes rail scrolling, and keeps overlays viewport-fixed. */
+@media (max-width: 820px) {
+  .storefront-cinematic .store-search {
+    display: none !important;
+  }
+
+  .storefront-cinematic .store-hero-next {
+    margin-top: 0 !important;
+  }
+
+  .storefront-cinematic .store-left-rail {
+    position: fixed !important;
+    inset: 0 auto 0 0 !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: calc(24px + env(safe-area-inset-bottom)) !important;
+  }
+
+  .storefront-cinematic .store-left-rail .rail-nav {
+    overflow: visible !important;
+    flex: 0 0 auto;
+  }
+
+  .storefront-cinematic .store-left-rail .rail-foot {
+    margin-top: 18px !important;
+    padding-bottom: 10px;
+  }
+
+  .storefront-cinematic .store-cart-drawer {
+    position: fixed !important;
+    z-index: 90 !important;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .storefront-cinematic .cart-overlay {
+    position: fixed !important;
+    z-index: 89 !important;
+  }
+
+  .storefront-cinematic .drawer-items {
+    min-height: 76px;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+  }
+}
+
+@media (max-width: 480px) {
+  /* The old width:100% left an empty bordered block after the price. */
+  .storefront-cinematic .hero-buy-row {
+    width: max-content !important;
+    max-width: calc(100vw - 36px) !important;
+    right: auto !important;
+  }
+
+  .storefront-cinematic .hero-buy-row > button {
+    flex: 0 1 auto !important;
+    min-width: 0;
+  }
+
+  .storefront-cinematic .hero-buy-row > div {
+    flex: 0 0 auto !important;
+  }
+}
+
+/* Extra hooks used by the GSAP cart enhancer. */
+.storefront-cinematic .store-stage,
+.storefront-cinematic .header-cart {
+  will-change: transform;
+}

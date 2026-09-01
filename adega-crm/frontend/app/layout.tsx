@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import './login-desktop.css';
 import './login-background-version.css';
+import './storefront-fixes.css';
+import StorefrontEnhancer from '@/components/StorefrontEnhancer';
 
 export const metadata: Metadata = {
   title: 'Adega CRM',
@@ -18,7 +20,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="pt-BR" data-scroll-behavior="smooth">
-      <body>{children}</body>
+      <body>
+        {children}
+        <StorefrontEnhancer />
+      </body>
     </html>
   );
 }
