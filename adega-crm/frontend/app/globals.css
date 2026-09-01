@@ -455,6 +455,7 @@ button:active{transform:scale(.985)}
 @media(max-width:430px){.manager-content{padding-inline:8px}.stock-metrics,.finance-metrics,.dashboard-kpis{grid-template-columns:1fr!important}.pdv-grid{grid-template-columns:1fr 1fr!important}.beverage-catalog-grid{grid-template-columns:1fr!important}.beverage-catalog-grid>button{min-height:142px!important;grid-template-columns:62px 1fr 22px!important}.data-row,.product-row{grid-template-columns:1fr auto!important}.manager-mobile-tabs{left:5px;right:5px}.manager-mobile-tabs button span{font-size:9px}}
 
 .post-login-toast{position:relative;width:min(300px,72vw);height:210px;margin-bottom:6px;display:flex;align-items:center;justify-content:center;gap:0;color:#f3bd55;filter:drop-shadow(0 18px 26px rgba(0,0,0,.72))}.post-login-toast .toast-glass{width:112px;height:150px;stroke-width:1.25;fill:rgba(207,126,28,.12)}.post-login-toast .toast-glass.left{transform:rotate(-12deg);margin-right:-18px}.post-login-toast .toast-glass.right{transform:rotate(12deg);margin-left:-18px}.post-login-toast .toast-spark{position:absolute;top:22px;left:50%;width:38px;height:38px;transform:translateX(-50%);color:#ffe2a1;filter:drop-shadow(0 0 12px rgba(255,190,75,.72))}
+.toast-orbit{position:absolute;width:205px;height:205px;border:1px solid rgba(242,186,75,.34);border-radius:50%;box-shadow:0 0 45px rgba(209,125,22,.13),inset 0 0 35px rgba(255,196,84,.08)}.toast-orbit:before,.toast-orbit:after{content:"";position:absolute;width:7px;height:7px;border-radius:50%;background:#ffd77f;box-shadow:0 0 16px #f0a62f}.toast-orbit:before{top:14px;left:30px}.toast-orbit:after{right:18px;bottom:37px}.toast-bubbles{position:absolute;inset:0;pointer-events:none}.toast-bubble{position:absolute;left:50%;bottom:52px;width:8px;height:8px;border:1px solid #ffd985;border-radius:50%;box-shadow:0 0 10px rgba(255,196,77,.5)}.toast-bubble:nth-child(2){left:42%;width:5px;height:5px}.toast-bubble:nth-child(3){left:57%;bottom:62px;width:11px;height:11px}.toast-bubble:nth-child(4){left:48%;bottom:42px;width:4px;height:4px}
 
 /* GSAP: performance-safe mobile motion layer */
 .status-badge{transition:color .18s ease,background-color .18s ease,border-color .18s ease}.login-modal,.catalog-card,.post-login-content{animation:none}.finish-sale.success{background:linear-gradient(135deg,#35c96f,#168445);color:#06150c}.checkout-next.success{background:linear-gradient(135deg,#78df93,#33a65d);color:#07150c}.finish-sale.loading,.checkout-next.loading{cursor:wait}.manager-app button,.storefront-app button,.login-screen button{touch-action:manipulation}.pdv-cart-list>div,.drawer-item,.store-product-card,.metric-card{transform:translateZ(0)}
@@ -478,6 +479,7 @@ button:active{transform:scale(.985)}
   .storefront-cinematic .store-left-rail{position:fixed;top:0;bottom:0;left:0;height:100dvh;z-index:60}
   .storefront-cinematic .store-stage{position:relative;z-index:3}
   .storefront-cinematic .mobile-store-bottom{position:fixed;left:0;right:0;bottom:0;z-index:70}
+  .storefront-cinematic .store-cart-drawer{position:fixed!important;left:0!important;right:0!important;bottom:0!important;top:auto!important;max-height:92dvh;overscroll-behavior:contain;transform:translateZ(0)}
 }
 
 /* Hero com arte estática: sem parallax, glow ou esfera vermelha. */
@@ -492,6 +494,8 @@ button:active{transform:scale(.985)}
 
 @media(max-width:480px){
   .hero-static-product{top:136px;right:-9%;width:78%;height:238px}
+  .storefront-cinematic .hero-buy-row{position:absolute;left:0;top:365px;width:100%;max-width:350px;z-index:7;justify-content:flex-start}.storefront-cinematic .hero-buy-row>button{height:42px;flex:0 1 auto}.storefront-cinematic .hero-buy-row>div{height:42px;flex:none;background:rgba(8,10,12,.9)}
+  .storefront-cinematic .hero-trust{top:424px}
 }
 
 @media(max-width:520px){

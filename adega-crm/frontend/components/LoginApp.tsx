@@ -125,7 +125,9 @@ export default function LoginApp() {
       .fromTo('.post-login-content', { autoAlpha: 0, y: 18 }, { autoAlpha: 1, y: 0, duration: 0.65, ease: 'power3.out' })
       .fromTo('.toast-glass.left', { rotate: -18, x: -18 }, { rotate: -7, x: 5, duration: 0.7, yoyo: true, repeat: 2, ease: 'sine.inOut' }, 0.15)
       .fromTo('.toast-glass.right', { rotate: 18, x: 18 }, { rotate: 7, x: -5, duration: 0.7, yoyo: true, repeat: 2, ease: 'sine.inOut' }, 0.15)
-      .fromTo('.toast-spark', { scale: 0, autoAlpha: 0 }, { scale: 1, autoAlpha: 1, duration: 0.3, yoyo: true, repeat: 5, ease: 'power2.out' }, 0.5)
+      .fromTo('.toast-spark', { scale: 0, autoAlpha: 0, rotation:-35 }, { scale: 1, autoAlpha: 1, rotation:35, duration: 0.34, yoyo: true, repeat: 5, ease: 'power2.out' }, 0.42)
+      .fromTo('.toast-orbit', { rotation:0, scale:.82, autoAlpha:.25 }, { rotation:360, scale:1.08, autoAlpha:.8, duration:2.1, ease:'none' }, 0.1)
+      .fromTo('.toast-bubble', { y:24, scale:.4, autoAlpha:0 }, { y:-62, scale:1, autoAlpha:1, duration:1.15, stagger:.12, repeat:1, ease:'power1.out' }, 0.3)
       .to('.post-login-loader', { autoAlpha: 0, duration: 0.42, ease: 'power1.in' }, (duration - 220) / 1000);
     const destinationTimer = transitioning ? window.setTimeout(() => router.replace('/gestor', { scroll: false }), duration + 80) : null;
     return () => {
@@ -288,12 +290,12 @@ export default function LoginApp() {
         <div className="post-login-veil" />
         <div className="post-login-content">
           <div className="post-login-toast" aria-hidden="true">
+            <i className="toast-orbit" />
+            <i className="toast-bubbles"><b className="toast-bubble"/><b className="toast-bubble"/><b className="toast-bubble"/><b className="toast-bubble"/></i>
             <Wine className="toast-glass left" />
             <Sparkles className="toast-spark" />
             <Wine className="toast-glass right" />
           </div>
-          <div className="post-login-track" aria-hidden="true"><i className={loadProgress > .5 ? 'is-flowing' : ''} style={{width:`${loadProgress}%`}}><b/><span/></i></div>
-          <div className="post-login-copy"><span>Sincronizando seu ambiente de gestão…</span></div>
         </div>
       </section>}
 
