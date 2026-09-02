@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Activity, Headphones, LayoutGrid, Mic, Monitor, Settings, SlidersHorizontal, Star, Store, Trophy, Users, Volume2, Waves } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { LogoutButton } from "@/components/LogoutButton";
 
 export const Route = createFileRoute("/configuracoes")({ component: SettingsPage });
 const nav = [["Dashboard","/",LayoutGrid],["Lobbies","/lobbies",Users],["Rank","/rank",Trophy],["Loja","/loja",Store],["Pro","/pro",Star],["Configurações","/configuracoes",Settings]] as const;
@@ -60,6 +61,8 @@ function SettingsPage(){
   <div className="mt-4 grid gap-3 md:grid-cols-2"><Toggle checked={cfg.systemAudio} onChange={v=>patch("systemAudio",v)} label="Áudio do sistema" description="Solicita áudio junto com a tela quando o navegador permitir."/><Toggle checked={cfg.lowLatency} onChange={v=>patch("lowLatency",v)} label="Baixa latência" description="Prioriza resposta rápida em vez de buffer excessivo."/><Toggle checked={cfg.hardwareAcceleration} onChange={v=>patch("hardwareAcceleration",v)} label="Aceleração por hardware" description="Preferência para reduzir carga da CPU quando suportado."/><Toggle checked={cfg.showPreview} onChange={v=>patch("showPreview",v)} label="Preview local" description="Exibe sua própria transmissão dentro da sala."/></div></section>
 
   <section className="panel p-5"><h2 className="flex items-center gap-2 font-semibold"><Waves className="h-4 w-4"/>Sons e experiência</h2><div className="mt-4 grid gap-3 md:grid-cols-2"><Toggle checked={cfg.joinSounds} onChange={v=>patch("joinSounds",v)} label="Sons de entrada/saída" description="Mantém os avisos sonoros da call."/><Toggle checked={cfg.muteSounds} onChange={v=>patch("muteSounds",v)} label="Sons de mute/deafen" description="Feedback ao ligar/desligar microfone e áudio."/></div></section>
+
+  <section className="panel flex flex-wrap items-center justify-between gap-4 p-5"><div><h2 className="font-semibold">Conta</h2><p className="mt-1 text-xs text-muted-foreground">Encerra sua sessão neste dispositivo e desconecta qualquer call ativa.</p></div><LogoutButton onError={setStatus}/></section>
 
   <div className="flex flex-wrap items-center gap-3"><button onClick={save} className="btn-primary rounded-lg px-5 py-2.5 font-semibold">Salvar configurações</button><Link to="/lobbies" className="btn-ghost rounded-lg px-5 py-2.5 text-sm">Ir para lobbies</Link>{status&&<p className="text-sm text-muted-foreground">{status}</p>}</div></main></div></div>;
 }
