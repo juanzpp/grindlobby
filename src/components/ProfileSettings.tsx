@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Check, ImagePlus, Loader2, Save, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
+import { LogoutButton } from "@/components/LogoutButton";
 import { findItem, usePlayer } from "@/lib/player-store";
 import { STORE_ITEMS } from "@/lib/store-items";
 import { getTier } from "@/lib/levels";
@@ -32,6 +33,6 @@ export function ProfileSettings({onClose}:{onClose:()=>void}){
   <div className="mt-4 grid gap-3 sm:grid-cols-2"><button onClick={()=>setForm({...form,privateProfile:!form.privateProfile})} className="flex items-center justify-between rounded-lg border border-border bg-panel px-3 py-2.5 text-sm">Perfil privado<span>{form.privateProfile?"Ativo":"Desativado"}</span></button><button onClick={()=>setForm({...form,allowInvites:!form.allowInvites})} className="flex items-center justify-between rounded-lg border border-border bg-panel px-3 py-2.5 text-sm">Permitir convites<span>{form.allowInvites?"Ativo":"Desativado"}</span></button></div>
   <div className="mt-5 space-y-4">{[{title:"Molduras conquistadas",list:ownedBorders,slot:"border" as const},{title:"Títulos conquistados",list:ownedTitles,slot:"title" as const},{title:"Backgrounds conquistados",list:ownedBanners,slot:"banner" as const}].map(group=><div key={group.slot}><p className="label-caps">{group.title}</p><div className="mt-2 flex flex-wrap gap-2">{group.list.length?group.list.map(item=><button key={item.id} onClick={()=>void equip(item)} className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs ${player.equipped[group.slot]===item.id?"border-success/50 bg-success/15 text-success":"border-border bg-panel text-muted-foreground"}`}>{player.equipped[group.slot]===item.id&&<Check className="h-3.5 w-3.5"/>}{item.name}</button>):<span className="text-xs text-muted-foreground">Nenhum item conquistado nesta categoria.</span>}</div></div>)}</div>
   {error&&<p className="mt-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</p>}
-  <div className="mt-6 flex justify-end"><button onClick={()=>void save()} disabled={saving||!!uploading} className="btn-primary flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50">{saving?<Loader2 className="h-4 w-4 animate-spin"/>:<Save className="h-4 w-4"/>}Salvar alterações</button></div>
+  <div className="mt-6 flex flex-wrap items-center justify-between gap-3"><LogoutButton onError={setError}/><button onClick={()=>void save()} disabled={saving||!!uploading} className="btn-primary flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50">{saving?<Loader2 className="h-4 w-4 animate-spin"/>:<Save className="h-4 w-4"/>}Salvar alterações</button></div>
  </div></div>
 }
