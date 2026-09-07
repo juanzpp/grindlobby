@@ -38,23 +38,23 @@ jobs:
         working-directory: desktop
         run: bun run build
 
-      - name: Capture real desktop UI preview
+      - name: Capture real desktop UI previews
         working-directory: desktop
         shell: pwsh
         continue-on-error: true
         run: |
-          bunx playwright@1.63.0 install chromium
+          bunx playwright install chromium
           $bun = (Get-Command bun).Source
           $preview = Start-Process -FilePath $bun -ArgumentList "run","preview" -PassThru
           Start-Sleep -Seconds 3
-          bunx playwright@1.63.0 screenshot --viewport-size="1536,864" --wait-for-timeout=1500 http://127.0.0.1:4173 desktop-v3-preview.png
+          bun run capture:previews
           Stop-Process -Id $preview.Id -Force -ErrorAction SilentlyContinue
 
-      - name: Upload UI preview
+      - name: Upload UI previews
         uses: actions/upload-artifact@v4
         with:
-          name: GrindLobby-Desktop-V3-Preview
-          path: desktop/desktop-v3-preview.png
+          name: GrindLobby-Desktop-V3-Previews
+          path: desktop/preview-captures/*.png
           if-no-files-found: warn
           retention-days: 14
 
