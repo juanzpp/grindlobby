@@ -1,12 +1,10 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import App from './App'
-import BillingPortal from './BillingPortal'
-import './styles.css'
+import V3App from './V3App'
+import './v3.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
-    <BillingPortal />
+    <V3App />
   </React.StrictMode>,
 )
