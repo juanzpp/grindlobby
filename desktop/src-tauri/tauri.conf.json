@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "GrindLobby",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "identifier": "com.grindlobby.desktop",
   "build": {
     "beforeDevCommand": "bun run dev",
@@ -14,10 +14,10 @@
       {
         "label": "main",
         "title": "GrindLobby",
-        "width": 1440,
-        "height": 900,
-        "minWidth": 1080,
-        "minHeight": 680,
+        "width": 1536,
+        "height": 864,
+        "minWidth": 1280,
+        "minHeight": 720,
         "center": true,
         "resizable": true,
         "fullscreen": false,
@@ -27,7 +27,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' customprotocol: asset:; img-src 'self' asset: http://asset.localhost blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost https: wss:;"
+      "csp": "default-src 'self' customprotocol: asset:; img-src 'self' asset: http://asset.localhost blob: data:; media-src 'self' blob: data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost https: wss:;"
     }
   },
   "bundle": {
@@ -35,7 +35,7 @@
     "targets": ["nsis"],
     "category": "Game",
     "shortDescription": "GrindLobby desktop client",
-    "longDescription": "Native GrindLobby desktop client for communities, lobbies, voice, streaming, ranking and competitive play.",
+    "longDescription": "GrindLobby Windows desktop client for communities, lobbies, native voice, streaming, ranking and competitive play.",
     "windows": {
       "nsis": {
         "displayLanguageSelector": false,
