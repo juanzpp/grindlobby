@@ -118,9 +118,10 @@ function patchLobbyFilters() {
   const bar = document.querySelector<HTMLElement>('.v3-lobby-filters')
   const grid = document.querySelector<HTMLElement>('.v3-lobby-grid')
   if (!bar || !grid || bar.dataset.realFilters === '1') return
+  const lobbyGrid = grid
 
   bar.dataset.realFilters = '1'
-  const cards = () => Array.from(grid.querySelectorAll<HTMLElement>('.v3-lobby-card'))
+  const cards = () => Array.from(lobbyGrid.querySelectorAll<HTMLElement>('.v3-lobby-card'))
   const games = Array.from(new Set(cards().map((card) => text(card.querySelector('.v3-lobby-card-art strong'))).filter(Boolean))).sort((a, b) => a.localeCompare(b))
 
   const game = document.createElement('select')
@@ -160,7 +161,7 @@ function patchLobbyFilters() {
       }
       return bMembers - aMembers
     })
-    visible.forEach((card) => grid.appendChild(card))
+    visible.forEach((card) => lobbyGrid.appendChild(card))
   }
 
   game.addEventListener('change', apply)
