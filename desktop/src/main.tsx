@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import V3Shell from './V3Shell'
 import { installRealMode } from './real-mode'
+import { installPolishMode } from './polish-mode'
 import './v3.css'
 import './v3-fidelity-overrides.css'
 import './v3-login-override.css'
@@ -14,4 +15,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 )
 
 const stopRealMode = installRealMode()
-window.addEventListener('beforeunload', stopRealMode, { once: true })
+const stopPolishMode = installPolishMode()
+window.addEventListener('beforeunload', () => {
+  stopRealMode()
+  stopPolishMode()
+}, { once: true })
