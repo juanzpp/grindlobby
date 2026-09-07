@@ -1,0 +1,128 @@
+/* Final desktop composition pass against the approved 1536×864 blueprints. */
+@media (min-width: 1181px) {
+  .gl-sidebar {
+    width: 220px;
+    padding: 18px 12px 14px;
+    background:
+      radial-gradient(250px 210px at 50% 4%, rgba(108, 43, 220, .14), transparent 72%),
+      linear-gradient(180deg, rgba(7, 7, 16, .995), rgba(4, 4, 10, .995));
+  }
+
+  .gl-shell { padding-left: 220px; }
+  .gl-brand { padding-bottom: 15px; }
+  .gl-brand-mark { width: 70px; height: 70px; }
+  .gl-brand-name { font-size: 21px; }
+  .gl-brand-tag { margin-top: 6px; font-size: 6.5px; }
+
+  .gl-nav { gap: 3px; }
+  .gl-nav a { min-height: 40px; padding: 0 12px; border-radius: 7px; }
+
+  .gl-content { padding: 0 10px 76px; }
+  .gl-topbar {
+    height: 58px;
+    margin: 0 -10px 8px;
+    padding: 0 15px;
+    background: rgba(5,5,12,.94);
+  }
+  .gl-search { width: 375px; height: 36px; }
+
+  .gl-hero {
+    min-height: 211px;
+    border-radius: 7px;
+    background-position: center 51%;
+  }
+  .gl-hero-copy { left: 26px; top: 26px; width: 470px; }
+  .gl-hero h1 { font-size: 33px; line-height: .98; }
+  .gl-hero p { margin-top: 10px; font-size: 11px; max-width: 360px; }
+  .gl-hero-actions { margin-top: 13px; }
+
+  .gl-dashboard-grid {
+    grid-template-columns: minmax(330px, .99fr) minmax(350px, 1.02fr) minmax(330px, .98fr);
+    gap: 10px;
+    margin-top: 9px;
+  }
+
+  .gl-panel { border-radius: 7px; }
+  .gl-section-head { height: 39px; padding: 0 12px; }
+  .gl-panel-title { font-size: 13px; }
+  .gl-ranking-row, .gl-lobby-row, .gl-activity-row { min-height: 41px; }
+  .gl-call-panel { min-height: 185px; }
+  .gl-stream-body { min-height: 111px; }
+
+  .gl-bottom-dock {
+    left: 220px;
+    min-height: 67px;
+    grid-template-columns: 220px minmax(300px,1fr) 320px 150px;
+    padding: 7px 15px;
+  }
+}
+
+/* In the approved sidebar the upgrade block is a restrained PIX/payment tile,
+   not a generic neon CTA. Keep the existing route/action, only restyle the card. */
+.gl-premium-card {
+  position: relative;
+  padding-top: 32px;
+  border-color: rgba(255, 211, 83, .42);
+  background:
+    radial-gradient(180px 75px at 15% 0%, rgba(255, 207, 75, .10), transparent 70%),
+    linear-gradient(145deg, rgba(49,38,16,.40), rgba(14,11,21,.80));
+}
+.gl-premium-card::before {
+  content: "◇  AGORA COM PIX";
+  position: absolute;
+  left: 14px;
+  top: 10px;
+  color: #ffd966;
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: .14em;
+}
+.gl-premium-card .gl-premium-title { color: #fff0ba; }
+.gl-premium-card .gl-premium-title svg { color: #ffd65e; }
+.gl-premium-card .gl-premium-sub { color: #968da0; }
+
+/* Card depth from the reference: borders remain thin; glow lives mostly inside. */
+.gl-panel {
+  background:
+    radial-gradient(430px 160px at 88% -20%, rgba(115,45,225,.055), transparent 64%),
+    linear-gradient(180deg, rgba(11,10,24,.95), rgba(7,7,17,.97));
+  box-shadow:
+    0 16px 38px rgba(0,0,0,.28),
+    inset 0 1px 0 rgba(255,255,255,.022),
+    inset 0 0 30px rgba(113,45,229,.018);
+}
+
+.gl-ranking-row:hover,
+.gl-lobby-row:hover,
+.gl-activity-row:hover,
+.gl-community-row:hover {
+  background: linear-gradient(90deg, rgba(116,45,214,.09), rgba(116,45,214,.015));
+}
+
+.gl-round-btn {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.025), 0 5px 14px rgba(0,0,0,.18);
+}
+
+/* Lobby blueprint uses a shorter cinematic masthead than the dashboard. */
+.gl-lobbies-layout .gl-lobby-card {
+  box-shadow: 0 16px 38px rgba(0,0,0,.23), inset 0 1px 0 rgba(255,255,255,.022);
+}
+
+/* Login micro-tuning: keep scene and form as one composition rather than two halves. */
+@media (min-width: 1181px) {
+  .gl-login-card {
+    right: 40px;
+    top: 84px;
+    bottom: 79px;
+    width: 500px;
+    min-width: 500px;
+    padding-left: 36px;
+    padding-right: 36px;
+  }
+  .gl-login-copy { left: 58px; top: 21.5%; width: 345px; }
+  .gl-login-brand { left: 49px; top: 28px; }
+}
+
+/* Never let the decorative overlay flatten real video if a media element is mounted. */
+.gl-stream-preview:has(video)::after { display: none; }
+.gl-stream-preview video { width: 100%; height: 100%; object-fit: contain; background: #020205; }
