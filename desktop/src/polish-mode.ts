@@ -106,8 +106,9 @@ function patchSidebarPremium() {
   const card = document.querySelector<HTMLButtonElement>('.v3-premium-card')
   if (!card) return
   if (/premium ativo/i.test(value(card))) {
-    card.disabled = true
-    card.title = 'Premium ativo nesta conta'
+    card.disabled = false
+    card.title = 'Abrir inventário Premium'
+    card.setAttribute('aria-label', 'Premium ativo — abrir inventário')
   }
 }
 
