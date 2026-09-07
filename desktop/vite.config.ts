@@ -1,11 +1,11 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 export default defineConfig({
   plugins: [react()],
   clearScreen: false,
-  publicDir: path.resolve(__dirname, '../public'),
+  publicDir: fileURLToPath(new URL('../public', import.meta.url)),
   server: {
     port: 1420,
     strictPort: true,

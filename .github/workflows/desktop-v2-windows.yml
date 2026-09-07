@@ -16,7 +16,7 @@ permissions:
 jobs:
   build-windows:
     runs-on: windows-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
 
     steps:
       - name: Checkout
@@ -33,6 +33,30 @@ jobs:
       - name: Install desktop dependencies
         working-directory: desktop
         run: bun install
+
+      - name: Validate TypeScript and web bundle
+        working-directory: desktop
+        run: bun run build
+
+      - name: Capture real desktop UI preview
+        working-directory: desktop
+        shell: pwsh
+        continue-on-error: true
+        run: |
+          bunx playwright@1.63.0 install chromium
+          $bun = (Get-Command bun).Source
+          $preview = Start-Process -FilePath $bun -ArgumentList "run","preview" -PassThru
+          Start-Sleep -Seconds 3
+          bunx playwright@1.63.0 screenshot --viewport-size="1440,900" --wait-for-timeout=1200 http://127.0.0.1:4173 desktop-v2-preview.png
+          Stop-Process -Id $preview.Id -Force -ErrorAction SilentlyContinue
+
+      - name: Upload UI preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: GrindLobby-Desktop-V2-Preview
+          path: desktop/desktop-v2-preview.png
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Generate GrindLobby native icons
         working-directory: desktop
