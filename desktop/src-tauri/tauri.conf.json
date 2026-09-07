@@ -30,6 +30,13 @@
       "csp": "default-src 'self' customprotocol: asset:; img-src 'self' asset: http://asset.localhost blob: data:; media-src 'self' blob: data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' ipc: http://ipc.localhost https: wss:;"
     }
   },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["grindlobby"]
+      }
+    }
+  },
   "bundle": {
     "active": true,
     "targets": ["nsis"],
