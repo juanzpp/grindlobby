@@ -1,3 +1,5 @@
+@import url('/reference-fidelity.css?v=1');
+
 /* GrindLobby brand compatibility layer.
    The original GL artwork is a dark-background PNG. On the dark UI we render it
    with screen blending so black pixels disappear visually while purple/white
