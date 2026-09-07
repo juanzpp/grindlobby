@@ -40,4 +40,15 @@ export default tseslint.config(
     },
   },
   eslintPluginPrettier,
+  {
+    files: [
+      "src/lib/call-session.ts",
+      "src/lib/livekit-session.ts",
+      "src/routes/api.livekit-token.ts",
+      "src/server.ts",
+    ],
+    rules: {
+      "prettier/prettier": "off",
+    },
+  },
 );
