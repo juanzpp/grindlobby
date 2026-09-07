@@ -24,8 +24,11 @@ export const Route = createFileRoute("/api/livekit-token")({
         const bearer = authorization.match(/^Bearer\s+(.+)$/i)?.[1];
         if (!bearer) return json({ error: "Não autorizado." }, 401);
 
-        const body = (await request.json().catch(() => null)) as { lobbyId?: unknown } | null;
+        const body = (await request.json().catch(() => null)) as
+          | { lobbyId?: unknown; publisher?: unknown }
+          | null;
         const lobbyId = typeof body?.lobbyId === "string" ? body.lobbyId.trim().toUpperCase() : "";
+        const publisher = body?.publisher === "screen-native" ? "screen-native" : "voice";
         if (!/^GL-[A-Z0-9]{4,12}$/.test(lobbyId)) return json({ error: "Lobby inválido." }, 400);
 
         const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || FALLBACK_SUPABASE_URL;
@@ -80,6 +83,9 @@ export const Route = createFileRoute("/api/livekit-token")({
         if (!activeUserIds.has(user.id) && activeUserIds.size >= maxMembers) {
           return json({ error: "Lobby lotado." }, 409);
         }
+        if (publisher === "screen-native" && !activeUserIds.has(user.id)) {
+          return json({ error: "Entre no lobby antes de transmitir a tela." }, 409);
+        }
 
         const name =
           user.user_metadata?.display_name ||
@@ -87,28 +93,37 @@ export const Route = createFileRoute("/api/livekit-token")({
           user.email?.split("@")[0] ||
           "Jogador";
 
+        const nativeScreen = publisher === "screen-native";
+        const identity = nativeScreen ? `${user.id}:screen` : user.id;
         const token = new AccessToken(livekitApiKey, livekitApiSecret, {
-          identity: user.id,
-          name,
+          identity,
+          name: nativeScreen ? `${name} · Tela` : name,
           ttl: "15m",
-          metadata: JSON.stringify({ lobbyId }),
+          metadata: JSON.stringify({ lobbyId, ownerUserId: user.id, publisher }),
         });
 
         token.addGrant({
           roomJoin: true,
           room: `lobby-${lobbyId}`,
           canPublish: true,
-          canSubscribe: true,
+          canSubscribe: !nativeScreen,
           canPublishData: false,
-          canPublishSources: [
-            TrackSource.MICROPHONE,
-            TrackSource.CAMERA,
-            TrackSource.SCREEN_SHARE,
-            TrackSource.SCREEN_SHARE_AUDIO,
-          ],
+          canPublishSources: nativeScreen
+            ? [TrackSource.SCREEN_SHARE]
+            : [
+                TrackSource.MICROPHONE,
+                TrackSource.CAMERA,
+                TrackSource.SCREEN_SHARE,
+                TrackSource.SCREEN_SHARE_AUDIO,
+              ],
         });
 
-        return json({ token: await token.toJwt(), url: livekitUrl, room: `lobby-${lobbyId}` });
+        return json({
+          token: await token.toJwt(),
+          url: livekitUrl,
+          room: `lobby-${lobbyId}`,
+          publisher,
+        });
       },
     },
   },
