@@ -75,16 +75,18 @@ fn capture_sources(kind: &str) -> Result<Vec<(CaptureSource, CaptureSourceDto)>,
     let options = DesktopCapturerOptions::new(source_type);
     let capturer = DesktopCapturer::new(options)
         .ok_or_else(|| "A captura nativa do Windows não está disponível neste computador.".to_string())?;
+
     Ok(capturer
         .get_source_list()
         .into_iter()
         .map(|source| {
+            let title = source.title();
             let dto = CaptureSourceDto {
                 id: source.id(),
-                title: if source.title().trim().is_empty() {
+                title: if title.trim().is_empty() {
                     if kind == "screen" { "Monitor".to_string() } else { "Janela".to_string() }
                 } else {
-                    source.title()
+                    title
                 },
                 display_id: source.display_id(),
                 kind: kind.to_string(),
@@ -118,6 +120,7 @@ fn spawn_capture_thread(
 ) -> Result<(Sender<CaptureCommand>, thread::JoinHandle<()>), String> {
     let source_type = source_type(&kind)?;
     let (command_tx, command_rx) = mpsc::channel();
+
     let handle = thread::spawn(move || {
         let callback = {
             let mut frame_buffer = VideoFrame {
@@ -126,11 +129,11 @@ fn spawn_capture_thread(
                 frame_metadata: None,
                 buffer: I420Buffer::new(1, 1),
             };
+
             move |result: Result<DesktopFrame, CaptureError>| {
                 let frame = match result {
                     Ok(frame) => frame,
-                    Err(CaptureError::Temporary) => return,
-                    Err(CaptureError::Permanent) => return,
+                    Err(CaptureError::Temporary) | Err(CaptureError::Permanent) => return,
                 };
 
                 let width = frame.width();
@@ -177,10 +180,8 @@ fn spawn_capture_thread(
         options.set_include_cursor(include_cursor);
         let Some(mut capturer) = DesktopCapturer::new(options) else { return; };
         let selected = capturer.get_source_list().into_iter().find(|source| source.id() == source_id);
-        if selected.is_none() {
-            return;
-        }
-        capturer.start_capture(selected, callback);
+        let Some(selected) = selected else { return; };
+        capturer.start_capture(Some(selected), callback);
 
         loop {
             match command_rx.recv_timeout(interval) {
@@ -190,6 +191,7 @@ fn spawn_capture_thread(
             }
         }
     });
+
     Ok((command_tx, handle))
 }
 
@@ -198,14 +200,21 @@ pub async fn start_native_screen_share(
     request: StartNativeShareRequest,
     state: State<'_, NativeScreenState>,
 ) -> Result<(), String> {
-    stop_native_screen_share(state.clone()).await?;
-
     if !matches!(request.preset.as_str(), "480p30" | "480p60" | "720p30" | "720p60" | "1080p30" | "1080p60") {
         return Err("Perfil de transmissão inválido.".to_string());
     }
+
     let available = capture_sources(&request.source_kind)?;
     if !available.iter().any(|(_, dto)| dto.id == request.source_id) {
         return Err("A tela ou janela selecionada não está mais disponível.".to_string());
+    }
+
+    let previous = {
+        let mut guard = state.control.lock().map_err(|_| "Falha interna no estado da transmissão.".to_string())?;
+        guard.take()
+    };
+    if let Some(previous) = previous {
+        let _ = previous.stop_tx.send(());
     }
 
     let (stop_tx, stop_rx) = oneshot::channel::<()>();
@@ -213,7 +222,7 @@ pub async fn start_native_screen_share(
     let request_for_task = request.clone();
 
     tauri::async_runtime::spawn(async move {
-        let result: Result<(), String> = async {
+        let setup_result: Result<(Room, Sender<CaptureCommand>, thread::JoinHandle<()>), String> = async {
             let (room, _) = Room::connect(&request_for_task.url, &request_for_task.token, RoomOptions::default())
                 .await
                 .map_err(|error| format!("Não foi possível conectar o publisher nativo: {error}"))?;
@@ -236,10 +245,12 @@ pub async fn start_native_screen_share(
 
             let native_source = NativeVideoSource::new(resolution, true);
             *video_source_slot.lock().map_err(|_| "Falha interna na captura.".to_string())? = Some(native_source.clone());
+
             let track = LocalVideoTrack::create_video_track(
                 "grind-native-screen",
                 RtcVideoSource::Native(native_source),
             );
+
             room.local_participant()
                 .publish_track(
                     LocalTrack::Video(track),
@@ -252,36 +263,40 @@ pub async fn start_native_screen_share(
                 .await
                 .map_err(|error| format!("Falha ao publicar tela: {error}"))?;
 
-            let _ = ready_tx.send(Ok(()));
-            let _ = stop_rx.await;
-            let _ = capture_tx.send(CaptureCommand::Terminate);
-            let _ = tauri::async_runtime::spawn_blocking(move || capture_handle.join()).await;
-            room.disconnect().await.map_err(|error| format!("Falha ao encerrar transmissão: {error}"))?;
-            Ok(())
+            Ok((room, capture_tx, capture_handle))
         }
         .await;
 
-        if let Err(error) = result {
-            let _ = ready_tx.send(Err(error));
+        match setup_result {
+            Ok((room, capture_tx, capture_handle)) => {
+                let _ = ready_tx.send(Ok(()));
+                let _ = stop_rx.await;
+                let _ = capture_tx.send(CaptureCommand::Terminate);
+                let _ = tauri::async_runtime::spawn_blocking(move || capture_handle.join()).await;
+                let _ = room.close().await;
+            }
+            Err(error) => {
+                let _ = ready_tx.send(Err(error));
+            }
         }
     });
 
     {
-        let mut control = state.control.lock().map_err(|_| "Falha interna no estado da transmissão.".to_string())?;
-        *control = Some(NativeShareControl { stop_tx });
+        let mut guard = state.control.lock().map_err(|_| "Falha interna no estado da transmissão.".to_string())?;
+        *guard = Some(NativeShareControl { stop_tx });
     }
 
     match ready_rx.await {
         Ok(Ok(())) => Ok(()),
         Ok(Err(error)) => {
-            if let Ok(mut control) = state.control.lock() {
-                *control = None;
+            if let Ok(mut guard) = state.control.lock() {
+                *guard = None;
             }
             Err(error)
         }
         Err(_) => {
-            if let Ok(mut control) = state.control.lock() {
-                *control = None;
+            if let Ok(mut guard) = state.control.lock() {
+                *guard = None;
             }
             Err("O publisher nativo encerrou antes de iniciar.".to_string())
         }
