@@ -5,7 +5,7 @@ import V3App from './V3App'
 import { animateLogin } from './motion'
 import heroImage from '../../src/assets/login-portal.jpg'
 import { currentSession, signIn, signUp, supabase } from './lib/supabase'
-import { beginSocialLogin, installOAuthDeepLinkListener, type SocialProvider } from './lib/oauth'
+import { beginPasswordRecovery, beginSocialLogin, installOAuthDeepLinkListener, type SocialProvider } from './lib/oauth'
 
 const socialProviders: Array<{ id: SocialProvider; label: string; icon: string; className: string }> = [
   { id: 'steam', label: 'Steam', icon: '/brands/steam.svg', className: 'steam' },
@@ -18,6 +18,7 @@ export default function V3Shell() {
   const [session, setSession] = useState<Session | null>(null)
   const [booting, setBooting] = useState(true)
   const [authMessage, setAuthMessage] = useState('')
+  const [recovering, setRecovering] = useState(false)
 
   useEffect(() => {
     let mounted = true
@@ -29,13 +30,17 @@ export default function V3Shell() {
       setBooting(false)
     })
 
-    const { data } = supabase.auth.onAuthStateChange((_event, value) => {
+    const { data } = supabase.auth.onAuthStateChange((event, value) => {
       if (!mounted) return
+      if (event === 'PASSWORD_RECOVERY') setRecovering(true)
       setSession(value)
       setBooting(false)
     })
 
-    void installOAuthDeepLinkListener((message) => setAuthMessage(message)).then((stop) => {
+    void installOAuthDeepLinkListener(
+      (message) => setAuthMessage(message),
+      () => setRecovering(true),
+    ).then((stop) => {
       if (!mounted) stop()
       else unlisten = stop
     })
@@ -56,8 +61,56 @@ export default function V3Shell() {
     )
   }
 
+  if (session && recovering) return <PasswordReset onDone={() => setRecovering(false)} />
   if (session) return <V3App />
   return <CleanLogin externalMessage={authMessage} onExternalMessage={setAuthMessage} />
+}
+
+function PasswordReset({ onDone }: { onDone: () => void }) {
+  const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState('')
+
+  async function submit(event: FormEvent) {
+    event.preventDefault()
+    setMessage('')
+    if (password.length < 8) {
+      setMessage('A nova senha precisa ter pelo menos 8 caracteres.')
+      return
+    }
+    if (password !== confirm) {
+      setMessage('As senhas não coincidem.')
+      return
+    }
+    setBusy(true)
+    try {
+      const { error } = await supabase.auth.updateUser({ password })
+      if (error) throw error
+      setMessage('Senha atualizada com sucesso.')
+      window.setTimeout(onDone, 500)
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Não foi possível atualizar sua senha.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <main className="v3-login v3-login-clean" style={{ backgroundImage: `url(${heroImage})` }}>
+      <div className="v3-login-shade" />
+      <section className="v3-login-card v3-login-card-clean v3-password-reset-card">
+        <h2>Nova senha</h2>
+        <span className="v3-card-tagline">RECUPERAÇÃO DA CONTA GRINDLOBBY</span>
+        <form onSubmit={submit}>
+          <label><LockKeyhole /><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Nova senha" autoComplete="new-password" /></label>
+          <label><LockKeyhole /><input type="password" value={confirm} onChange={(event) => setConfirm(event.target.value)} placeholder="Repita a nova senha" autoComplete="new-password" /></label>
+          {message && <div className="v3-form-message">{message}</div>}
+          <button className="v3-primary v3-login-submit" disabled={busy || password.length < 8 || confirm.length < 8}>{busy ? 'Salvando...' : 'Atualizar senha'} <ChevronRight /></button>
+        </form>
+      </section>
+    </main>
+  )
 }
 
 function CleanLogin({ externalMessage, onExternalMessage }: { externalMessage: string; onExternalMessage: (message: string) => void }) {
@@ -68,6 +121,7 @@ function CleanLogin({ externalMessage, onExternalMessage }: { externalMessage: s
   const [password, setPassword] = useState('')
   const [remember, setRemember] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [recoveryBusy, setRecoveryBusy] = useState(false)
   const [socialBusy, setSocialBusy] = useState<SocialProvider | null>(null)
   const [message, setMessage] = useState('')
 
@@ -92,6 +146,20 @@ function CleanLogin({ externalMessage, onExternalMessage }: { externalMessage: s
       setMessage(error instanceof Error ? error.message : 'Não foi possível autenticar.')
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function recoverPassword() {
+    setMessage('')
+    onExternalMessage('')
+    setRecoveryBusy(true)
+    try {
+      await beginPasswordRecovery(identifier)
+      setMessage('Enviamos um link de recuperação para o seu e-mail. Ao abrir o link, o GrindLobby voltará para esta tela para você definir a nova senha.')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Não foi possível enviar o e-mail de recuperação.')
+    } finally {
+      setRecoveryBusy(false)
     }
   }
 
@@ -136,7 +204,7 @@ function CleanLogin({ externalMessage, onExternalMessage }: { externalMessage: s
           {mode === 'signup' && <label><UserRound /><input value={username} onChange={(event) => setUsername(event.target.value)} placeholder="Seu nick" autoComplete="username" /></label>}
           <label><span className="field-icon">✉</span><input value={identifier} onChange={(event) => setIdentifier(event.target.value)} placeholder={mode === 'login' ? 'Seu e-mail ou usuário' : 'Seu e-mail'} autoComplete="email" /></label>
           <label><LockKeyhole /><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Sua senha" autoComplete={mode === 'login' ? 'current-password' : 'new-password'} /></label>
-          {mode === 'login' && <div className="v3-remember"><label><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} /> Lembrar senha</label><button type="button">Esqueceu sua senha?</button></div>}
+          {mode === 'login' && <div className="v3-remember"><label><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} /> Lembrar senha</label><button type="button" disabled={recoveryBusy} onClick={() => void recoverPassword()}>{recoveryBusy ? 'Enviando...' : 'Esqueceu sua senha?'}</button></div>}
           {(message || externalMessage) && <div className="v3-form-message">{message || externalMessage}</div>}
           <button className="v3-primary v3-login-submit" disabled={busy || !identifier || password.length < 8}>{busy ? 'Conectando...' : mode === 'login' ? 'Entrar no Lobby' : 'Criar conta'} <ChevronRight /></button>
         </form>
