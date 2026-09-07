@@ -266,7 +266,9 @@ export const voiceSession = {
   subscribe(listener: Listener) {
     listeners.add(listener)
     listener(snapshot())
-    return () => listeners.delete(listener)
+    return () => {
+      listeners.delete(listener)
+    }
   },
   async connect(
     code: string,
