@@ -1,0 +1,119 @@
+/* Fidelity layer for the approved 1536x864 GrindLobby references. */
+.v3-login-shade{overflow:hidden;pointer-events:none}
+.v3-login-shade::before{
+  content:"";
+  position:absolute;
+  left:340px;
+  top:58px;
+  width:540px;
+  height:540px;
+  border-radius:50%;
+  background:
+    url('/grindlobby-logo.png') center/190px auto no-repeat,
+    radial-gradient(circle at 50% 48%,rgba(255,255,255,.23) 0 1%,rgba(189,133,255,.14) 9%,rgba(113,44,255,.34) 29%,rgba(74,16,184,.72) 52%,rgba(50,8,139,.86) 62%,rgba(17,4,55,.94) 72%,transparent 73%);
+  border:2px solid rgba(170,105,255,.82);
+  box-shadow:
+    0 0 12px rgba(215,178,255,.92),
+    0 0 42px rgba(150,70,255,.84),
+    0 0 105px rgba(101,36,238,.62),
+    inset 0 0 58px rgba(170,91,255,.7),
+    inset 0 0 125px rgba(69,14,174,.8);
+  filter:saturate(1.18);
+  opacity:.98;
+}
+.v3-login-shade::after{
+  content:"Good\A Players\A Better\A People";
+  white-space:pre;
+  position:absolute;
+  left:795px;
+  top:88px;
+  transform:rotate(-7deg);
+  font-family:"Segoe Print","Bradley Hand","Comic Sans MS",cursive;
+  font-style:italic;
+  font-size:25px;
+  line-height:.88;
+  color:#c78bff;
+  text-shadow:0 0 12px rgba(152,69,255,.72);
+  opacity:.9;
+}
+.v3-login::before{
+  content:"";
+  position:absolute;
+  z-index:1;
+  left:323px;
+  top:230px;
+  width:585px;
+  height:195px;
+  border:2px solid rgba(177,111,255,.82);
+  border-left-color:transparent;
+  border-right-color:transparent;
+  border-radius:50%;
+  transform:rotate(-14deg);
+  box-shadow:0 0 20px rgba(132,54,255,.45),inset 0 0 18px rgba(133,57,255,.2);
+  pointer-events:none;
+}
+.v3-login-copy,.v3-login-brand,.v3-login-card,.v3-login-footer{z-index:4}
+.v3-login-copy{max-width:390px}
+.v3-login-card{backdrop-filter:blur(12px)}
+.v3-card-logo{position:relative}
+.v3-card-logo::after{
+  content:"";
+  position:absolute;
+  width:132px;
+  height:46px;
+  border:2px solid rgba(173,100,255,.74);
+  border-radius:50%;
+  transform:rotate(-9deg);
+  box-shadow:0 0 17px rgba(135,51,255,.52);
+}
+
+.v3-home-hero,.v3-lobbies-hero{position:relative;isolation:isolate;overflow:hidden}
+.v3-home-hero::before,.v3-lobbies-hero::before{
+  content:"";
+  position:absolute;
+  z-index:-1;
+  right:13%;
+  top:-76%;
+  width:420px;
+  aspect-ratio:1;
+  border-radius:50%;
+  background:
+    url('/grindlobby-logo.png') center/138px auto no-repeat,
+    radial-gradient(circle,rgba(151,80,255,.46) 0 18%,rgba(95,34,230,.7) 42%,rgba(48,13,135,.76) 61%,transparent 68%);
+  border:1px solid rgba(172,111,255,.75);
+  box-shadow:0 0 52px rgba(122,48,255,.7),inset 0 0 55px rgba(152,72,255,.52);
+  opacity:.9;
+}
+.v3-home-hero::after,.v3-lobbies-hero::after{
+  content:"Good\A Players\A Better\A People";
+  white-space:pre;
+  position:absolute;
+  right:22px;
+  top:20px;
+  font-family:"Segoe Print","Bradley Hand",cursive;
+  font-size:18px;
+  line-height:.9;
+  font-style:italic;
+  color:#c58aff;
+  text-shadow:0 0 9px rgba(139,55,255,.65);
+  transform:rotate(-5deg);
+  opacity:.82;
+}
+.v3-home-hero>div{position:relative;z-index:2}
+.v3-lobbies-hero h1,.v3-lobbies-hero p{position:relative;z-index:2}
+
+/* Keep typography close to the proportions in the approved captures. */
+.v3-sidebar nav button{font-size:14px;font-weight:520}
+.v3-panel-title h2{font-size:15px;font-weight:750}
+.v3-home-hero h1{font-size:39px;font-weight:820}
+.v3-home-hero p{font-size:14px}
+.v3-rank-line div strong,.v3-lobby-line strong{font-size:11px}
+.v3-lobby-card h3{font-size:12px}
+.v3-store-head h1,.v3-profile-cover h1{font-size:32px}
+.v3-store-item h3{font-size:11px}
+
+@media(max-width:1360px){
+  .v3-login-shade::before{left:275px;width:500px;height:500px}
+  .v3-login::before{left:258px;width:545px}
+  .v3-login-shade::after{left:700px}
+}
