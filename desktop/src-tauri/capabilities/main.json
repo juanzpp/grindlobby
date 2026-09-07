@@ -5,8 +5,11 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
+    "core:event:default",
     "core:window:allow-minimize",
     "core:window:allow-toggle-maximize",
-    "core:window:allow-close"
+    "core:window:allow-close",
+    "deep-link:default",
+    "opener:default"
   ]
 }
