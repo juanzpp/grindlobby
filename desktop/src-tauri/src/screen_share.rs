@@ -62,12 +62,29 @@ fn source_type(kind: &str) -> Result<DesktopCaptureSourceType, String> {
     }
 }
 
-fn frame_interval(preset: &str) -> Duration {
-    if preset.ends_with("60") {
-        Duration::from_millis(16)
-    } else {
-        Duration::from_millis(33)
+fn preset_spec(preset: &str) -> Result<(u32, u32, Duration), String> {
+    match preset {
+        "480p30" => Ok((854, 480, Duration::from_millis(33))),
+        "480p60" => Ok((854, 480, Duration::from_millis(16))),
+        "720p30" => Ok((1280, 720, Duration::from_millis(33))),
+        "720p60" => Ok((1280, 720, Duration::from_millis(16))),
+        "1080p30" => Ok((1920, 1080, Duration::from_millis(33))),
+        "1080p60" => Ok((1920, 1080, Duration::from_millis(16))),
+        _ => Err("Perfil de transmissão inválido.".to_string()),
     }
+}
+
+fn fitted_dimensions(source_width: i32, source_height: i32, max_width: u32, max_height: u32) -> (u32, u32) {
+    let source_width = source_width.max(2) as f64;
+    let source_height = source_height.max(2) as f64;
+    let scale = (max_width as f64 / source_width)
+        .min(max_height as f64 / source_height)
+        .min(1.0);
+    let mut width = (source_width * scale).round() as u32;
+    let mut height = (source_height * scale).round() as u32;
+    width = width.max(2) & !1;
+    height = height.max(2) & !1;
+    (width, height)
 }
 
 fn capture_sources(kind: &str) -> Result<Vec<(CaptureSource, CaptureSourceDto)>, String> {
@@ -115,6 +132,8 @@ fn spawn_capture_thread(
     source_id: u64,
     include_cursor: bool,
     interval: Duration,
+    max_width: u32,
+    max_height: u32,
     resolution_signal: ResolutionSignal,
     video_source_slot: VideoSourceSlot,
 ) -> Result<(Sender<CaptureCommand>, thread::JoinHandle<()>), String> {
@@ -129,6 +148,7 @@ fn spawn_capture_thread(
                 frame_metadata: None,
                 buffer: I420Buffer::new(1, 1),
             };
+            let mut output_resolution: Option<(u32, u32)> = None;
 
             move |result: Result<DesktopFrame, CaptureError>| {
                 let frame = match result {
@@ -140,15 +160,6 @@ fn spawn_capture_thread(
                 let height = frame.height();
                 if width <= 0 || height <= 0 {
                     return;
-                }
-
-                {
-                    let (lock, cvar) = &*resolution_signal;
-                    let mut guard = lock.lock().expect("resolution mutex poisoned");
-                    if guard.is_none() {
-                        *guard = Some(VideoResolution { width: width as u32, height: height as u32 });
-                        cvar.notify_all();
-                    }
                 }
 
                 if frame_buffer.buffer.width() as i32 != width || frame_buffer.buffer.height() as i32 != height {
@@ -170,8 +181,29 @@ fn spawn_capture_thread(
                     height,
                 );
 
+                let (target_width, target_height) = output_resolution
+                    .unwrap_or_else(|| fitted_dimensions(width, height, max_width, max_height));
+                if output_resolution.is_none() {
+                    output_resolution = Some((target_width, target_height));
+                    let (lock, cvar) = &*resolution_signal;
+                    let mut guard = lock.lock().expect("resolution mutex poisoned");
+                    *guard = Some(VideoResolution { width: target_width, height: target_height });
+                    cvar.notify_all();
+                }
+
                 if let Some(source) = video_source_slot.lock().expect("video source mutex poisoned").as_ref() {
-                    source.capture_frame(&frame_buffer);
+                    if width as u32 == target_width && height as u32 == target_height {
+                        source.capture_frame(&frame_buffer);
+                    } else {
+                        let scaled_buffer = frame_buffer.buffer.scale(target_width as i32, target_height as i32);
+                        let scaled_frame = VideoFrame {
+                            rotation: VideoRotation::VideoRotation0,
+                            timestamp_us: 0,
+                            frame_metadata: None,
+                            buffer: scaled_buffer,
+                        };
+                        source.capture_frame(&scaled_frame);
+                    }
                 }
             }
         };
@@ -200,10 +232,7 @@ pub async fn start_native_screen_share(
     request: StartNativeShareRequest,
     state: State<'_, NativeScreenState>,
 ) -> Result<(), String> {
-    if !matches!(request.preset.as_str(), "480p30" | "480p60" | "720p30" | "720p60" | "1080p30" | "1080p60") {
-        return Err("Perfil de transmissão inválido.".to_string());
-    }
-
+    let (max_width, max_height, interval) = preset_spec(&request.preset)?;
     let available = capture_sources(&request.source_kind)?;
     if !available.iter().any(|(_, dto)| dto.id == request.source_id) {
         return Err("A tela ou janela selecionada não está mais disponível.".to_string());
@@ -233,7 +262,9 @@ pub async fn start_native_screen_share(
                 request_for_task.source_kind.clone(),
                 request_for_task.source_id,
                 request_for_task.include_cursor,
-                frame_interval(&request_for_task.preset),
+                interval,
+                max_width,
+                max_height,
                 resolution_signal.clone(),
                 video_source_slot.clone(),
             )?;
