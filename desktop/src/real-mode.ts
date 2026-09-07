@@ -19,6 +19,14 @@ function text(node: Element | null) {
   return (node?.textContent || '').trim()
 }
 
+function setText(node: Element | null, value: string) {
+  if (node && text(node) !== value) node.textContent = value
+}
+
+function setHtml(node: HTMLElement | null, value: string) {
+  if (node && node.innerHTML !== value) node.innerHTML = value
+}
+
 function normalizeGame(value: string) {
   return value.trim().toLowerCase().replace(/\s+/g, ' ')
 }
@@ -60,19 +68,16 @@ function patchHome() {
   document.querySelectorAll('.v3-now-playing,.v3-store-highlight').forEach((node) => node.remove())
   document.querySelectorAll('.v3-dock-music').forEach((node) => node.remove())
 
-  const feed = document.querySelector('.v3-community-feed .v3-panel-title h2')
-  if (feed) feed.textContent = 'Suas Comunidades'
+  setText(document.querySelector('.v3-community-feed .v3-panel-title h2'), 'Suas Comunidades')
   document.querySelectorAll<HTMLElement>('.v3-community-feed p').forEach((item) => {
     const name = text(item.querySelector('strong'))
-    if (name) item.innerHTML = `<strong>${name}</strong> · você faz parte desta comunidade.`
+    if (name) setHtml(item, `<strong>${name}</strong> · você faz parte desta comunidade.`)
   })
 
   const journey = document.querySelector('.v3-journey-main')
   if (journey) {
-    const label = journey.querySelector('span')
-    const value = journey.querySelector('strong')
-    if (label) label.textContent = 'Grind Rating'
-    if (value) value.textContent = 'Pontuação competitiva'
+    setText(journey.querySelector('span'), 'Grind Rating')
+    setText(journey.querySelector('strong'), 'Pontuação competitiva')
   }
 
   const publicButton = document.querySelector<HTMLButtonElement>('.v3-live-lobbies .v3-filter-pills button:first-child')
@@ -98,6 +103,7 @@ function patchVoice() {
   if (settingsButton && !settingsButton.dataset.realAction) {
     settingsButton.dataset.realAction = '1'
     settingsButton.title = 'Abrir configurações de áudio'
+    settingsButton.setAttribute('aria-label', 'Abrir configurações de áudio')
     settingsButton.addEventListener('click', () => navigate('Configurações'))
   }
 }
@@ -119,10 +125,12 @@ function patchLobbyFilters() {
 
   const game = document.createElement('select')
   game.className = 'v3-real-select'
+  game.setAttribute('aria-label', 'Filtrar por jogo')
   game.innerHTML = `<option value="">Todos os jogos</option>${games.map((value) => `<option value="${value.replace(/"/g, '&quot;')}">${value}</option>`).join('')}`
 
   const order = document.createElement('select')
   order.className = 'v3-real-select'
+  order.setAttribute('aria-label', 'Ordenar lobbies')
   order.innerHTML = '<option value="active">Mais ativos</option><option value="slots">Mais vagas</option><option value="name">Nome A–Z</option>'
 
   const refresh = document.createElement('button')
@@ -169,8 +177,7 @@ function patchLobbyFilters() {
 function patchCommunitiesFromLobby() {
   const aside = document.querySelector<HTMLElement>('.v3-featured-communities')
   if (!aside) return
-  const title = aside.querySelector('.v3-panel-title h2')
-  if (title) title.textContent = 'Suas Comunidades'
+  setText(aside.querySelector('.v3-panel-title h2'), 'Suas Comunidades')
 
   const rows = aside.querySelectorAll('.v3-community-row')
   const featured = aside.querySelector<HTMLElement>('.v3-featured-main')
@@ -189,9 +196,29 @@ function patchCommunitiesFromLobby() {
 function patchNotifications() {
   const bell = document.querySelector<HTMLButtonElement>('.v3-bell')
   if (!bell) return
-  bell.title = 'Atualizar dados'
-  bell.setAttribute('aria-label', 'Atualizar dados')
+  if (bell.title !== 'Atualizar dados') bell.title = 'Atualizar dados'
+  if (bell.getAttribute('aria-label') !== 'Atualizar dados') bell.setAttribute('aria-label', 'Atualizar dados')
   bell.querySelector('i')?.remove()
+}
+
+function patchSearch() {
+  const input = document.querySelector<HTMLInputElement>('.v3-search input')
+  if (!input) return
+  const placeholder = 'Filtrar lobbies e ranking...'
+  if (input.placeholder !== placeholder) input.placeholder = placeholder
+}
+
+function patchPremium() {
+  const card = document.querySelector<HTMLButtonElement>('.v3-premium-card')
+  if (!card || card.dataset.realPremium === '1' || /premium ativo/i.test(text(card))) return
+  card.dataset.realPremium = '1'
+  card.title = 'Abrir checkout Premium via Pix'
+  card.addEventListener('click', () => {
+    window.setTimeout(() => {
+      const checkout = Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find((button) => button !== card && /premium\s*(?:via pix|·)/i.test(text(button)))
+      checkout?.click()
+    }, 80)
+  })
 }
 
 function patchAchievements() {
@@ -228,10 +255,8 @@ function patchAchievements() {
 function patchProfileRating() {
   const rank = document.querySelector<HTMLElement>('.v3-profile-ranks')
   if (!rank) return
-  const small = rank.querySelector('small')
-  const strong = rank.querySelector('strong')
-  if (small) small.textContent = 'Grind Rating'
-  if (strong) strong.textContent = 'Pontuação competitiva'
+  setText(rank.querySelector('small'), 'Grind Rating')
+  setText(rank.querySelector('strong'), 'Pontuação competitiva')
 }
 
 function patchStore() {
@@ -239,16 +264,22 @@ function patchStore() {
   if (!store || store.dataset.realStore === '1') return
   store.dataset.realStore = '1'
 
-  const heading = store.querySelector('.v3-store-head h1')
-  const subtitle = store.querySelector('.v3-store-head p')
-  if (heading) heading.textContent = 'Inventário'
-  if (subtitle) subtitle.textContent = 'Somente itens realmente vinculados à sua conta aparecem aqui.'
+  setText(store.querySelector('.v3-store-head h1'), 'Inventário')
+  setText(store.querySelector('.v3-store-head p'), 'Somente itens realmente vinculados à sua conta aparecem aqui.')
+  setText(store.querySelector('.v3-store-hero h2'), 'COSMÉTICOS DA SUA CONTA')
+  setText(store.querySelector('.v3-store-hero p'), 'Equipe somente itens realmente adquiridos e vinculados ao seu perfil.')
   store.querySelector('.v3-store-head > button')?.remove()
   store.querySelector('.v3-store-tabs')?.remove()
   store.querySelector('.v3-store-compact')?.remove()
   store.querySelector('.v3-store-guarantees')?.remove()
-  store.querySelectorAll('.v3-store-title button').forEach((button) => button.remove())
   store.querySelector('.v3-store-hero button')?.remove()
+
+  const titles = Array.from(store.querySelectorAll<HTMLElement>('.v3-store-title'))
+  if (titles[0]) {
+    setText(titles[0].querySelector('h2'), 'Itens disponíveis na sua conta')
+    titles[0].querySelector('button')?.remove()
+  }
+  titles.slice(1).forEach((item) => item.remove())
 
   const grid = store.querySelector<HTMLElement>('.v3-store-grid')
   if (!grid) return
@@ -270,10 +301,8 @@ function patchMusic() {
   const page = document.querySelector<HTMLElement>('.v3-music')
   if (!page || page.dataset.realMusic === '1') return
   page.dataset.realMusic = '1'
-  const title = page.querySelector('.v3-music-hero h1')
-  const subtitle = page.querySelector('.v3-music-hero p')
-  if (title) title.textContent = 'Player de Áudio'
-  if (subtitle) subtitle.textContent = 'Reprodução dentro do GrindLobby, sem abrir navegador externo.'
+  setText(page.querySelector('.v3-music-hero h1'), 'Player de Áudio')
+  setText(page.querySelector('.v3-music-hero p'), 'Reprodução dentro do GrindLobby, sem abrir navegador externo.')
 
   const form = page.querySelector<HTMLFormElement>('.v3-music-add')
   const audio = page.querySelector<HTMLAudioElement>('audio')
@@ -293,10 +322,8 @@ function patchMusic() {
     if (!file) return
     audio.src = URL.createObjectURL(file)
     void audio.play()
-    const now = page.querySelector('.v3-music-player h2')
-    const detail = page.querySelector('.v3-music-player p')
-    if (now) now.textContent = file.name
-    if (detail) detail.textContent = `${(file.size / 1024 / 1024).toFixed(1)} MB · arquivo local`
+    setText(page.querySelector('.v3-music-player h2'), file.name)
+    setText(page.querySelector('.v3-music-player p'), `${(file.size / 1024 / 1024).toFixed(1)} MB · arquivo local`)
   })
   form.prepend(picker, open)
 }
@@ -308,6 +335,8 @@ function patchAll() {
   patchLobbyFilters()
   patchCommunitiesFromLobby()
   patchNotifications()
+  patchSearch()
+  patchPremium()
   patchAchievements()
   patchProfileRating()
   patchStore()
@@ -318,7 +347,7 @@ let scheduled = false
 function schedulePatch() {
   if (scheduled) return
   scheduled = true
-  queueMicrotask(() => {
+  window.requestAnimationFrame(() => {
     scheduled = false
     patchAll()
   })
