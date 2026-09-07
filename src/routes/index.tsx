@@ -1,27 +1,484 @@
-import { createFileRoute,Link } from "@tanstack/react-router";
-import { Crown,Headphones,LayoutGrid,LogOut,Mic,Plus,Settings,SignalHigh,Star,Store,Trophy,Users,Wifi } from "lucide-react";
-import { useEffect,useMemo,useState,useSyncExternalStore } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import {
+  Bell,
+  Crown,
+  Gamepad2,
+  Headphones,
+  Home,
+  LogOut,
+  Mic,
+  MicOff,
+  MonitorUp,
+  Music2,
+  Search,
+  Settings,
+  ShoppingBag,
+  Trophy,
+  UserRound,
+  Users,
+  Volume2,
+} from "lucide-react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { supabase } from "@/lib/supabase";
 import { callSession } from "@/lib/call-session";
-import { PlayerProvider,usePlayer,findItem } from "@/lib/player-store";
+import { PlayerProvider, usePlayer } from "@/lib/player-store";
 import { getTier } from "@/lib/levels";
 import { ProfileAvatar } from "@/components/ProfileAvatar";
 import { ProfileSettings } from "@/components/ProfileSettings";
-import { TopElos } from "@/components/TopElos";
-import { LevelHero } from "@/components/LevelHero";
-import { EventTicker } from "@/components/EventTicker";
-export const Route=createFileRoute("/")({component:Dashboard});
-const nav=[["Dashboard","/",LayoutGrid],["Lobbies","/lobbies",Users],["Rank","/rank",Trophy],["Loja","/loja",Store],["Pro","/pro",Star],["Configurações","/configuracoes",Settings]] as const;
-type Presence={userId:string;name:string;avatar?:string|null;speaking?:boolean;sharing?:boolean};
-type LobbyRow={route_code:string;name:string;visibility:string;max_members:number;status:string;game_label:string|null;owner_id:string};
-type OnlineProfile={id:string;display_name:string|null;username:string|null;avatar:string|null;last_seen_at:string|null;status:string|null};
-function fmtAgo(iso:string|null){if(!iso)return"agora";const m=Math.max(0,Math.floor((Date.now()-new Date(iso).getTime())/60000));if(m<1)return"agora";if(m<60)return`há ${m} min`;return`há ${Math.floor(m/60)} h`}
-function fmtDuration(start:number|null){if(!start)return"—";const s=Math.floor((Date.now()-start)/1000);return`${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`}
-function Dashboard(){return <PlayerProvider><DashboardInner/></PlayerProvider>}
-function DashboardInner(){const{player}=usePlayer();const[profileOpen,setProfileOpen]=useState(false);const[people,setPeople]=useState<Presence[]>([]);const[lobby,setLobby]=useState<LobbyRow|null>(null);const[online,setOnline]=useState<OnlineProfile[]>([]);const[clock,setClock]=useState(0);const call=useSyncExternalStore(callSession.subscribe,()=>callSession.snapshot,()=>callSession.snapshot);const tier=getTier(player.level);const title=findItem(player.equipped.title)?.label;
- useEffect(()=>{const t=setInterval(()=>setClock(v=>v+1),1000);return()=>clearInterval(t)},[]);
- useEffect(()=>{const load=async()=>{const since=new Date(Date.now()-15*60_000).toISOString();const{data}=await supabase.from("profiles").select("id,display_name,username,avatar,last_seen_at,status").gte("last_seen_at",since).order("last_seen_at",{ascending:false}).limit(8);setOnline((data||[]) as OnlineProfile[])};void load();const ch=supabase.channel("dashboard-online-profiles").on("postgres_changes",{event:"UPDATE",schema:"public",table:"profiles"},()=>void load()).subscribe();return()=>{void supabase.removeChannel(ch)}},[]);
- useEffect(()=>{setPeople([]);setLobby(null);if(!call.lobbyId)return;let ch:any=null;void(async()=>{const{data}=await supabase.from("lobbies").select("route_code,name,visibility,max_members,status,game_label,owner_id").eq("route_code",call.lobbyId).maybeSingle();if(data)setLobby(data as LobbyRow);const source=supabase.channel(`grind:room:${call.lobbyId}`);ch=source;source.on("presence",{event:"sync"},()=>setPeople(Object.values(source.presenceState<Presence>()).flat().map(v=>v as unknown as Presence))).subscribe()})();return()=>{if(ch)void supabase.removeChannel(ch)}},[call.lobbyId]);
- const recent=useMemo(()=>{const live=people.map(p=>({id:`room-${p.userId}`,name:p.name,text:p.sharing?"está compartilhando a tela":"está online na sua call",time:"agora",avatar:p.avatar||null}));const ids=new Set(people.map(p=>p.userId));const others=online.filter(p=>!ids.has(p.id)).slice(0,Math.max(0,5-live.length)).map(p=>({id:p.id,name:p.display_name||p.username||"Jogador",text:p.status==="online"?"está online":"esteve online",time:fmtAgo(p.last_seen_at),avatar:p.avatar}));return[...live,...others].slice(0,5)},[people,online]);
- const rtt=call.metrics.rttMs;const bitrate=call.metrics.bitrateKbps;const quality=rtt==null?"Sem amostra":rtt<60?"Excelente":rtt<120?"Boa":rtt<180?"Instável":"Ruim";const qClass=rtt==null?"text-muted-foreground":rtt<120?"text-success":rtt<180?"text-warning":"text-destructive";
- return <div className="min-h-screen bg-background text-foreground"><div className="flex min-h-screen"><aside className="hidden w-64 shrink-0 flex-col border-r border-border bg-card/60 px-5 py-6 lg:flex"><div className="flex flex-col items-center gap-3 pb-8"><img src="/grindlobby-logo.png" className="h-16 w-16 object-contain" alt="GL"/><p className="font-display text-2xl font-bold italic">GRIND<span className="text-primary-glow">LOBBY</span></p></div><nav className="space-y-1">{nav.map(([label,to,Icon])=><Link key={label} to={to} className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm ${to==="/"?"border border-primary/40 bg-primary/15":"text-muted-foreground hover:bg-secondary"}`}><Icon className="h-4 w-4"/>{label}</Link>)}</nav><div className="mt-6 space-y-2"><Link to="/lobbies" className="btn-primary flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm"><Plus className="h-4 w-4"/>Criar lobby</Link>{call.lobbyId&&<Link to="/sala/$lobbyId" params={{lobbyId:call.lobbyId}} className="btn-ghost flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm"><Headphones className="h-4 w-4"/>Voltar para call</Link>}</div><div className="mt-8"><p className="label-caps">Atividade recente</p><div className="mt-3 space-y-3">{recent.length?recent.map(a=><div key={a.id} className="flex items-start gap-2.5">{a.avatar?<img src={a.avatar} className="h-7 w-7 rounded-full object-cover" alt=""/>:<span className="grid h-7 w-7 place-items-center rounded-full bg-primary/30 text-xs font-bold">{a.name[0]?.toUpperCase()}</span>}<div className="min-w-0 text-xs"><p className="truncate"><b>{a.name}</b> <span className="text-muted-foreground">{a.text}</span></p><p className="text-muted-foreground">{a.time}</p></div></div>):<p className="text-xs text-muted-foreground">Nenhum jogador online detectado agora.</p>}</div></div><button onClick={()=>setProfileOpen(true)} className="mt-auto flex items-center gap-3 rounded-xl border border-border bg-panel p-3 text-left"><ProfileAvatar name={player.nickname} size={40} borderId={player.equipped.border} avatarUrl={player.avatarUrl}/><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{player.nickname}{title&&<span className="ml-1 text-[9px] text-primary-glow">{title}</span>}</p><p className="text-[11px] text-muted-foreground">Level {player.level} • {tier.name}</p></div><Settings className="h-4 w-4 text-muted-foreground"/></button></aside><main className="min-w-0 flex-1 space-y-4 p-4 md:p-6"><header className="panel flex flex-wrap items-center justify-between gap-3 px-5 py-3"><div className="flex items-center gap-2 text-sm"><Crown className="h-4 w-4 text-primary-glow"/><span className="font-semibold">{player.nickname}</span><span className="text-muted-foreground">•</span><span className="text-primary-glow">{player.email}</span></div><SignalHigh className={`h-5 w-5 ${call.lobbyId?"text-success":"text-muted-foreground"}`}/></header><EventTicker/><TopElos/><LevelHero onOpenProfile={()=>setProfileOpen(true)}/><div className="grid gap-4 xl:grid-cols-[1.65fr_1fr]"><section className="panel p-5"><div className="flex items-center justify-between"><p className="label-caps">Lobby atual</p>{call.lobbyId&&<span className="text-xs text-success">● call ativa</span>}</div>{!call.lobbyId?<div className="mt-6 rounded-xl border border-dashed border-border p-8 text-center"><p className="text-sm font-semibold">Você não está em nenhum lobby.</p><Link to="/lobbies" className="btn-primary mt-4 inline-flex rounded-lg px-4 py-2 text-sm">Abrir lobbies</Link></div>:<><div className="mt-3 flex flex-wrap items-center justify-between gap-4"><div><h2 className="font-display text-2xl font-bold">{lobby?.name||call.lobbyId}</h2><div className="mt-2 flex gap-2 text-xs"><span className="rounded-md border border-border px-2 py-1">{lobby?.visibility||"pública"}</span><span className="rounded-md border border-border px-2 py-1">{lobby?.game_label||"EA FC 27"}</span><span className="rounded-md border border-border px-2 py-1">{call.lobbyId}</span></div></div><div className="flex items-center gap-3"><span className="flex items-center gap-2 text-sm"><Users className="h-4 w-4"/>{people.length}/{lobby?.max_members||10}</span><Link to="/sala/$lobbyId" params={{lobbyId:call.lobbyId}} className="btn-primary rounded-lg px-3 py-2 text-sm">Abrir sala</Link></div></div><div className="mt-5 rounded-xl border border-border bg-panel/50 p-3"><p className="label-caps">Membros online ({people.length})</p><div className="mt-2 divide-y divide-border">{people.length?people.map(p=><div key={p.userId} className="flex items-center gap-3 py-2.5"><ProfileAvatar name={p.name} size={34} avatarUrl={p.avatar||""}/><div className="min-w-0 flex-1"><p className="text-sm font-semibold">{p.name}</p><p className="text-xs text-muted-foreground">{p.sharing?"Compartilhando tela":p.speaking?"Falando":"Na call"}</p></div>{p.speaking?<span className="text-xs text-success">falando</span>:<Mic className="h-4 w-4 text-muted-foreground"/>}</div>):<p className="py-4 text-sm text-muted-foreground">Aguardando sincronização de presença...</p>}</div></div></>}</section><div className="space-y-4"><section className="panel p-5"><div className="flex items-center justify-between"><p className="label-caps flex items-center gap-2"><Wifi className="h-4 w-4"/>Conexão da call</p>{call.lobbyId&&<span className="text-xs text-success">Em call • {fmtDuration(call.startedAt)}{clock<0?"":""}</span>}</div>{!call.lobbyId?<p className="mt-5 text-sm text-muted-foreground">Entre em uma call para medir a conexão.</p>:<><div className={`mt-5 font-display text-4xl font-bold ${qClass}`}>{rtt==null?"—":Math.round(rtt)}<span className="ml-1 text-sm">ms</span></div><p className={`mt-1 text-sm ${qClass}`}>{quality}</p><div className="mt-4 grid grid-cols-2 gap-2"><div className="rounded-lg border border-border p-3 text-center"><p className="text-[10px] text-muted-foreground">BITRATE REAL</p><p className="mt-1 text-sm font-semibold">{bitrate==null?"—":`${Math.round(bitrate)} kbps`}</p></div><div className="rounded-lg border border-border p-3 text-center"><p className="text-[10px] text-muted-foreground">PERDA DE PACOTES</p><p className="mt-1 text-sm font-semibold">{call.metrics.packetsLost==null?"—":call.metrics.packetsLost}</p></div></div>{rtt==null&&<p className="mt-3 text-xs text-muted-foreground">Aguardando uma amostra real do WebRTC; nenhum valor é simulado.</p>}<button onClick={()=>callSession.leave()} className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-destructive/40 bg-destructive/10 py-2.5 text-sm text-destructive"><LogOut className="h-4 w-4"/>Sair da call</button></>}</section><section className="panel p-5"><p className="label-caps">Jogadores online</p><div className="mt-3 space-y-2">{online.length?online.slice(0,5).map(p=><div key={p.id} className="flex items-center gap-3"><ProfileAvatar name={p.display_name||p.username||"J"} size={30} avatarUrl={p.avatar||""}/><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{p.display_name||p.username||"Jogador"}</p><p className="text-xs text-muted-foreground">{fmtAgo(p.last_seen_at)}</p></div></div>):<p className="text-sm text-muted-foreground">Nenhum jogador online agora.</p>}</div></section></div></div></main></div>{profileOpen&&<ProfileSettings onClose={()=>setProfileOpen(false)}/>}</div>}
+import portalBg from "@/assets/login-portal.jpg";
+import rankEmblem from "@/assets/rank-emblem.png";
+
+export const Route = createFileRoute("/")({ component: Dashboard });
+
+type Presence = {
+  userId: string;
+  name: string;
+  avatar?: string | null;
+  speaking?: boolean;
+  sharing?: boolean;
+};
+
+type LobbyRow = {
+  route_code: string;
+  name: string;
+  visibility: string;
+  max_members: number;
+  status: string;
+  game_label: string | null;
+  owner_id: string;
+};
+
+type OnlineProfile = {
+  id: string;
+  display_name: string | null;
+  username: string | null;
+  avatar: string | null;
+  last_seen_at: string | null;
+  status: string | null;
+};
+
+const nav = [
+  ["Início", "/", Home],
+  ["Lobbies", "/lobbies", Gamepad2],
+  ["Top Elos", "/rank", Trophy],
+  ["Loja", "/loja", ShoppingBag],
+  ["Perfil", "/perfil", UserRound],
+  ["Configurações", "/configuracoes", Settings],
+] as const;
+
+function fmtAgo(iso: string | null) {
+  if (!iso) return "agora";
+  const minutes = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000));
+  if (minutes < 1) return "agora";
+  if (minutes < 60) return `há ${minutes} min`;
+  return `há ${Math.floor(minutes / 60)} h`;
+}
+
+function fmtDuration(start: number | null) {
+  if (!start) return "00:00";
+  const seconds = Math.max(0, Math.floor((Date.now() - start) / 1000));
+  return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
+function Dashboard() {
+  return (
+    <PlayerProvider>
+      <DashboardInner />
+    </PlayerProvider>
+  );
+}
+
+function DashboardInner() {
+  const { player } = usePlayer();
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [people, setPeople] = useState<Presence[]>([]);
+  const [lobby, setLobby] = useState<LobbyRow | null>(null);
+  const [online, setOnline] = useState<OnlineProfile[]>([]);
+  const [, setClock] = useState(0);
+  const call = useSyncExternalStore(callSession.subscribe, () => callSession.snapshot, () => callSession.snapshot);
+  const tier = getTier(player.level);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setClock((value) => value + 1), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const load = async () => {
+      const since = new Date(Date.now() - 15 * 60_000).toISOString();
+      const { data } = await supabase
+        .from("profiles")
+        .select("id,display_name,username,avatar,last_seen_at,status")
+        .gte("last_seen_at", since)
+        .order("last_seen_at", { ascending: false })
+        .limit(8);
+      setOnline((data || []) as OnlineProfile[]);
+    };
+    void load();
+    const channel = supabase
+      .channel("dashboard-online-profiles")
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "profiles" }, () => void load())
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, []);
+
+  useEffect(() => {
+    setPeople([]);
+    setLobby(null);
+    if (!call.lobbyId) return;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    void (async () => {
+      const { data } = await supabase
+        .from("lobbies")
+        .select("route_code,name,visibility,max_members,status,game_label,owner_id")
+        .eq("route_code", call.lobbyId)
+        .maybeSingle();
+      if (data) setLobby(data as LobbyRow);
+      const source = supabase.channel(`grind:room:${call.lobbyId}`);
+      channel = source;
+      source
+        .on("presence", { event: "sync" }, () => {
+          setPeople(
+            Object.values(source.presenceState<Presence>())
+              .flat()
+              .map((value) => value as unknown as Presence),
+          );
+        })
+        .subscribe();
+    })();
+    return () => {
+      if (channel) void supabase.removeChannel(channel);
+    };
+  }, [call.lobbyId]);
+
+  const ranking = useMemo(() => {
+    const self = {
+      id: "self",
+      name: player.nickname,
+      avatar: player.avatarUrl || null,
+      sub: `${tier.name} · Nível ${player.level}`,
+      score: `${player.xp.toLocaleString("pt-BR")} XP`,
+    };
+    const others = online
+      .filter((profile) => (profile.display_name || profile.username) !== player.nickname)
+      .slice(0, 4)
+      .map((profile) => ({
+        id: profile.id,
+        name: profile.display_name || profile.username || "Jogador",
+        avatar: profile.avatar,
+        sub: profile.status === "online" ? "Online agora" : fmtAgo(profile.last_seen_at),
+        score: "ONLINE",
+      }));
+    return [self, ...others].slice(0, 5);
+  }, [online, player.avatarUrl, player.level, player.nickname, player.xp, tier.name]);
+
+  const activity = useMemo(() => {
+    const inCall = people.map((person) => ({
+      id: `call-${person.userId}`,
+      name: person.name,
+      detail: person.sharing ? "está compartilhando a tela" : person.speaking ? "está falando na call" : "está na sua call",
+      avatar: person.avatar || null,
+    }));
+    const others = online
+      .filter((profile) => !people.some((person) => person.userId === profile.id))
+      .slice(0, Math.max(0, 4 - inCall.length))
+      .map((profile) => ({
+        id: profile.id,
+        name: profile.display_name || profile.username || "Jogador",
+        detail: profile.status === "online" ? "está online no GrindLobby" : `esteve online ${fmtAgo(profile.last_seen_at)}`,
+        avatar: profile.avatar,
+      }));
+    return [...inCall, ...others].slice(0, 4);
+  }, [online, people]);
+
+  const disconnect = async () => {
+    try {
+      const { livekitSession } = await import("@/lib/livekit-session");
+      await livekitSession.disconnect(true);
+    } catch {
+      callSession.leave();
+    }
+  };
+
+  const isSharing = people.some((person) => person.sharing);
+
+  return (
+    <div className="gl-app">
+      <div className="gl-shell">
+        <aside className="gl-sidebar">
+          <div className="gl-brand">
+            <img src="/grindlobby-logo.png" alt="GrindLobby" className="gl-brand-mark" />
+            <div className="gl-brand-name">GrindLobby</div>
+            <div className="gl-brand-tag">Jogue. Conecte. Evolua.</div>
+          </div>
+
+          <nav className="gl-nav" aria-label="Navegação principal">
+            {nav.map(([label, to, Icon]) => (
+              <Link key={label} to={to} data-active={to === "/" ? "true" : "false"}>
+                <Icon />
+                <span>{label}</span>
+              </Link>
+            ))}
+          </nav>
+
+          <Link to="/pro" className="gl-premium-card">
+            <div className="gl-premium-title">
+              <Crown size={19} />
+              <span>Seja Premium</span>
+            </div>
+            <div className="gl-premium-sub">1080p liberado, cosméticos e recursos exclusivos.</div>
+          </Link>
+          <div className="gl-sidebar-meta">GrindLobby v1.0.0<br />Jogue maior.</div>
+        </aside>
+
+        <main className="gl-content">
+          <header className="gl-topbar">
+            <div className="gl-search">
+              <Search size={15} />
+              <span>Buscar jogadores, lobbies, comunidades...</span>
+            </div>
+            <div className="gl-topbar-spacer" />
+            <Bell size={16} color="#aaa3bb" />
+            <button className="gl-user" onClick={() => setProfileOpen(true)} type="button">
+              <ProfileAvatar name={player.nickname} size={32} avatarUrl={player.avatarUrl} borderId={player.equipped.border} />
+              <span>
+                <span className="gl-user-name">{player.nickname}</span>
+                <span className="gl-user-tier">★ {player.pro ? "Premium" : tier.name}</span>
+              </span>
+            </button>
+          </header>
+
+          <section
+            className="gl-hero gl-enter"
+            style={{ backgroundImage: `url(${portalBg})` }}
+            aria-label="Boas-vindas"
+          >
+            <div className="gl-hero-copy">
+              <h1>
+                Bem-vindo ao<br />GrindLobby, <em>{player.nickname}</em>
+              </h1>
+              <p>Mais que lobbies. Uma comunidade que joga junto, evolui junto e chega mais longe.</p>
+              <div className="gl-hero-actions">
+                <Link to="/lobbies" className="gl-primary">Encontrar Lobbies →</Link>
+                <Link to="/lobbies" className="gl-secondary">Explorar Comunidades</Link>
+              </div>
+            </div>
+          </section>
+
+          <div className="gl-dashboard-grid gl-enter gl-enter-d1">
+            <div className="gl-stack">
+              <section className="gl-panel">
+                <div className="gl-section-head">
+                  <h2 className="gl-panel-title">Top Elos da Semana</h2>
+                  <Link to="/rank" className="gl-panel-link">Ver ranking →</Link>
+                </div>
+                <div>
+                  {ranking.map((row, index) => (
+                    <div key={row.id} className="gl-ranking-row">
+                      <div className="gl-rank-num">{index + 1}</div>
+                      {row.avatar ? (
+                        <img className="gl-avatar" src={row.avatar} alt="" />
+                      ) : (
+                        <div className="gl-avatar">{row.name.slice(0, 1).toUpperCase()}</div>
+                      )}
+                      <div className="gl-rank-info">
+                        <div className="gl-row-name">{row.name}</div>
+                        <div className="gl-row-sub">{row.sub}</div>
+                      </div>
+                      <div className="gl-score">{row.score}</div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="gl-panel">
+                <div className="gl-section-head">
+                  <h2 className="gl-panel-title">Sua Jornada</h2>
+                  <button className="gl-panel-link" type="button" onClick={() => setProfileOpen(true)}>Ver perfil →</button>
+                </div>
+                <div className="gl-journey">
+                  <div className="gl-journey-top">
+                    <img src={rankEmblem} className="gl-emblem" alt="Elo" />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 10, color: "#8f88a0" }}>Elo Principal</div>
+                      <div style={{ marginTop: 2, fontSize: 18, fontWeight: 800 }}>{tier.name}</div>
+                      <div style={{ marginTop: 2, fontSize: 10, color: "#b7aec8" }}>{player.xp.toLocaleString("pt-BR")} XP</div>
+                      <div className="gl-progress" style={{ marginTop: 10 }}><span style={{ width: `${Math.min(100, Math.max(8, (player.level % 10) * 10))}%` }} /></div>
+                    </div>
+                  </div>
+                  <div className="gl-stats">
+                    <div className="gl-stat"><strong>{player.level}</strong><span>NÍVEL</span></div>
+                    <div className="gl-stat"><strong>{people.length}</strong><span>NA CALL</span></div>
+                    <div className="gl-stat"><strong>{call.metrics.rttMs == null ? "—" : Math.round(call.metrics.rttMs)}</strong><span>PING MS</span></div>
+                    <div className="gl-stat"><strong>{player.pro ? "PRO" : "FREE"}</strong><span>PLANO</span></div>
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            <div className="gl-stack">
+              <section className="gl-panel">
+                <div className="gl-section-head">
+                  <h2 className="gl-panel-title">Lobbies ao Vivo</h2>
+                  <Link to="/lobbies" className="gl-panel-link">Ver todos →</Link>
+                </div>
+                <div>
+                  {call.lobbyId ? (
+                    <div className="gl-lobby-row">
+                      <div className="gl-game-icon">GL</div>
+                      <div className="gl-row-main">
+                        <div className="gl-row-name">{lobby?.name || `Lobby ${call.lobbyId}`}</div>
+                        <div className="gl-row-sub">{lobby?.game_label || "GrindLobby"} · <span style={{ color: "#20e68a" }}>Voz ativa</span></div>
+                      </div>
+                      <span className="gl-chip green">{people.length}/{lobby?.max_members || 10}</span>
+                      <Link to="/sala/$lobbyId" params={{ lobbyId: call.lobbyId }} className="gl-primary" style={{ minHeight: 29, padding: "0 13px", marginLeft: 8 }}>Abrir</Link>
+                    </div>
+                  ) : (
+                    <div style={{ padding: "19px 13px", color: "#8d879d", fontSize: 10 }}>Nenhuma call ativa. Entre em um lobby para aparecer aqui.</div>
+                  )}
+                  {online.slice(0, 3).map((profile) => (
+                    <div className="gl-lobby-row" key={profile.id}>
+                      <div className="gl-game-icon">{(profile.display_name || profile.username || "G").slice(0, 1).toUpperCase()}</div>
+                      <div className="gl-row-main">
+                        <div className="gl-row-name">{profile.display_name || profile.username || "Jogador"}</div>
+                        <div className="gl-row-sub">Disponível no GrindLobby</div>
+                      </div>
+                      <span className="gl-chip green">ONLINE</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="gl-panel">
+                <div className="gl-section-head">
+                  <h2 className="gl-panel-title">Atividade da Comunidade</h2>
+                  <Link to="/lobbies" className="gl-panel-link">Ver tudo →</Link>
+                </div>
+                <div style={{ padding: "5px 0 9px" }}>
+                  {activity.length ? activity.map((item) => (
+                    <div className="gl-activity-row" key={item.id}>
+                      {item.avatar ? <img src={item.avatar} className="gl-avatar" alt="" /> : <div className="gl-avatar">{item.name.slice(0,1).toUpperCase()}</div>}
+                      <div className="gl-row-main">
+                        <div className="gl-row-name">{item.name}</div>
+                        <div className="gl-row-sub">{item.detail}</div>
+                      </div>
+                    </div>
+                  )) : <div style={{ padding: "18px 13px", color: "#8d879d", fontSize: 10 }}>Sem atividade recente detectada.</div>}
+                </div>
+              </section>
+            </div>
+
+            <div className="gl-stack">
+              <section className="gl-panel gl-call-panel">
+                <div className="gl-section-head">
+                  <h2 className="gl-panel-title" style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: 99, background: call.lobbyId ? "#20e68a" : "#655f72", boxShadow: call.lobbyId ? "0 0 11px rgba(32,230,138,.7)" : "none" }} />
+                    Chamada de Voz
+                  </h2>
+                  <span className="gl-panel-link">{call.lobbyId ? fmtDuration(call.startedAt) : "offline"}</span>
+                </div>
+                <div style={{ padding: "9px 13px 0" }}>
+                  <div className="gl-row-name">{lobby?.name || (call.lobbyId ? `Lobby ${call.lobbyId}` : "Sem call ativa")}</div>
+                  <div className="gl-row-sub">{call.lobbyId ? `${people.length} na call` : "Entre em um lobby para iniciar"}</div>
+                </div>
+                <div className="gl-call-users">
+                  {(people.length ? people : [{ userId: "self", name: player.nickname, avatar: player.avatarUrl, speaking: false, sharing: false }]).slice(0, 6).map((person) => (
+                    <div className="gl-call-user" key={person.userId}>
+                      {person.avatar ? <img src={person.avatar} className="gl-avatar" alt="" /> : <div className="gl-avatar">{person.name.slice(0, 1).toUpperCase()}</div>}
+                      <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{person.name}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="gl-call-controls">
+                  <button className="gl-round-btn" type="button" onClick={() => void callSession.setMuted(!call.muted)} aria-label={call.muted ? "Ativar microfone" : "Mutar microfone"}>
+                    {call.muted ? <MicOff size={15} /> : <Mic size={15} />}
+                  </button>
+                  {call.lobbyId ? (
+                    <Link to="/sala/$lobbyId" params={{ lobbyId: call.lobbyId }} className="gl-round-btn" aria-label="Abrir sala"><Headphones size={15} /></Link>
+                  ) : (
+                    <Link to="/lobbies" className="gl-round-btn" aria-label="Encontrar lobby"><Headphones size={15} /></Link>
+                  )}
+                  <Link to="/configuracoes" className="gl-round-btn" aria-label="Configurações"><Settings size={15} /></Link>
+                  <button className="gl-round-btn danger" type="button" disabled={!call.lobbyId} onClick={() => void disconnect()} aria-label="Sair da call"><LogOut size={16} /></button>
+                </div>
+              </section>
+
+              <section className="gl-panel">
+                <div className="gl-section-head">
+                  <h2 className="gl-panel-title">Tela ao Vivo</h2>
+                  <span className="gl-panel-link">{isSharing ? "transmissão ativa" : "pronta"}</span>
+                </div>
+                <div className="gl-stream-body">
+                  <div className="gl-stream-preview" />
+                  <div>
+                    <div style={{ fontSize: 8, fontWeight: 700, marginBottom: 7 }}>Qualidade da transmissão</div>
+                    <div className="gl-quality-grid">
+                      <div className="gl-quality">480p 30</div>
+                      <div className="gl-quality">480p 60</div>
+                      <div className="gl-quality active">720p 30</div>
+                      <div className="gl-quality">1080p Pro 👑</div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section className="gl-panel gl-audio-strip">
+                <Music2 size={18} color="#20d779" />
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 7, color: "#7d768d" }}>Tocando agora</div>
+                  <div className="gl-row-name">GRIND BEATS</div>
+                </div>
+                <div className="gl-bars" aria-hidden="true">
+                  {Array.from({ length: 16 }).map((_, index) => <span key={index} />)}
+                </div>
+              </section>
+
+              <Link to="/loja" className="gl-panel" style={{ minHeight: 80, padding: "11px 13px", display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 8, color: "#8d849d" }}>Destaque da Loja</div>
+                  <div style={{ marginTop: 4, fontSize: 11, fontWeight: 800 }}>Bundle Sombras</div>
+                  <div style={{ marginTop: 3, fontSize: 9, color: "#cfc8d8" }}>Pacote exclusivo</div>
+                </div>
+                <div className="gl-primary" style={{ minHeight: 29, padding: "0 13px" }}>Ver loja</div>
+              </Link>
+            </div>
+          </div>
+        </main>
+      </div>
+
+      <footer className="gl-bottom-dock">
+        <div className="gl-dock-call">
+          <span style={{ width: 10, height: 10, borderRadius: 99, border: "2px solid #20e68a", boxShadow: "0 0 12px rgba(32,230,138,.68)" }} />
+          <div>
+            <div style={{ fontSize: 8, fontWeight: 700 }}>{call.lobbyId ? "Chamada de Voz Ativa" : "Voz disponível"}</div>
+            <div style={{ marginTop: 2, fontSize: 10, color: "#d4cfdb" }}>{lobby?.name || "Entre em um lobby"}</div>
+          </div>
+        </div>
+        <div className="gl-dock-members">
+          {(people.length ? people : online.slice(0, 5)).slice(0, 6).map((person: Presence | OnlineProfile) => {
+            const name = "name" in person ? person.name : person.display_name || person.username || "Jogador";
+            const avatar = "avatar" in person ? person.avatar : null;
+            return avatar ? <img key={("userId" in person ? person.userId : person.id)} src={avatar} className="gl-avatar" alt="" /> : <div key={("userId" in person ? person.userId : person.id)} className="gl-avatar">{name.slice(0,1).toUpperCase()}</div>;
+          })}
+        </div>
+        <div className="gl-dock-controls">
+          <button className="gl-round-btn" type="button" onClick={() => void callSession.setMuted(!call.muted)}>{call.muted ? <MicOff size={15} /> : <Mic size={15} />}</button>
+          <Link to="/configuracoes" className="gl-round-btn"><Volume2 size={15} /></Link>
+          {call.lobbyId ? <Link to="/sala/$lobbyId" params={{ lobbyId: call.lobbyId }} className="gl-round-btn"><MonitorUp size={15} /></Link> : <Link to="/lobbies" className="gl-round-btn"><MonitorUp size={15} /></Link>}
+          <button className="gl-round-btn danger" disabled={!call.lobbyId} type="button" onClick={() => void disconnect()}><LogOut size={15} /></button>
+        </div>
+        <div className="gl-dock-audio">
+          <Music2 size={18} color="#20d779" />
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 7, color: "#70697d" }}>Tocando Agora</div>
+            <div style={{ fontSize: 9, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>GRIND BEATS</div>
+          </div>
+        </div>
+      </footer>
+
+      {profileOpen && <ProfileSettings onClose={() => setProfileOpen(false)} />}
+    </div>
+  );
+}
