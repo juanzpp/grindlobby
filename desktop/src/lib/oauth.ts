@@ -2,8 +2,10 @@ import type { Provider } from '@supabase/supabase-js'
 import { EDGE_FUNCTION_BASE, supabase } from './supabase'
 
 export type SocialProvider = 'steam' | 'discord' | 'google' | 'xbox'
+export type AuthDeepLinkKind = 'login' | 'recovery'
 
 const CALLBACK_URL = 'grindlobby://auth/callback'
+const RECOVERY_CALLBACK_URL = 'grindlobby://auth/callback?mode=recovery'
 
 function providerForSupabase(provider: Exclude<SocialProvider, 'steam'>): Provider {
   return provider === 'xbox' ? 'azure' : provider
@@ -48,7 +50,16 @@ export async function beginSocialLogin(provider: SocialProvider) {
   await openExternal(data.url)
 }
 
-export async function consumeAuthDeepLink(rawUrl: string) {
+export async function beginPasswordRecovery(email: string) {
+  const normalized = email.trim().toLowerCase()
+  if (!/^\S+@\S+\.\S+$/.test(normalized)) throw new Error('Digite o e-mail da sua conta para recuperar a senha.')
+  const { error } = await supabase.auth.resetPasswordForEmail(normalized, {
+    redirectTo: RECOVERY_CALLBACK_URL,
+  })
+  if (error) throw error
+}
+
+export async function consumeAuthDeepLink(rawUrl: string): Promise<AuthDeepLinkKind | false> {
   const url = new URL(rawUrl)
   if (url.protocol !== 'grindlobby:' || url.hostname !== 'auth' || url.pathname !== '/callback') return false
 
@@ -57,32 +68,37 @@ export async function consumeAuthDeepLink(rawUrl: string) {
   const authError = hash.get('error_description') || query.get('error_description') || hash.get('error') || query.get('error')
   if (authError) throw new Error(authError)
 
+  const kind: AuthDeepLinkKind = query.get('mode') === 'recovery' || hash.get('type') === 'recovery' || query.get('type') === 'recovery' ? 'recovery' : 'login'
   const accessToken = hash.get('access_token') || query.get('access_token')
   const refreshToken = hash.get('refresh_token') || query.get('refresh_token')
   if (accessToken && refreshToken) {
     const { error } = await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
     if (error) throw error
-    return true
+    return kind
   }
 
   const code = query.get('code')
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code)
     if (error) throw error
-    return true
+    return kind
   }
 
   throw new Error('Retorno de autenticação inválido.')
 }
 
-export async function installOAuthDeepLinkListener(onError?: (message: string) => void) {
+export async function installOAuthDeepLinkListener(onError?: (message: string) => void, onRecovery?: () => void) {
   try {
     const { getCurrent, onOpenUrl } = await import('@tauri-apps/plugin-deep-link')
     const handle = (urls: string[]) => {
       for (const url of urls) {
-        void consumeAuthDeepLink(url).catch((error) => {
-          onError?.(error instanceof Error ? error.message : 'Falha ao concluir login social.')
-        })
+        void consumeAuthDeepLink(url)
+          .then((kind) => {
+            if (kind === 'recovery') onRecovery?.()
+          })
+          .catch((error) => {
+            onError?.(error instanceof Error ? error.message : 'Falha ao concluir autenticação.')
+          })
       }
     }
 
