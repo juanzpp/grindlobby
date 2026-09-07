@@ -1,19 +1,29 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
+  Bell,
   Copy,
+  Crown,
   DoorOpen,
+  Gamepad2,
   Globe2,
-  LayoutGrid,
+  Headphones,
+  Home,
   LockKeyhole,
+  LogOut,
+  Mic,
+  MicOff,
   Plus,
+  Search,
   Settings,
-  Star,
-  Store,
+  ShoppingBag,
   Trophy,
+  UserRound,
   Users,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { supabase } from "@/lib/supabase";
+import { callSession } from "@/lib/call-session";
+import portalBg from "@/assets/login-portal.jpg";
 
 export const Route = createFileRoute("/lobbies")({ component: LobbiesPage });
 
@@ -45,46 +55,43 @@ type SavedLobby = {
 };
 
 const nav = [
-  ["Dashboard", "/", LayoutGrid],
-  ["Lobbies", "/lobbies", Users],
-  ["Rank", "/rank", Trophy],
-  ["Loja", "/loja", Store],
-  ["Pro", "/pro", Star],
+  ["Início", "/", Home],
+  ["Lobbies", "/lobbies", Gamepad2],
+  ["Top Elos", "/rank", Trophy],
+  ["Loja", "/loja", ShoppingBag],
+  ["Perfil", "/perfil", UserRound],
   ["Configurações", "/configuracoes", Settings],
 ] as const;
-
-function Logo() {
-  return <img src="/grindlobby-logo.png" alt="GrindLobby" className="mx-auto h-14 w-14 object-contain" />;
-}
 
 function LobbiesPage() {
   const navigate = useNavigate();
   const [name, setName] = useState("Meu lobby");
   const [game, setGame] = useState("EA FC 27");
   const [visibility, setVisibility] = useState<LobbyVisibility>("public");
+  const [activeTab, setActiveTab] = useState<LobbyVisibility>("public");
+  const [gameFilter, setGameFilter] = useState("Todos os jogos");
   const [joinCode, setJoinCode] = useState("");
   const [message, setMessage] = useState("");
   const [presence, setPresence] = useState<Presence[]>([]);
   const [saved, setSaved] = useState<SavedLobby[]>([]);
   const [publicLobbyIds, setPublicLobbyIds] = useState<Set<string>>(new Set());
+  const [showCreate, setShowCreate] = useState(false);
+  const [userName, setUserName] = useState("Jogador");
+  const call = useSyncExternalStore(callSession.subscribe, () => callSession.snapshot, () => callSession.snapshot);
 
   async function loadMine() {
     await supabase.rpc("cleanup_stale_lobbies");
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
+    const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       setSaved([]);
       return;
     }
-
+    setUserName(user.user_metadata?.display_name || user.user_metadata?.username || user.email?.split("@")[0] || "Jogador");
     const { data } = await supabase
       .from("lobbies")
       .select("route_code,name,game_label,max_members,owner_id,status,visibility")
       .neq("status", "closed")
       .eq("owner_id", user.id);
-
     setSaved(
       (data || [])
         .filter((row: any) => row.route_code)
@@ -105,20 +112,16 @@ function LobbiesPage() {
       .select("route_code")
       .eq("visibility", "public")
       .neq("status", "closed");
-
     if (error) {
-      // Privacy-first: if visibility cannot be verified, do not expose rooms in discovery.
       setPublicLobbyIds(new Set());
       return;
     }
-
     setPublicLobbyIds(new Set((data || []).map((row: any) => row.route_code).filter(Boolean)));
   }
 
   useEffect(() => {
     const queryCode = new URLSearchParams(location.search).get("join");
     if (queryCode) setJoinCode(queryCode.toUpperCase());
-
     void loadMine();
     void syncPublicLobbyIds();
 
@@ -136,7 +139,6 @@ function LobbiesPage() {
 
     const mineTimer = window.setInterval(() => void loadMine(), 60000);
     const visibilityTimer = window.setInterval(() => void syncPublicLobbyIds(), 15000);
-
     return () => {
       clearInterval(mineTimer);
       clearInterval(visibilityTimer);
@@ -146,10 +148,8 @@ function LobbiesPage() {
 
   const publicLobbies = useMemo(() => {
     const lobbyMap = new Map<string, PublicLobby>();
-
     for (const person of presence) {
       if (!person.lobbyId || !publicLobbyIds.has(person.lobbyId)) continue;
-
       const existing = lobbyMap.get(person.lobbyId);
       if (existing) {
         existing.members++;
@@ -165,9 +165,16 @@ function LobbiesPage() {
         });
       }
     }
-
     return [...lobbyMap.values()].sort((a, b) => b.members - a.members);
   }, [presence, publicLobbyIds]);
+
+  const visiblePublic = useMemo(
+    () => publicLobbies.filter((lobby) => gameFilter === "Todos os jogos" || lobby.game === gameFilter),
+    [gameFilter, publicLobbies],
+  );
+  const privateRooms = useMemo(() => saved.filter((room) => room.visibility === "private"), [saved]);
+  const publicMine = useMemo(() => saved.filter((room) => room.visibility === "public"), [saved]);
+  const visibleCards = activeTab === "public" ? visiblePublic : privateRooms;
 
   const enter = (id: string) => {
     localStorage.setItem("grind:activeLobby", id);
@@ -176,15 +183,11 @@ function LobbiesPage() {
 
   async function createLobby() {
     setMessage("");
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
+    const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       setMessage("Faça login para criar uma sala.");
       return;
     }
-
     const id = `GL-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
     const payload = {
       owner_id: user.id,
@@ -195,18 +198,12 @@ function LobbiesPage() {
       route_code: id,
       game_label: game,
     };
-
     const { error } = await supabase.from("lobbies").insert(payload);
     if (error) {
       setMessage(`Não foi possível criar a sala: ${error.message}`);
       return;
     }
-
-    localStorage.setItem(
-      `grind:lobby-meta:${id}`,
-      JSON.stringify({ id, name: payload.name, game, maxPlayers: 10, visibility }),
-    );
-
+    localStorage.setItem(`grind:lobby-meta:${id}`, JSON.stringify({ id, name: payload.name, game, maxPlayers: 10, visibility }));
     await Promise.all([loadMine(), syncPublicLobbyIds()]);
     enter(id);
   }
@@ -217,28 +214,19 @@ function LobbiesPage() {
       setMessage("Código inválido. Use GL-XXXXXX.");
       return;
     }
-
     await supabase.rpc("cleanup_stale_lobbies");
     const { data } = await supabase
       .from("lobbies")
       .select("route_code,status,name,game_label,max_members,visibility")
       .eq("route_code", code)
       .maybeSingle();
-
     if (!data || data.status === "closed") {
       setMessage("Essa sala não existe mais ou já foi encerrada.");
       return;
     }
-
     localStorage.setItem(
       `grind:lobby-meta:${code}`,
-      JSON.stringify({
-        id: code,
-        name: data.name,
-        game: data.game_label,
-        maxPlayers: data.max_members,
-        visibility: data.visibility === "private" ? "private" : "public",
-      }),
+      JSON.stringify({ id: code, name: data.name, game: data.game_label, maxPlayers: data.max_members, visibility: data.visibility === "private" ? "private" : "public" }),
     );
     enter(code);
   }
@@ -248,212 +236,176 @@ function LobbiesPage() {
     setMessage("Convite copiado.");
   }
 
-  return (
-    <div className="min-h-screen bg-background text-foreground">
-      <div className="mx-auto flex max-w-7xl gap-6 p-4 md:p-6">
-        <aside className="hidden w-56 shrink-0 lg:block">
-          <div className="panel sticky top-6 p-4">
-            <Logo />
-            <nav className="mt-5 space-y-1">
-              {nav.map(([label, to, Icon]) => (
-                <Link
-                  key={label}
-                  to={to}
-                  className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm ${
-                    to === "/lobbies"
-                      ? "bg-primary/15 text-primary-glow"
-                      : "text-muted-foreground hover:bg-secondary"
-                  }`}
-                >
-                  <Icon className="h-4 w-4" />
-                  {label}
-                </Link>
-              ))}
-            </nav>
+  async function disconnect() {
+    try {
+      const { livekitSession } = await import("@/lib/livekit-session");
+      await livekitSession.disconnect(true);
+    } catch {
+      callSession.leave();
+    }
+  }
+
+  function renderPublicCard(lobby: PublicLobby) {
+    return (
+      <article className="gl-lobby-card" key={lobby.id}>
+        <div className="gl-lobby-card-head">
+          <div className="gl-game-icon">{lobby.game.slice(0, 2).toUpperCase()}</div>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div className="gl-row-name">{lobby.game}</div>
+            <div className="gl-row-sub" style={{ color: "#20e68a" }}>● Voz ativa</div>
           </div>
+          <div className="gl-score">{lobby.members}/{lobby.maxPlayers}</div>
+        </div>
+        <div className="gl-lobby-card-title">{lobby.name}</div>
+        <div className="gl-lobby-card-meta">
+          <span className="gl-chip"><Globe2 size={9} /> Público</span>
+          {lobby.sharing > 0 && <span className="gl-chip green">{lobby.sharing} tela(s) ao vivo</span>}
+        </div>
+        <div className="gl-lobby-card-foot">
+          <div className="gl-mini-avatars">
+            {Array.from({ length: Math.min(4, lobby.members) }).map((_, index) => <div key={index} className="gl-avatar">{index + 1}</div>)}
+          </div>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button className="gl-secondary" style={{ minHeight: 30, padding: "0 10px" }} onClick={() => void copy(lobby.id)} type="button" aria-label="Copiar convite"><Copy size={12} /></button>
+            <button className="gl-primary" style={{ minHeight: 30, padding: "0 15px" }} onClick={() => enter(lobby.id)} type="button">Entrar</button>
+          </div>
+        </div>
+      </article>
+    );
+  }
+
+  function renderPrivateCard(lobby: SavedLobby) {
+    return (
+      <article className="gl-lobby-card" key={lobby.id}>
+        <div className="gl-lobby-card-head">
+          <div className="gl-game-icon">{lobby.game.slice(0, 2).toUpperCase()}</div>
+          <div style={{ minWidth: 0, flex: 1 }}><div className="gl-row-name">{lobby.game}</div><div className="gl-row-sub">Sala vinculada à sua conta</div></div>
+          <LockKeyhole size={15} color="#ba80ff" />
+        </div>
+        <div className="gl-lobby-card-title">{lobby.name}</div>
+        <div className="gl-lobby-card-meta"><span className="gl-chip"><LockKeyhole size={9} /> Privado</span><span className="gl-chip">{lobby.id}</span></div>
+        <div className="gl-lobby-card-foot">
+          <span className="gl-row-sub">Até {lobby.maxPlayers} jogadores</span>
+          <div style={{ display: "flex", gap: 6 }}><button className="gl-secondary" style={{ minHeight: 30, padding: "0 10px" }} onClick={() => void copy(lobby.id)} type="button"><Copy size={12} /></button><button className="gl-primary" style={{ minHeight: 30, padding: "0 15px" }} onClick={() => enter(lobby.id)} type="button">Abrir</button></div>
+        </div>
+      </article>
+    );
+  }
+
+  return (
+    <div className="gl-app">
+      <div className="gl-shell">
+        <aside className="gl-sidebar">
+          <div className="gl-brand"><img src="/grindlobby-logo.png" alt="GrindLobby" className="gl-brand-mark" /><div className="gl-brand-name">GrindLobby</div><div className="gl-brand-tag">Jogue. Conecte. Evolua.</div></div>
+          <nav className="gl-nav" aria-label="Navegação principal">
+            {nav.map(([label, to, Icon]) => <Link key={label} to={to} data-active={to === "/lobbies" ? "true" : "false"}><Icon /><span>{label}</span></Link>)}
+          </nav>
+          <Link to="/pro" className="gl-premium-card"><div className="gl-premium-title"><Crown size={19} /><span>Seja Premium</span></div><div className="gl-premium-sub">1080p liberado, cosméticos e recursos exclusivos.</div></Link>
+          <div className="gl-sidebar-meta">GrindLobby v1.0.0<br />Jogue maior.</div>
         </aside>
 
-        <main className="min-w-0 flex-1 space-y-5">
-          <header>
-            <p className="label-caps">GrindLobby</p>
-            <h1 className="font-display text-3xl font-bold">Lobbies</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Lobbies públicos aparecem na descoberta. Lobbies privados entram apenas por convite ou código.
-            </p>
+        <main className="gl-content">
+          <header className="gl-topbar">
+            <div className="gl-search"><Search size={15} /><span>Filtrar lobbies e jogadores...</span></div>
+            <div className="gl-topbar-spacer" /><Bell size={16} color="#aaa3bb" />
+            <div className="gl-user"><div className="gl-user-avatar" /><span><span className="gl-user-name">{userName}</span><span className="gl-user-tier">★ GrindLobby</span></span></div>
           </header>
 
-          <section className="grid gap-4 xl:grid-cols-2">
-            <div className="panel p-5">
-              <h2 className="font-semibold">Criar lobby</h2>
-              <div className="mt-4 grid gap-3">
-                <input
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  className="rounded-lg border border-border bg-panel px-3 py-2"
-                />
-                <select
-                  value={game}
-                  onChange={(event) => setGame(event.target.value)}
-                  className="rounded-lg border border-border bg-panel px-3 py-2"
-                >
-                  <option>EA FC 27</option>
-                  <option>VALORANT</option>
-                  <option>CS2</option>
-                  <option>Outro</option>
-                </select>
+          <section className="gl-hero gl-enter" style={{ minHeight: 123, backgroundImage: `url(${portalBg})`, backgroundPosition: "center 47%" }}>
+            <div className="gl-hero-copy" style={{ top: 22 }}>
+              <h1 style={{ fontSize: 28 }}>Lobbies criam partidas.<br />Comunidades criam <em>histórias.</em></h1>
+              <p style={{ marginTop: 8 }}>Encontre seu time. Jogue junto. Evolua sempre.</p>
+            </div>
+          </section>
 
-                <div className="grid grid-cols-2 gap-2 rounded-xl border border-border bg-panel/50 p-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setVisibility("public")}
-                    aria-pressed={visibility === "public"}
-                    className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm transition ${
-                      visibility === "public"
-                        ? "bg-primary/15 text-primary-glow ring-1 ring-primary/30"
-                        : "text-muted-foreground hover:bg-secondary"
-                    }`}
-                  >
-                    <Globe2 className="h-4 w-4" />
-                    Público
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setVisibility("private")}
-                    aria-pressed={visibility === "private"}
-                    className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm transition ${
-                      visibility === "private"
-                        ? "bg-primary/15 text-primary-glow ring-1 ring-primary/30"
-                        : "text-muted-foreground hover:bg-secondary"
-                    }`}
-                  >
-                    <LockKeyhole className="h-4 w-4" />
-                    Privado
-                  </button>
+          <div className="gl-lobbies-layout gl-enter gl-enter-d1">
+            <section>
+              <div className="gl-lobby-toolbar">
+                <div className="gl-segment">
+                  <button type="button" className={activeTab === "public" ? "active" : ""} onClick={() => setActiveTab("public")}><Globe2 size={14} style={{ display: "inline", marginRight: 7 }} />Lobbies Públicos</button>
+                  <button type="button" className={activeTab === "private" ? "active" : ""} onClick={() => setActiveTab("private")}><LockKeyhole size={14} style={{ display: "inline", marginRight: 7 }} />Privados</button>
                 </div>
-
-                <p className="text-xs text-muted-foreground">
-                  {visibility === "public"
-                    ? "Público: aparece para todos na lista de lobbies ativos."
-                    : "Privado: não aparece na descoberta; acesso somente por código ou link de convite."}
-                </p>
-
-                <button
-                  onClick={() => void createLobby()}
-                  className="btn-primary flex items-center justify-center gap-2 rounded-lg px-4 py-2.5"
-                >
-                  <Plus className="h-4 w-4" />
-                  Criar e entrar
-                </button>
+                <div style={{ flex: 1 }} />
+                <button type="button" className="gl-primary" style={{ minHeight: 39, minWidth: 160 }} onClick={() => setShowCreate((value) => !value)}><Plus size={15} /> Criar Lobby</button>
               </div>
-            </div>
 
-            <div className="panel p-5">
-              <h2 className="font-semibold">Entrar com código</h2>
-              <div className="mt-4 flex gap-2">
-                <input
-                  value={joinCode}
-                  onChange={(event) => setJoinCode(event.target.value)}
-                  onKeyDown={(event) => event.key === "Enter" && void join()}
-                  className="min-w-0 flex-1 rounded-lg border border-border bg-panel px-3 py-2 uppercase"
-                  placeholder="GL-XXXXXX"
-                />
-                <button onClick={() => void join()} className="btn-ghost flex items-center gap-2 rounded-lg px-4">
-                  <DoorOpen className="h-4 w-4" />
-                  Entrar
-                </button>
+              <div className="gl-filter-row">
+                <select className="gl-filter" value={gameFilter} onChange={(event) => setGameFilter(event.target.value)}>
+                  <option>Todos os jogos</option><option>EA FC 27</option><option>VALORANT</option><option>CS2</option><option>Outro</option>
+                </select>
+                <button type="button" className="gl-filter" onClick={() => { void loadMine(); void syncPublicLobbyIds(); }}>Mais ativos / Atualizar</button>
+                <div className="gl-filter" style={{ display: "flex", alignItems: "center", gap: 7 }}><Mic size={12} /> Com voz</div>
               </div>
-              {message && <p className="mt-3 text-xs text-muted-foreground">{message}</p>}
-            </div>
-          </section>
 
-          <section className="panel p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="font-semibold">Lobbies públicos</h2>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Presença em tempo real — somente salas públicas e ativas aparecem aqui.
-                </p>
-              </div>
-              <span className="text-xs text-emerald-400">{publicLobbies.length} ativos</span>
-            </div>
-
-            {publicLobbies.length === 0 ? (
-              <p className="mt-5 text-sm text-muted-foreground">Nenhuma sala pública com jogadores online agora.</p>
-            ) : (
-              <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                {publicLobbies.map((lobby) => (
-                  <div key={lobby.id} className="rounded-xl border border-border bg-panel/60 p-4">
-                    <div className="flex justify-between gap-3">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="font-semibold">{lobby.name}</p>
-                          <Globe2 className="h-3.5 w-3.5 text-emerald-400" aria-label="Lobby público" />
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          {lobby.game} · {lobby.id}
-                        </p>
-                      </div>
-                      <span className="text-xs text-emerald-400">
-                        {lobby.members}/{lobby.maxPlayers}
-                      </span>
-                    </div>
-                    {lobby.sharing > 0 && (
-                      <p className="mt-2 text-xs text-purple-300">{lobby.sharing} tela(s) aberta(s)</p>
-                    )}
-                    <div className="mt-4 flex gap-2">
-                      <button
-                        onClick={() => enter(lobby.id)}
-                        className="btn-primary flex-1 rounded-lg px-3 py-2 text-sm"
-                      >
-                        Entrar
-                      </button>
-                      <button onClick={() => void copy(lobby.id)} className="btn-ghost rounded-lg px-3">
-                        <Copy className="h-4 w-4" />
-                      </button>
-                    </div>
+              {showCreate && (
+                <section className="gl-panel" style={{ padding: 13, marginBottom: 10 }}>
+                  <div className="gl-section-head" style={{ margin: "-13px -13px 12px" }}><h2 className="gl-panel-title">Criar novo lobby</h2><span className="gl-panel-link">Configuração real da sala</span></div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1.2fr .9fr .9fr auto", gap: 8 }}>
+                    <input className="gl-filter" style={{ width: "100%", minWidth: 0 }} value={name} onChange={(event) => setName(event.target.value)} aria-label="Nome do lobby" />
+                    <select className="gl-filter" style={{ width: "100%", minWidth: 0 }} value={game} onChange={(event) => setGame(event.target.value)}><option>EA FC 27</option><option>VALORANT</option><option>CS2</option><option>Outro</option></select>
+                    <select className="gl-filter" style={{ width: "100%", minWidth: 0 }} value={visibility} onChange={(event) => setVisibility(event.target.value as LobbyVisibility)}><option value="public">Público</option><option value="private">Privado</option></select>
+                    <button className="gl-primary" type="button" onClick={() => void createLobby()}>Criar e entrar</button>
                   </div>
-                ))}
-              </div>
-            )}
-          </section>
+                </section>
+              )}
 
-          <section className="panel p-5">
-            <h2 className="font-semibold">Suas salas abertas</h2>
-            {saved.length === 0 ? (
-              <p className="mt-4 text-sm text-muted-foreground">Nenhuma sala aberta vinculada à sua conta.</p>
-            ) : (
-              <div className="mt-4 space-y-2">
-                {saved.map((lobby) => (
-                  <div
-                    key={lobby.id}
-                    className="flex items-center gap-3 rounded-xl border border-border bg-panel/60 p-4"
-                  >
-                    <button onClick={() => enter(lobby.id)} className="min-w-0 flex-1 text-left">
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold">{lobby.name}</p>
-                        <span className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground">
-                          {lobby.visibility === "private" ? (
-                            <LockKeyhole className="h-3 w-3" />
-                          ) : (
-                            <Globe2 className="h-3 w-3" />
-                          )}
-                          {lobby.visibility === "private" ? "Privado" : "Público"}
-                        </span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {lobby.id} · {lobby.game}
-                      </p>
-                    </button>
-                    <button onClick={() => void copy(lobby.id)} className="btn-ghost rounded-lg p-2">
-                      <Copy className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
+              {visibleCards.length ? (
+                <div className="gl-lobby-cards">
+                  {activeTab === "public"
+                    ? (visibleCards as PublicLobby[]).map(renderPublicCard)
+                    : (visibleCards as SavedLobby[]).map(renderPrivateCard)}
+                </div>
+              ) : (
+                <div className="gl-panel" style={{ minHeight: 268, display: "grid", placeItems: "center", textAlign: "center", padding: 30 }}>
+                  <div><div style={{ width: 56, height: 56, borderRadius: 14, margin: "0 auto 13px", display: "grid", placeItems: "center", border: "1px solid rgba(148,92,255,.28)", background: "rgba(91,35,164,.16)", boxShadow: "0 0 34px rgba(113,35,230,.12)" }}>{activeTab === "public" ? <Globe2 size={24} color="#b674ff" /> : <LockKeyhole size={24} color="#b674ff" />}</div><div style={{ fontSize: 13, fontWeight: 800 }}>{activeTab === "public" ? "Nenhum lobby público ativo agora" : "Você ainda não tem lobby privado aberto"}</div><div style={{ marginTop: 6, fontSize: 10, color: "#827b91" }}>A lista usa presença e estado reais; nenhum lobby é inventado para preencher a interface.</div></div>
+                </div>
+              )}
+
+              {publicMine.length > 0 && activeTab === "public" && (
+                <section className="gl-panel" style={{ marginTop: 10 }}>
+                  <div className="gl-section-head"><h2 className="gl-panel-title">Suas salas públicas</h2><span className="gl-panel-link">{publicMine.length} abertas</span></div>
+                  {publicMine.map((room) => <div key={room.id} className="gl-lobby-row"><div className="gl-game-icon">{room.game.slice(0,2).toUpperCase()}</div><div className="gl-row-main"><div className="gl-row-name">{room.name}</div><div className="gl-row-sub">{room.id} · {room.game}</div></div><button type="button" className="gl-secondary" style={{ minHeight: 28, padding: "0 10px" }} onClick={() => void copy(room.id)}><Copy size={11} /></button><button type="button" className="gl-primary" style={{ minHeight: 28, padding: "0 12px", marginLeft: 6 }} onClick={() => enter(room.id)}>Abrir</button></div>)}
+                </section>
+              )}
+            </section>
+
+            <aside className="gl-stack">
+              <section className="gl-panel gl-community-feature">
+                <div className="gl-section-head" style={{ margin: "-12px -12px 10px" }}><h2 className="gl-panel-title">Acesso rápido</h2><span className="gl-panel-link">convites</span></div>
+                <div className="gl-community-feature-art" />
+                <div style={{ marginTop: 10, fontSize: 12, fontWeight: 800 }}>Entrar com código</div>
+                <div style={{ marginTop: 5, fontSize: 9, color: "#817a90" }}>Use o convite GL-XXXXXX de uma sala existente.</div>
+                <div style={{ display: "flex", gap: 6, marginTop: 10 }}><input className="gl-filter" style={{ minWidth: 0, flex: 1, textTransform: "uppercase" }} value={joinCode} onChange={(event) => setJoinCode(event.target.value)} onKeyDown={(event) => event.key === "Enter" && void join()} placeholder="GL-XXXXXX" /><button type="button" className="gl-primary" style={{ minHeight: 33, padding: "0 12px" }} onClick={() => void join()}><DoorOpen size={12} /> Entrar</button></div>
+                {message && <div style={{ marginTop: 8, fontSize: 9, color: "#a69db4" }}>{message}</div>}
+              </section>
+
+              <section className="gl-panel">
+                <div className="gl-section-head"><h2 className="gl-panel-title">Suas Salas</h2><span className="gl-panel-link">{saved.length}</span></div>
+                <div className="gl-community-list">
+                  {saved.length ? saved.slice(0, 5).map((room) => (
+                    <div className="gl-community-row" key={room.id} style={{ paddingLeft: 11, paddingRight: 11 }}>
+                      <div className="gl-game-icon">{room.game.slice(0,2).toUpperCase()}</div>
+                      <div className="gl-row-main"><div className="gl-row-name">{room.name}</div><div className="gl-row-sub">{room.visibility === "private" ? "Privado" : "Público"} · {room.id}</div></div>
+                      <button type="button" className="gl-primary" style={{ minHeight: 28, padding: "0 11px" }} onClick={() => enter(room.id)}>Abrir</button>
+                    </div>
+                  )) : <div style={{ padding: "18px 12px", fontSize: 9, color: "#817a90" }}>Nenhuma sala aberta vinculada à sua conta.</div>}
+                </div>
+              </section>
+
+              <section className="gl-panel" style={{ padding: 13 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}><Users size={15} color="#b76eff" /><div><div className="gl-row-name">Descoberta em tempo real</div><div className="gl-row-sub">{publicLobbies.length} lobby(s) público(s) com presença ativa</div></div></div>
+              </section>
+            </aside>
+          </div>
         </main>
       </div>
+
+      <footer className="gl-bottom-dock">
+        <div className="gl-dock-call"><span style={{ width: 10, height: 10, borderRadius: 99, border: `2px solid ${call.lobbyId ? "#20e68a" : "#6b6477"}`, boxShadow: call.lobbyId ? "0 0 12px rgba(32,230,138,.68)" : "none" }} /><div><div style={{ fontSize: 8, fontWeight: 700, color: call.lobbyId ? "#20e68a" : "#827b91" }}>{call.lobbyId ? "Chamada de Voz Ativa" : "Sem call ativa"}</div><div style={{ marginTop: 2, fontSize: 10, color: "#d4cfdb" }}>{call.lobbyId || "Encontre um lobby"}</div></div></div>
+        <div className="gl-dock-members"><div style={{ fontSize: 9, color: "#80798d" }}>{publicLobbies.length} lobbies públicos ativos</div></div>
+        <div className="gl-dock-controls"><button type="button" className="gl-round-btn" disabled={!call.lobbyId} onClick={() => void callSession.setMuted(!call.muted)}>{call.muted ? <MicOff size={15} /> : <Mic size={15} />}</button>{call.lobbyId ? <Link to="/sala/$lobbyId" params={{ lobbyId: call.lobbyId }} className="gl-round-btn"><Headphones size={15} /></Link> : <button className="gl-round-btn" type="button" onClick={() => setShowCreate(true)}><Plus size={15} /></button>}<Link to="/configuracoes" className="gl-round-btn"><Settings size={15} /></Link><button type="button" className="gl-round-btn danger" disabled={!call.lobbyId} onClick={() => void disconnect()}><LogOut size={15} /></button></div>
+        <div className="gl-dock-audio"><Gamepad2 size={18} color="#9e53ff" /><div><div style={{ fontSize: 7, color: "#70697d" }}>GrindLobby</div><div style={{ fontSize: 9, fontWeight: 700 }}>Lobby Browser</div></div></div>
+      </footer>
     </div>
   );
 }
