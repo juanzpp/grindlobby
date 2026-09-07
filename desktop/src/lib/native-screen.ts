@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import { EDGE_FUNCTION_BASE, SUPABASE_PUBLISHABLE_KEY, supabase } from './supabase'
+import { MEDIA_GATEWAY, supabase } from './supabase'
 import type { StreamPreset } from './voice'
 
 export type CaptureSourceKind = 'screen' | 'window'
@@ -19,11 +19,10 @@ async function getNativeScreenToken(lobbyId: string) {
   const accessToken = data.session?.access_token
   if (!accessToken) throw new Error('Sessão expirada. Entre novamente.')
 
-  const response = await fetch(`${EDGE_FUNCTION_BASE}/grind-gateway/api/livekit-token`, {
+  const response = await fetch(`${MEDIA_GATEWAY}/api/livekit-token`, {
     method: 'POST',
     headers: {
       authorization: `Bearer ${accessToken}`,
-      apikey: SUPABASE_PUBLISHABLE_KEY,
       'content-type': 'application/json',
     },
     body: JSON.stringify({ lobbyId, publisher: 'screen-native' }),
