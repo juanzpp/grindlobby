@@ -8,10 +8,11 @@ from pathlib import Path
 BASE = Path(__file__).resolve().parent
 OLD_SHA256 = "3fe6540f3e4ee3b5cc75a6c68d9fa1c046887635d02b0dca0736da7e5362915b"
 OLD_PAYLOAD_LEN = 87792
+PATCH_PAYLOAD_LEN = 14152
 PATCH_SHA256 = "0b348b5b52820637a7931deb2aea6dcdf02c01fea3bb26b3ec030dcc01005a03"
 FINAL_SHA256 = "93b9540fa35de9ce3a2fd9e318abd3342de2d4e0f28525b1a65aed0b83604988"
 PART_NAMES = [f"frontend_payload.part.{i:02d}" for i in range(5)]
-PATCH_NAME = "draft_v13.patch.b64"
+PATCH_PART_NAMES = [f"draft_v13.patch.part.{i:02d}" for i in range(5)]
 SPLIT = "\n__FIQ_V13_SPLIT_9C7B3A__\n"
 
 parts = [BASE / name for name in PART_NAMES]
@@ -28,10 +29,13 @@ old_digest = hashlib.sha256(old_html).hexdigest()
 if old_digest != OLD_SHA256:
     raise SystemExit(f"Base frontend integrity check failed: {old_digest} != {OLD_SHA256}")
 
-patch_path = BASE / PATCH_NAME
-if not patch_path.exists():
-    raise SystemExit(f"Missing frontend patch: {PATCH_NAME}")
-patch_payload = patch_path.read_text(encoding="utf-8").strip()
+patch_parts = [BASE / name for name in PATCH_PART_NAMES]
+missing_patch = [p.name for p in patch_parts if not p.exists()]
+if missing_patch:
+    raise SystemExit(f"Missing frontend patch parts: {missing_patch}")
+patch_payload = "".join(p.read_text(encoding="utf-8").strip() for p in patch_parts)
+if len(patch_payload) != PATCH_PAYLOAD_LEN:
+    raise SystemExit(f"Frontend patch payload length mismatch: {len(patch_payload)} != {PATCH_PAYLOAD_LEN}")
 patch_raw = lzma.decompress(base64.b64decode(patch_payload, validate=True))
 patch_digest = hashlib.sha256(patch_raw).hexdigest()
 if patch_digest != PATCH_SHA256:
