@@ -1,61 +1,43 @@
 from __future__ import annotations
-
-import base64
-import hashlib
-import lzma
+import base64, hashlib, lzma
 from pathlib import Path
-
-BASE = Path(__file__).resolve().parent
-OLD_SHA256 = "3fe6540f3e4ee3b5cc75a6c68d9fa1c046887635d02b0dca0736da7e5362915b"
-OLD_PAYLOAD_LEN = 87792
-PATCH_PAYLOAD_LEN = 14152
-PATCH_SHA256 = "0b348b5b52820637a7931deb2aea6dcdf02c01fea3bb26b3ec030dcc01005a03"
-FINAL_SHA256 = "93b9540fa35de9ce3a2fd9e318abd3342de2d4e0f28525b1a65aed0b83604988"
-PART_NAMES = [f"frontend_payload.part.{i:02d}" for i in range(5)]
-PATCH_PART_NAMES = [f"draft_v13.patch.part.{i:02d}" for i in range(5)]
-SPLIT = "\n__FIQ_V13_SPLIT_9C7B3A__\n"
-
-parts = [BASE / name for name in PART_NAMES]
-missing = [p.name for p in parts if not p.exists()]
-if missing:
-    raise SystemExit(f"Missing frontend payload parts: {missing}")
-
-payload = "".join(p.read_text(encoding="utf-8").strip() for p in parts)
-if len(payload) != OLD_PAYLOAD_LEN:
-    raise SystemExit(f"Frontend payload length mismatch: {len(payload)} != {OLD_PAYLOAD_LEN}")
-
-old_html = lzma.decompress(base64.b64decode(payload, validate=True))
-old_digest = hashlib.sha256(old_html).hexdigest()
-if old_digest != OLD_SHA256:
-    raise SystemExit(f"Base frontend integrity check failed: {old_digest} != {OLD_SHA256}")
-
-patch_parts = [BASE / name for name in PATCH_PART_NAMES]
-missing_patch = [p.name for p in patch_parts if not p.exists()]
-if missing_patch:
-    raise SystemExit(f"Missing frontend patch parts: {missing_patch}")
-patch_payload = "".join(p.read_text(encoding="utf-8").strip() for p in patch_parts)
-if len(patch_payload) != PATCH_PAYLOAD_LEN:
-    raise SystemExit(f"Frontend patch payload length mismatch: {len(patch_payload)} != {PATCH_PAYLOAD_LEN}")
-patch_raw = lzma.decompress(base64.b64decode(patch_payload, validate=True))
-patch_digest = hashlib.sha256(patch_raw).hexdigest()
-if patch_digest != PATCH_SHA256:
-    raise SystemExit(f"Frontend patch integrity check failed: {patch_digest} != {PATCH_SHA256}")
-
-patch_text = patch_raw.decode("utf-8")
-if SPLIT not in patch_text:
-    raise SystemExit("Frontend patch separator missing")
-css_patch, js_patch = patch_text.split(SPLIT, 1)
-
-html = old_html.decode("utf-8")
-if "</style>" not in html or "</script>" not in html:
-    raise SystemExit("Frontend insertion anchors missing")
-html = html.replace("</style>", "\n\n" + css_patch + "\n\n</style>", 1)
-script_pos = html.rfind("</script>")
-html = html[:script_pos] + "\n\n" + js_patch + "\n\n" + html[script_pos:]
-final_html = html.encode("utf-8")
-final_digest = hashlib.sha256(final_html).hexdigest()
-if final_digest != FINAL_SHA256:
-    raise SystemExit(f"Final frontend integrity check failed: {final_digest} != {FINAL_SHA256}")
-
-(BASE / "index.html").write_bytes(final_html)
-print(f"Football IQ v13 frontend reconstructed: {len(final_html)} bytes, sha256={final_digest}")
+BASE=Path(__file__).resolve().parent
+BASE_SHA256='3fe6540f3e4ee3b5cc75a6c68d9fa1c046887635d02b0dca0736da7e5362915b'
+BASE_PAYLOAD_LEN=87792
+PATCH_PAYLOAD_LEN=15868
+PATCH_SHA256='39328f4ede8dff1b82d00c4fa7405c4e84b5fdf10f5ab7745f29770c6af45c24'
+FINAL_SHA256='7714bf1234437044cd0079d127298dc77c99a6320be14a270747b73e20b391da'
+BASE_PARTS=[f'frontend_payload.part.{i:02d}' for i in range(5)]
+PATCH_PARTS=['v14.patch.part.00', 'v14.patch.part.01', 'v14.patch.part.02', 'v14.patch.part.03', 'v14.patch.part.04', 'v14.patch.part.05']
+SPLIT='\n__FIQ_V14_SPLIT_A91C5D__\n'
+LEGACY='\n\n\n  // ---------- BR DRAFT 2026 ----------'
+parts=[BASE/n for n in BASE_PARTS]
+missing=[p.name for p in parts if not p.exists()]
+if missing: raise SystemExit(f'Missing base frontend parts: {missing}')
+payload=''.join(p.read_text().strip() for p in parts)
+if len(payload)!=BASE_PAYLOAD_LEN: raise SystemExit(f'Base payload length mismatch: {len(payload)} != {BASE_PAYLOAD_LEN}')
+base_html=lzma.decompress(base64.b64decode(payload,validate=True))
+base_sha=hashlib.sha256(base_html).hexdigest()
+if base_sha!=BASE_SHA256: raise SystemExit(f'Base integrity failed: {base_sha} != {BASE_SHA256}')
+pparts=[BASE/n for n in PATCH_PARTS]
+missing=[p.name for p in pparts if not p.exists()]
+if missing: raise SystemExit(f'Missing V14 patch parts: {missing}')
+pp=''.join(p.read_text().strip() for p in pparts)
+if len(pp)!=PATCH_PAYLOAD_LEN: raise SystemExit(f'Patch payload length mismatch: {len(pp)} != {PATCH_PAYLOAD_LEN}')
+raw=lzma.decompress(base64.b64decode(pp,validate=True))
+psha=hashlib.sha256(raw).hexdigest()
+if psha!=PATCH_SHA256: raise SystemExit(f'Patch integrity failed: {psha} != {PATCH_SHA256}')
+patch=raw.decode('utf-8')
+if SPLIT not in patch: raise SystemExit('Patch separator missing')
+css,js=patch.split(SPLIT,1)
+html=base_html.decode('utf-8')
+iife=html.rfind('})();'); script_end=html.rfind('</script>'); legacy=html.find(LEGACY,iife)
+if iife<0 or script_end<0 or legacy<0 or legacy>script_end: raise SystemExit('V14 insertion/legacy anchors missing')
+html=html[:legacy]+'\n\n'+html[script_end:]
+html=html.replace('</style>','\n\n'+css+'\n\n</style>',1)
+iife=html.rfind('})();')
+html=html[:iife]+'\n\n'+js+'\n\n'+html[iife:]
+out=html.encode('utf-8'); digest=hashlib.sha256(out).hexdigest()
+if digest!=FINAL_SHA256: raise SystemExit(f'Final integrity failed: {digest} != {FINAL_SHA256}')
+(BASE/'index.html').write_bytes(out)
+print(f'Football IQ v14.1 P0 reconstructed: {len(out)} bytes, sha256={digest}')
