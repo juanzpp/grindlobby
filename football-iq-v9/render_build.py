@@ -93,8 +93,8 @@ html = html[:script_end] + '\n\n  ' + v15_js + '\n\n' + html[script_end:]
 required = [
     'fiq-v15-daily-draft-style',
     'v15HardDailyBank',
-    'dailyModeTimed',
-    'dailyModeUntimed',
+    'v15DailyMode',
+    'dailyModeSwitch',
     'legendPackPending',
 ]
 for marker in required:
