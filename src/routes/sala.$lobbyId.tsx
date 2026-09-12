@@ -108,8 +108,8 @@ function RoomPage() {
   const [live, setLive] = useState<LiveKitSessionSnapshot>(() => livekitSession.snapshot);
 
   const mic = useRef<MediaStream | null>(null);
-  const presenceRoom = useRef<any>(null);
-  const directory = useRef<any>(null);
+  const presenceRoom = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const directory = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const meter = useRef<number | null>(null);
   const meterContext = useRef<AudioContext | null>(null);
   const meRef = useRef<Person | null>(null);
@@ -259,6 +259,32 @@ function RoomPage() {
       } = await supabase.auth.getUser();
       if (dead || !user) {
         if (!user) navigate({ to: "/" });
+        return;
+      }
+      const { data: lobby, error: lobbyError } = await supabase
+        .from("lobbies")
+        .select("id,owner_id,status")
+        .eq("route_code", lobbyId)
+        .maybeSingle();
+      if (lobbyError || !lobby || lobby.status === "closed") {
+        setMicState("sala indisponível");
+        setStatus("Essa sala não existe mais ou já foi encerrada.");
+        return;
+      }
+      const now = new Date().toISOString();
+      const { error: memberError } = await supabase.from("lobby_members").upsert(
+        {
+          lobby_id: lobby.id,
+          user_id: user.id,
+          role: lobby.owner_id === user.id ? "owner" : "member",
+          joined_at: now,
+          last_seen_at: now,
+        },
+        { onConflict: "lobby_id,user_id" },
+      );
+      if (memberError) {
+        setMicState("sala indisponível");
+        setStatus("Não foi possível registrar sua entrada na sala.");
         return;
       }
       const self: Person = {

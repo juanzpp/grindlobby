@@ -146,7 +146,7 @@ function ActiveCallPresence() {
       userId = user.id;
       const { data: lobby } = await supabase
         .from("lobbies")
-        .select("id,status")
+        .select("id,status,owner_id")
         .eq("route_code", snap.lobbyId)
         .maybeSingle();
       if (!lobby) return;
@@ -157,7 +157,7 @@ function ActiveCallPresence() {
           {
             lobby_id: lobby.id,
             user_id: user.id,
-            role: "member",
+            role: lobby.owner_id === user.id ? "owner" : "member",
             joined_at: new Date().toISOString(),
             last_seen_at: new Date().toISOString(),
           },
@@ -212,7 +212,7 @@ function ActiveCallPresence() {
           await room.track({ userId: user.id, name, avatar: user.user_metadata?.avatar_url || null, speaking: false, sharing: false });
         }
       });
-      directory = supabase.channel(`grind:lobby-directory:persist:${user.id}`, { config: { presence: { key: user.id } } });
+      directory = supabase.channel("grind:lobby-directory", { config: { presence: { key: user.id } } });
       directory.subscribe(async (status: string) => {
         if (status === "SUBSCRIBED" && directory) {
           await directory.track({

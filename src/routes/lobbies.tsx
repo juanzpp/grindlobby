@@ -45,6 +45,7 @@ type PublicLobby = {
   members: number;
   sharing: number;
 };
+type PublicLobbyRow = Omit<PublicLobby, "members" | "sharing">;
 type SavedLobby = {
   id: string;
   name: string;
@@ -74,7 +75,7 @@ function LobbiesPage() {
   const [message, setMessage] = useState("");
   const [presence, setPresence] = useState<Presence[]>([]);
   const [saved, setSaved] = useState<SavedLobby[]>([]);
-  const [publicLobbyIds, setPublicLobbyIds] = useState<Set<string>>(new Set());
+  const [publicLobbyRows, setPublicLobbyRows] = useState<PublicLobbyRow[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [userName, setUserName] = useState("Jogador");
   const call = useSyncExternalStore(callSession.subscribe, () => callSession.snapshot, () => callSession.snapshot);
@@ -94,8 +95,8 @@ function LobbiesPage() {
       .eq("owner_id", user.id);
     setSaved(
       (data || [])
-        .filter((row: any) => row.route_code)
-        .map((row: any) => ({
+        .filter((row) => row.route_code)
+        .map((row) => ({
           id: row.route_code,
           name: row.name || `Lobby ${row.route_code}`,
           game: row.game_label || "Outro",
@@ -106,24 +107,33 @@ function LobbiesPage() {
     );
   }
 
-  async function syncPublicLobbyIds() {
+  async function syncPublicLobbies() {
     const { data, error } = await supabase
       .from("lobbies")
-      .select("route_code")
+      .select("route_code,name,game_label,max_members")
       .eq("visibility", "public")
       .neq("status", "closed");
     if (error) {
-      setPublicLobbyIds(new Set());
+      setPublicLobbyRows([]);
       return;
     }
-    setPublicLobbyIds(new Set((data || []).map((row: any) => row.route_code).filter(Boolean)));
+    setPublicLobbyRows(
+      (data || [])
+        .filter((row) => row.route_code)
+        .map((row) => ({
+          id: row.route_code,
+          name: row.name || `Lobby ${row.route_code}`,
+          game: row.game_label || "Outro",
+          maxPlayers: row.max_members || 10,
+        })),
+    );
   }
 
   useEffect(() => {
     const queryCode = new URLSearchParams(location.search).get("join");
     if (queryCode) setJoinCode(queryCode.toUpperCase());
     void loadMine();
-    void syncPublicLobbyIds();
+    void syncPublicLobbies();
 
     const channel = supabase.channel("grind:lobby-directory");
     channel
@@ -133,12 +143,17 @@ function LobbiesPage() {
             .flat()
             .map((value) => value as unknown as Presence),
         );
-        void syncPublicLobbyIds();
+        void syncPublicLobbies();
       })
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "lobbies" },
+        () => void syncPublicLobbies(),
+      )
       .subscribe();
 
     const mineTimer = window.setInterval(() => void loadMine(), 60000);
-    const visibilityTimer = window.setInterval(() => void syncPublicLobbyIds(), 15000);
+    const visibilityTimer = window.setInterval(() => void syncPublicLobbies(), 15000);
     return () => {
       clearInterval(mineTimer);
       clearInterval(visibilityTimer);
@@ -147,26 +162,22 @@ function LobbiesPage() {
   }, []);
 
   const publicLobbies = useMemo(() => {
-    const lobbyMap = new Map<string, PublicLobby>();
+    const lobbyMap = new Map<string, PublicLobby>(
+      publicLobbyRows.map((lobby) => [lobby.id, { ...lobby, members: 0, sharing: 0 }]),
+    );
+    const seenMembers = new Set<string>();
     for (const person of presence) {
-      if (!person.lobbyId || !publicLobbyIds.has(person.lobbyId)) continue;
+      if (!person.lobbyId) continue;
       const existing = lobbyMap.get(person.lobbyId);
-      if (existing) {
-        existing.members++;
-        if (person.sharing) existing.sharing++;
-      } else {
-        lobbyMap.set(person.lobbyId, {
-          id: person.lobbyId,
-          name: person.name || `Lobby ${person.lobbyId}`,
-          game: person.game || "Outro",
-          maxPlayers: person.maxPlayers || 10,
-          members: 1,
-          sharing: person.sharing ? 1 : 0,
-        });
-      }
+      if (!existing) continue;
+      const memberKey = `${person.lobbyId}:${person.userId}`;
+      if (seenMembers.has(memberKey)) continue;
+      seenMembers.add(memberKey);
+      existing.members++;
+      if (person.sharing) existing.sharing++;
     }
     return [...lobbyMap.values()].sort((a, b) => b.members - a.members);
-  }, [presence, publicLobbyIds]);
+  }, [presence, publicLobbyRows]);
 
   const visiblePublic = useMemo(
     () => publicLobbies.filter((lobby) => gameFilter === "Todos os jogos" || lobby.game === gameFilter),
@@ -198,13 +209,32 @@ function LobbiesPage() {
       route_code: id,
       game_label: game,
     };
-    const { error } = await supabase.from("lobbies").insert(payload);
-    if (error) {
-      setMessage(`Não foi possível criar a sala: ${error.message}`);
+    const { data: createdLobby, error: lobbyError } = await supabase
+      .from("lobbies")
+      .insert(payload)
+      .select("id")
+      .single();
+    if (lobbyError || !createdLobby) {
+      setMessage(`Não foi possível criar a sala: ${lobbyError?.message || "resposta inválida do servidor"}`);
+      return;
+    }
+    const now = new Date().toISOString();
+    const { error: memberError } = await supabase.from("lobby_members").upsert(
+      {
+        lobby_id: createdLobby.id,
+        user_id: user.id,
+        role: "owner",
+        joined_at: now,
+        last_seen_at: now,
+      },
+      { onConflict: "lobby_id,user_id" },
+    );
+    if (memberError) {
+      setMessage(`A sala foi criada, mas não foi possível ativá-la: ${memberError.message}`);
       return;
     }
     localStorage.setItem(`grind:lobby-meta:${id}`, JSON.stringify({ id, name: payload.name, game, maxPlayers: 10, visibility }));
-    await Promise.all([loadMine(), syncPublicLobbyIds()]);
+    await Promise.all([loadMine(), syncPublicLobbies()]);
     enter(id);
   }
 
@@ -217,11 +247,31 @@ function LobbiesPage() {
     await supabase.rpc("cleanup_stale_lobbies");
     const { data } = await supabase
       .from("lobbies")
-      .select("route_code,status,name,game_label,max_members,visibility")
+      .select("id,owner_id,route_code,status,name,game_label,max_members,visibility")
       .eq("route_code", code)
       .maybeSingle();
     if (!data || data.status === "closed") {
       setMessage("Essa sala não existe mais ou já foi encerrada.");
+      return;
+    }
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setMessage("Faça login novamente para entrar na sala.");
+      return;
+    }
+    const now = new Date().toISOString();
+    const { error: memberError } = await supabase.from("lobby_members").upsert(
+      {
+        lobby_id: data.id,
+        user_id: user.id,
+        role: data.owner_id === user.id ? "owner" : "member",
+        joined_at: now,
+        last_seen_at: now,
+      },
+      { onConflict: "lobby_id,user_id" },
+    );
+    if (memberError) {
+      setMessage(`Não foi possível entrar na sala: ${memberError.message}`);
       return;
     }
     localStorage.setItem(
@@ -333,7 +383,7 @@ function LobbiesPage() {
                 <select className="gl-filter" value={gameFilter} onChange={(event) => setGameFilter(event.target.value)}>
                   <option>Todos os jogos</option><option>EA FC 27</option><option>VALORANT</option><option>CS2</option><option>Outro</option>
                 </select>
-                <button type="button" className="gl-filter" onClick={() => { void loadMine(); void syncPublicLobbyIds(); }}>Mais ativos / Atualizar</button>
+                <button type="button" className="gl-filter" onClick={() => { void loadMine(); void syncPublicLobbies(); }}>Mais ativos / Atualizar</button>
                 <div className="gl-filter" style={{ display: "flex", alignItems: "center", gap: 7 }}><Mic size={12} /> Com voz</div>
               </div>
 
